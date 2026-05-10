@@ -1,0 +1,22 @@
+{
+  "name": "storify",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:api": "pnpm --filter @storify/api dev",
+    "dev:web": "pnpm --filter @storify/web dev",
+    "build": "pnpm -r build",
+    "type-check": "pnpm -r type-check",
+    "lint": "pnpm -r lint",
+    "db:generate": "pnpm --filter @storify/database db:generate",
+    "db:migrate": "pnpm --filter @storify/database db:migrate",
+    "db:seed": "pnpm --filter @storify/database db:seed",
+    "db:studio": "pnpm --filter @storify/database db:studio",
+    "db:reset": "pnpm --filter @storify/database db:reset",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@prisma/client", "@prisma/engines", "esbuild", "msgpackr-extract", "prisma"]
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "name": "@storify/web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo 'Web app not yet scaffolded'",
+    "build": "echo 'Web app not yet scaffolded'",
+    "type-check": "echo 'Web app not yet scaffolded'"
+  }
+}

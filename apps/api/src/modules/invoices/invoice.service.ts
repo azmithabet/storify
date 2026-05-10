@@ -315,6 +315,18 @@ export async function createInvoice(
       })
     }
 
+    // External financing record (stock IS updated immediately — handled above)
+    if (input.externalFinancing) {
+      await tx.externalFinancing.create({
+        data: {
+          invoiceId: invoice.id,
+          companyName: input.externalFinancing.companyName,
+          referenceNo: input.externalFinancing.referenceNo ?? null,
+          commissionPct: input.externalFinancing.commissionPct,
+        },
+      })
+    }
+
     // Mandatory audit log inside transaction
     await tx.auditLog.create({
       data: {

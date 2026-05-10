@@ -10,6 +10,9 @@ import { tenantRoutes } from './modules/tenants/tenant.routes'
 import { authRoutes } from './modules/auth/auth.routes'
 import { productRoutes } from './modules/products/product.routes'
 import { stockRoutes } from './modules/stock/stock.routes'
+import { paymentMethodRoutes } from './modules/payment-methods/pm.routes'
+import { customerRoutes } from './modules/customers/customer.routes'
+import { invoiceRoutes } from './modules/invoices/invoice.routes'
 
 const app = Fastify({
   logger: {
@@ -50,6 +53,9 @@ app.register(async function tenantScoped(sub) {
   sub.register(authRoutes, { prefix: '/api/auth' })
   sub.register(productRoutes, { prefix: '/api/products' })
   sub.register(stockRoutes, { prefix: '/api/stock' })
+  sub.register(paymentMethodRoutes, { prefix: '/api/payment-methods' })
+  sub.register(customerRoutes, { prefix: '/api/customers' })
+  sub.register(invoiceRoutes, { prefix: '/api/invoices' })
 })
 
 const start = async () => {

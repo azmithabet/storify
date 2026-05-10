@@ -27,7 +27,8 @@
     "nanoid": "^5.0.6",
     "bcryptjs": "^2.4.3",
     "decimal.js": "^10.4.3",
-    "lru-cache": "^10.2.0"
+    "lru-cache": "^10.2.0",
+    "@storify/database": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.4.2",

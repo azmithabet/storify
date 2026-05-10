@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/generated/client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_MASTER_URL")
+}
+
+// ─── Master DB Models ────────────────────────────────────────────────────────
+
+model Plan {
+  id           String   @id @default(cuid())
+  name         String   @unique @db.VarChar(100)
+  slug         String   @unique @db.VarChar(50)
+  description  String?  @db.Text
+  maxProducts  Int      @default(100)  @map("max_products")
+  maxOrders    Int      @default(500)  @map("max_orders")
+  maxUsers     Int      @default(3)    @map("max_users")
+  maxStorage   Int      @default(1024) @map("max_storage")
+  priceMonthly Decimal  @db.Decimal(10, 2) @map("price_monthly")
+  priceYearly  Decimal  @db.Decimal(10, 2) @map("price_yearly")
+  features     Json     @default("[]")
+  isActive     Boolean  @default(true) @map("is_active")
+  sortOrder    Int      @default(0)    @map("sort_order")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt     @map("updated_at")
+
+  tenants       Tenant[]
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Tenant {
+  id            String       @id @default(cuid())
+  name          String       @db.VarChar(200)
+  subdomain     String       @unique @db.VarChar(100)
+  schemaName    String       @unique @db.VarChar(100) @map("schema_name")
+  schemaVersion Int          @default(0)              @map("schema_version")
+  email         String       @unique @db.VarChar(255)
+  phone         String?      @db.VarChar(50)
+  logoUrl       String?      @db.Text                 @map("logo_url")
+  status        TenantStatus @default(PROVISIONING)
+  ownerName     String       @db.VarChar(200)         @map("owner_name")
+  ownerEmail    String       @db.VarChar(255)         @map("owner_email")
+  planId        String       @map("plan_id")
+  suspendedAt   DateTime?    @map("suspended_at")
+  cancelledAt   DateTime?    @map("cancelled_at")
+  createdAt     DateTime     @default(now())          @map("created_at")
+  updatedAt     DateTime     @updatedAt               @map("updated_at")
+
+  plan          Plan         @relation(fields: [planId], references: [id])
+  subscriptions Subscription[]
+
+  @@map("tenants")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+  PROVISIONING
+}
+
+model Subscription {
+  id                     String             @id @default(cuid())
+  tenantId               String             @map("tenant_id")
+  planId                 String             @map("plan_id")
+  billingCycle           BillingCycle       @map("billing_cycle")
+  status                 SubscriptionStatus @default(TRIALING)
+  currentPeriodStart     DateTime           @map("current_period_start")
+  currentPeriodEnd       DateTime           @map("current_period_end")
+  cancelledAt            DateTime?          @map("cancelled_at")
+  trialEndsAt            DateTime?          @map("trial_ends_at")
+  priceAtSubscription    Decimal            @db.Decimal(10, 2) @map("price_at_subscription")
+
+  // Paymob integration — v1.2
+  provider               String?            @default("paymob") @db.VarChar(50)
+  providerSubscriptionId String?            @db.VarChar(200)   @map("provider_subscription_id")
+  providerCustomerId     String?            @db.VarChar(200)   @map("provider_customer_id")
+  providerCardToken      String?            @db.Text           @map("provider_card_token")
+  lastPaymentAt          DateTime?          @map("last_payment_at")
+  nextBillingAt          DateTime?          @map("next_billing_at")
+  failedAttempts         Int                @default(0)        @map("failed_attempts")
+  lastFailureReason      String?            @db.Text           @map("last_failure_reason")
+
+  createdAt              DateTime           @default(now())    @map("created_at")
+  updatedAt              DateTime           @updatedAt         @map("updated_at")
+
+  tenant          Tenant          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan            Plan            @relation(fields: [planId], references: [id])
+  paymentAttempts PaymentAttempt[]
+
+  @@map("subscriptions")
+}
+
+enum BillingCycle {
+  MONTHLY
+  YEARLY
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+  TRIALING
+  SUSPENDED
+}
+
+model PaymentAttempt {
+  id                    String               @id @default(cuid())
+  subscriptionId        String               @map("subscription_id")
+  amount                Decimal              @db.Decimal(10, 2)
+  currency              String               @default("EGP") @db.VarChar(10)
+  status                PaymentAttemptStatus
+  provider              String               @default("paymob") @db.VarChar(50)
+  providerTransactionId String?              @unique @db.VarChar(200) @map("provider_transaction_id")
+  providerResponse      Json?                @map("provider_response")
+  errorCode             String?              @db.VarChar(100) @map("error_code")
+  errorMessage          String?              @db.Text         @map("error_message")
+  attemptType           String               @db.VarChar(50)  @map("attempt_type")
+  attemptedAt           DateTime             @default(now())  @map("attempted_at")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@index([subscriptionId, attemptedAt(sort: Desc)], name: "idx_pay_subscription")
+  @@index([status, attemptedAt], name: "idx_pay_status")
+  @@map("payment_attempts")
+}
+
+enum PaymentAttemptStatus {
+  SUCCESS
+  FAILED
+  PENDING
+  REFUNDED
+}

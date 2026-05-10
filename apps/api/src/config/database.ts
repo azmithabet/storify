@@ -1,4 +1,4 @@
-import { PrismaClient } from '@storify/database'
+import { PrismaClient, TenantPrismaClient } from '@storify/database'
 import { LRUCache } from 'lru-cache'
 import { config } from './env'
 
@@ -9,8 +9,8 @@ export const masterDb = new PrismaClient({
 })
 
 // Tenant clients — LRU-evicted pool.
-// Each PrismaClient holds ~10 connections; unbounded Map would exhaust PG's max_connections.
-const tenantClients = new LRUCache<string, PrismaClient>({
+// Each TenantPrismaClient holds ~10 connections; unbounded Map would exhaust PG's max_connections.
+const tenantClients = new LRUCache<string, TenantPrismaClient>({
   max: 50,
   ttl: 1000 * 60 * 30, // 30 min idle TTL
   updateAgeOnGet: true,
@@ -19,13 +19,13 @@ const tenantClients = new LRUCache<string, PrismaClient>({
   },
 })
 
-export function getTenantDb(schemaName: string): PrismaClient {
+export function getTenantDb(schemaName: string): TenantPrismaClient {
   const cached = tenantClients.get(schemaName)
   if (cached) return cached
 
   const base = new URL(config.DATABASE_MASTER_URL)
   base.searchParams.set('schema', schemaName)
-  const client = new PrismaClient({ datasources: { db: { url: base.toString() } } })
+  const client = new TenantPrismaClient({ datasources: { db: { url: base.toString() } } })
   tenantClients.set(schemaName, client)
   return client
 }

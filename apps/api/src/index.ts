@@ -1,7 +1,13 @@
 import Fastify from 'fastify'
+import rateLimit from '@fastify/rate-limit'
 import { config } from './config/env'
 import { masterDb } from './config/database'
+import { redis } from './config/redis'
+import jwtPlugin from './shared/plugins/jwt.plugin'
+import cookiePlugin from './shared/plugins/cookie.plugin'
+import { tenantMiddleware } from './shared/middleware/tenant.middleware'
 import { tenantRoutes } from './modules/tenants/tenant.routes'
+import { authRoutes } from './modules/auth/auth.routes'
 
 const app = Fastify({
   logger: {
@@ -13,6 +19,15 @@ const app = Fastify({
   },
 })
 
+// ─── Global plugins ───────────────────────────────────────────────────────────
+app.register(jwtPlugin)
+app.register(cookiePlugin)
+app.register(rateLimit, {
+  global: false, // opt-in per-route via config.rateLimit
+  redis,
+})
+
+// ─── Public routes (no tenant required) ──────────────────────────────────────
 app.get('/health', async () => {
   return { status: 'ok', env: config.NODE_ENV, timestamp: new Date().toISOString() }
 })
@@ -26,6 +41,12 @@ app.get('/plans', async (_req, reply) => {
 })
 
 app.register(tenantRoutes, { prefix: '/api/tenants' })
+
+// ─── Tenant-scoped routes (tenant middleware required) ────────────────────────
+app.register(async function tenantScoped(sub) {
+  sub.addHook('onRequest', tenantMiddleware)
+  sub.register(authRoutes, { prefix: '/api/auth' })
+})
 
 const start = async () => {
   try {

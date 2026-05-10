@@ -1,15 +1,58 @@
 import { masterDb } from '../../config/database'
+import { getTenantDb } from '../../config/database'
 import { runTenantMigrations } from '@storify/database'
+import { hashPassword } from '../../shared/utils/password'
 import type { RegisterTenantInput } from './tenant.schema'
 
-// Placeholder — will be fully implemented in Step 05 (all 34 tenant tables)
+const SUPER_ADMIN_PERMISSIONS: Record<string, string[]> = {
+  invoices: ['create', 'read', 'update', 'delete', 'refund'],
+  products: ['create', 'read', 'update', 'delete'],
+  stock: ['read', 'adjust', 'transfer'],
+  customers: ['create', 'read', 'update', 'delete'],
+  installments: ['create', 'read', 'update', 'approve', 'reject'],
+  suppliers: ['create', 'read', 'update', 'delete'],
+  purchase_orders: ['create', 'read', 'update', 'approve', 'receive'],
+  expenses: ['create', 'read', 'update', 'approve', 'delete'],
+  reports: ['read', 'export'],
+  users: ['create', 'read', 'update', 'delete'],
+  settings: ['read', 'update'],
+  billing: ['read', 'update'],
+}
+
 async function seedTenantDefaults(
-  _schemaName: string,
-  _ownerName: string,
-  _ownerEmail: string,
-  _ownerPassword: string,
+  schemaName: string,
+  ownerName: string,
+  ownerEmail: string,
+  ownerPassword: string,
 ): Promise<void> {
-  // Step 05 fills this in with roles, branch, users, payment methods, etc.
+  const db = getTenantDb(schemaName)
+
+  // 1. Create super_admin role
+  const role = await db.role.create({
+    data: {
+      slug: 'super_admin',
+      name: 'Super Admin',
+      permissions: SUPER_ADMIN_PERMISSIONS,
+    },
+  })
+
+  // 2. Create main branch
+  const branch = await db.branch.create({
+    data: { name: 'الفرع الرئيسي', isMain: true, isActive: true },
+  })
+
+  // 3. Create super_admin user with bcrypt-hashed password
+  const passwordHash = await hashPassword(ownerPassword)
+  await db.user.create({
+    data: {
+      email: ownerEmail,
+      passwordHash,
+      fullName: ownerName,
+      roleId: role.id,
+      branchId: branch.id,
+      isActive: true,
+    },
+  })
 }
 
 export async function provisionTenant(data: RegisterTenantInput) {
@@ -50,10 +93,10 @@ export async function provisionTenant(data: RegisterTenantInput) {
     // 4. Create PostgreSQL schema
     await masterDb.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS "${schemaName}"`)
 
-    // 5. Run tenant migrations (empty in Step 03 — schema_version stays 0)
+    // 5. Run tenant migrations (001_init.sql creates auth tables, schema_version → 1)
     await runTenantMigrations(schemaName, tenant.id)
 
-    // 6. Seed tenant defaults (no-op in Step 03)
+    // 6. Seed roles, main branch, and super_admin user
     await seedTenantDefaults(schemaName, data.ownerName, data.ownerEmail, data.ownerPassword)
 
     // 7. Activate tenant

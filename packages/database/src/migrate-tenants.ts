@@ -46,9 +46,17 @@ export async function runTenantMigrations(schemaName: string, tenantId: string):
       continue
     }
 
+    // Split into individual statements — $executeRawUnsafe rejects multi-statement strings
+    const statements = sql
+      .split(';')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0)
+
     const db = createTenantClient(schemaName)
     try {
-      await db.$executeRawUnsafe(sql)
+      for (const stmt of statements) {
+        await db.$executeRawUnsafe(stmt)
+      }
       await masterDb.tenant.update({
         where: { id: tenantId },
         data: { schemaVersion: m.version },

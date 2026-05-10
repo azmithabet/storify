@@ -8,6 +8,8 @@ import cookiePlugin from './shared/plugins/cookie.plugin'
 import { tenantMiddleware } from './shared/middleware/tenant.middleware'
 import { tenantRoutes } from './modules/tenants/tenant.routes'
 import { authRoutes } from './modules/auth/auth.routes'
+import { productRoutes } from './modules/products/product.routes'
+import { stockRoutes } from './modules/stock/stock.routes'
 
 const app = Fastify({
   logger: {
@@ -46,6 +48,8 @@ app.register(tenantRoutes, { prefix: '/api/tenants' })
 app.register(async function tenantScoped(sub) {
   sub.addHook('onRequest', tenantMiddleware)
   sub.register(authRoutes, { prefix: '/api/auth' })
+  sub.register(productRoutes, { prefix: '/api/products' })
+  sub.register(stockRoutes, { prefix: '/api/stock' })
 })
 
 const start = async () => {

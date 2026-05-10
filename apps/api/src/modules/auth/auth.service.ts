@@ -41,7 +41,7 @@ export async function loginUser(
 
   await db.user.update({
     where: { id: user.id },
-    data: { lastLoginAt: new Date() },
+    data: { lastLogin: new Date() },
   })
 
   const payload: JWTPayload = {

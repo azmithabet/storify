@@ -31,7 +31,7 @@ CREATE TABLE users (
   role_id       UUID         NOT NULL REFERENCES roles(id),
   branch_id     UUID         REFERENCES branches(id),
   is_active     BOOLEAN      NOT NULL DEFAULT true,
-  last_login_at TIMESTAMPTZ,
+  last_login    TIMESTAMPTZ,
   created_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
   updated_at    TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
@@ -46,7 +46,7 @@ CREATE TABLE password_reset_tokens (
   token_hash TEXT         NOT NULL UNIQUE,
   expires_at TIMESTAMPTZ  NOT NULL,
   used_at    TIMESTAMPTZ,
-  ip         VARCHAR(45),
+  ip         INET,
   created_at TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
 

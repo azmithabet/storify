@@ -75,17 +75,20 @@ CREATE INDEX idx_products_category ON products(category_id);
 CREATE TABLE product_variants (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
-  sku        VARCHAR(100) UNIQUE,
-  barcode    VARCHAR(100) UNIQUE,
+  sku        VARCHAR(100),
+  barcode    VARCHAR(100),
   attributes JSONB NOT NULL DEFAULT '{}',
   cost_price DECIMAL(15,4) NOT NULL,
   sell_price DECIMAL(15,4) NOT NULL,
   image_url  TEXT,
   is_active  BOOLEAN NOT NULL DEFAULT true,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE (product_id, sku)
 );
 
 CREATE INDEX idx_variants_product ON product_variants(product_id);
+CREATE UNIQUE INDEX idx_variants_barcode
+  ON product_variants(barcode) WHERE barcode IS NOT NULL;
 
 -- ─── stock ────────────────────────────────────────────────────────────────────
 
@@ -192,7 +195,6 @@ CREATE INDEX idx_customers_phone ON customers(phone);
 CREATE TABLE customer_documents (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   customer_id UUID NOT NULL REFERENCES customers(id) ON DELETE CASCADE,
-  branch_id   UUID NOT NULL REFERENCES branches(id),
   doc_type    VARCHAR(100) NOT NULL,
   file_url    TEXT NOT NULL,
   uploaded_by UUID NOT NULL REFERENCES users(id),
@@ -537,7 +539,7 @@ CREATE TABLE audit_logs (
   action     VARCHAR(50) NOT NULL,
   before     JSONB,
   after      JSONB,
-  ip         VARCHAR(45),
+  ip         INET,
   user_agent TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

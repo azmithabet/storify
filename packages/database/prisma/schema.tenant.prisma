@@ -34,7 +34,6 @@ model Branch {
   supplierTransactions SupplierTransaction[]
   purchaseOrders      PurchaseOrder[]
   paymentFeeExpenses  PaymentFeeExpense[]
-  customerDocuments   CustomerDocument[]
 
   @@map("branches")
 }
@@ -61,7 +60,7 @@ model User {
   roleId       String    @db.Uuid         @map("role_id")
   branchId     String?   @db.Uuid         @map("branch_id")
   isActive     Boolean   @default(true)   @map("is_active")
-  lastLoginAt  DateTime? @map("last_login_at")
+  lastLogin    DateTime? @map("last_login")
   createdAt    DateTime  @default(now())  @map("created_at")
   updatedAt    DateTime  @updatedAt       @map("updated_at")
 
@@ -96,7 +95,7 @@ model PasswordResetToken {
   tokenHash String    @unique @db.Text @map("token_hash")
   expiresAt DateTime  @map("expires_at")
   usedAt    DateTime? @map("used_at")
-  ip        String?   @db.VarChar(45)
+  ip        String?   @db.Inet
   createdAt DateTime  @default(now()) @map("created_at")
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -330,14 +329,12 @@ model Customer {
 model CustomerDocument {
   id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   customerId  String   @db.Uuid @map("customer_id")
-  branchId    String   @db.Uuid @map("branch_id")
   docType     String   @db.VarChar(100) @map("doc_type")
   fileUrl     String   @db.Text         @map("file_url")
   uploadedById String  @db.Uuid         @map("uploaded_by")
   uploadedAt  DateTime @default(now())  @map("uploaded_at")
 
   customer   Customer @relation(fields: [customerId], references: [id])
-  branch     Branch   @relation(fields: [branchId], references: [id])
   uploadedBy User     @relation(fields: [uploadedById], references: [id])
 
   @@map("customer_documents")
@@ -735,7 +732,7 @@ model AuditLog {
   action    String    @db.VarChar(50)
   before    Json?
   after     Json?
-  ip        String?   @db.VarChar(45)
+  ip        String?   @db.Inet
   userAgent String?   @db.Text @map("user_agent")
   createdAt DateTime  @default(now()) @map("created_at")
 

@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import { config } from './config/env'
-import { masterDb } from '@storify/database'
+import { masterDb } from './config/database'
+import { tenantRoutes } from './modules/tenants/tenant.routes'
 
 const app = Fastify({
   logger: {
@@ -23,6 +24,8 @@ app.get('/plans', async (_req, reply) => {
   })
   return reply.send({ data: plans })
 })
+
+app.register(tenantRoutes, { prefix: '/api/tenants' })
 
 const start = async () => {
   try {

@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storify — Wireframes</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --c-bg:       #0D0F14;
+  --c-surface:  #151820;
+  --c-border:   #252A35;
+  --c-border2:  #1E2330;
+  --c-primary:  #6366F1;
+  --c-primary2: #818CF8;
+  --c-accent:   #EC4899;
+  --c-green:    #10B981;
+  --c-amber:    #F59E0B;
+  --c-red:      #EF4444;
+  --c-blue:     #3B82F6;
+  --c-text:     #E2E8F0;
+  --c-muted:    #64748B;
+  --c-muted2:   #94A3B8;
+  --c-white:    #FFFFFF;
+  --r:          8px;
+  --r2:         12px;
+  --font:       'IBM Plex Sans Arabic', sans-serif;
+  --mono:       'JetBrains Mono', monospace;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;background:var(--c-bg);color:var(--c-text);font-family:var(--font);font-size:14px}
+
+/* ── Layout ── */
+.shell{display:flex;height:100vh;overflow:hidden}
+.nav{width:220px;background:var(--c-surface);border-left:1px solid var(--c-border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+.main{flex:1;overflow-y:auto;background:var(--c-bg)}
+
+/* ── Nav ── */
+.nav-logo{padding:20px 16px 14px;border-bottom:1px solid var(--c-border)}
+.nav-logo .brand{font-size:18px;font-weight:700;color:var(--c-primary2);letter-spacing:-.5px}
+.nav-logo .sub{font-size:10px;color:var(--c-muted);margin-top:2px;font-family:var(--mono)}
+.nav-section{padding:10px 12px 4px;font-size:10px;font-weight:600;color:var(--c-muted);text-transform:uppercase;letter-spacing:.08em}
+.nav-item{display:flex;align-items:center;gap:9px;padding:8px 14px;cursor:pointer;border-radius:0;transition:all .15s;font-size:13px;color:var(--c-muted2);border-right:2px solid transparent;margin:1px 0}
+.nav-item:hover{background:rgba(99,102,241,.08);color:var(--c-text)}
+.nav-item.active{background:rgba(99,102,241,.12);color:var(--c-primary2);border-right-color:var(--c-primary)}
+.nav-item .ico{width:16px;text-align:center;font-size:14px;flex-shrink:0}
+.nav-item .badge{margin-right:auto;background:var(--c-primary);color:#fff;font-size:9px;padding:1px 6px;border-radius:10px;font-family:var(--mono)}
+
+/* ── Page ── */
+.page{display:none;padding:28px 32px;animation:fadeIn .2s ease}
+.page.active{display:block}
+@keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── Page Header ── */
+.page-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px}
+.page-title{font-size:22px;font-weight:700;color:var(--c-white);letter-spacing:-.5px}
+.page-sub{font-size:12px;color:var(--c-muted);margin-top:3px}
+.page-actions{display:flex;gap:8px;align-items:center}
+
+/* ── Buttons ── */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--r);border:none;cursor:pointer;font-size:13px;font-family:var(--font);font-weight:500;transition:all .15s}
+.btn-primary{background:var(--c-primary);color:#fff}
+.btn-primary:hover{background:var(--c-primary2)}
+.btn-secondary{background:var(--c-border);color:var(--c-text)}
+.btn-secondary:hover{background:var(--c-border2)}
+.btn-ghost{background:transparent;color:var(--c-muted2);border:1px solid var(--c-border)}
+.btn-ghost:hover{color:var(--c-text);border-color:var(--c-muted)}
+.btn-danger{background:rgba(239,68,68,.15);color:var(--c-red);border:1px solid rgba(239,68,68,.3)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{width:34px;height:34px;padding:0;justify-content:center}
+
+/* ── Cards ── */
+.card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r2);padding:20px}
+.card-sm{padding:14px 16px}
+.card-title{font-size:13px;font-weight:600;color:var(--c-muted2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px}
+
+/* ── Stats Grid ── */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px}
+.stat{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r2);padding:18px 20px;position:relative;overflow:hidden}
+.stat::before{content:'';position:absolute;top:0;right:0;width:3px;height:100%;border-radius:0 var(--r2) var(--r2) 0}
+.stat.green::before{background:var(--c-green)}
+.stat.blue::before{background:var(--c-blue)}
+.stat.amber::before{background:var(--c-amber)}
+.stat.purple::before{background:var(--c-primary)}
+.stat-label{font-size:11px;color:var(--c-muted);margin-bottom:6px;font-weight:500}
+.stat-value{font-size:24px;font-weight:700;color:var(--c-white);font-family:var(--mono);letter-spacing:-1px}
+.stat-change{font-size:11px;margin-top:4px}
+.stat-change.up{color:var(--c-green)}
+.stat-change.down{color:var(--c-red)}
+
+/* ── Table ── */
+.tbl-wrap{overflow-x:auto;border-radius:var(--r2);border:1px solid var(--c-border)}
+table{width:100%;border-collapse:collapse}
+thead th{background:rgba(99,102,241,.08);padding:10px 14px;text-align:right;font-size:11px;font-weight:600;color:var(--c-muted2);text-transform:uppercase;letter-spacing:.06em;border-bottom:1px solid var(--c-border)}
+tbody tr{border-bottom:1px solid var(--c-border2);transition:background .1s}
+tbody tr:last-child{border-bottom:none}
+tbody tr:hover{background:rgba(255,255,255,.02)}
+tbody td{padding:11px 14px;font-size:13px;color:var(--c-text)}
+
+/* ── Badge ── */
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-green{background:rgba(16,185,129,.12);color:var(--c-green)}
+.badge-red{background:rgba(239,68,68,.12);color:var(--c-red)}
+.badge-amber{background:rgba(245,158,11,.12);color:var(--c-amber)}
+.badge-blue{background:rgba(59,130,246,.12);color:var(--c-blue)}
+.badge-purple{background:rgba(99,102,241,.12);color:var(--c-primary2)}
+.badge-gray{background:rgba(100,116,139,.12);color:var(--c-muted2)}
+
+/* ── Form ── */
+.form-grid{display:grid;gap:16px}
+.form-grid-2{grid-template-columns:1fr 1fr}
+.form-grid-3{grid-template-columns:1fr 1fr 1fr}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-label{font-size:12px;font-weight:500;color:var(--c-muted2)}
+.form-label span{color:var(--c-red);margin-right:2px}
+.form-input{background:var(--c-bg);border:1px solid var(--c-border);border-radius:var(--r);padding:9px 12px;font-size:13px;color:var(--c-text);font-family:var(--font);outline:none;transition:border .15s;width:100%}
+.form-input:focus{border-color:var(--c-primary)}
+.form-input::placeholder{color:var(--c-muted)}
+.form-select{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:left 10px center}
+.form-hint{font-size:11px;color:var(--c-muted)}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:2px;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r);padding:3px;width:fit-content;margin-bottom:20px}
+.tab-btn{padding:7px 16px;border-radius:6px;border:none;background:transparent;color:var(--c-muted);cursor:pointer;font-size:13px;font-family:var(--font);font-weight:500;transition:all .15s}
+.tab-btn.active{background:var(--c-primary);color:#fff}
+
+/* ── POS Layout ── */
+.pos-layout{display:grid;grid-template-columns:1fr 360px;gap:16px;height:calc(100vh - 100px)}
+.pos-products{display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.pos-cart{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r2);display:flex;flex-direction:column;overflow:hidden}
+.pos-search{position:relative}
+.pos-search input{width:100%;background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r);padding:10px 40px 10px 14px;font-size:13px;color:var(--c-text);font-family:var(--font);outline:none}
+.pos-search input:focus{border-color:var(--c-primary)}
+.pos-search .ico{position:absolute;right:12px;top:50%;transform:translateY(-50%);color:var(--c-muted);font-size:16px}
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;overflow-y:auto;padding:2px}
+.product-card{background:var(--c-surface);border:1px solid var(--c-border);border-radius:var(--r);padding:12px;cursor:pointer;transition:all .15s;text-align:center}
+.product-card:hover{border-color:var(--c-primary);background:rgba(99,102,241,.05)}
+.product-card .p-img{width:48px;height:48px;background:var(--c-border);border-radius:6px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.product-card .p-name{font-size:12px;font-weight:500;color:var(--c-text);margin-bottom:3px;line-height:1.3}
+.product-card .p-price{font-size:13px;font-weight:700;color:var(--c-primary2);font-family:var(--mono)}
+.product-card .p-stock{font-size:10px;color:var(--c-muted)}
+.cart-header{padding:14px 16px;border-bottom:1px solid var(--c-border);font-size:14px;font-weight:600;color:var(--c-white)}
+.cart-items{flex:1;overflow-y:auto;padding:8px}
+.cart-item{display:flex;align-items:center;gap:10px;padding:8px;border-radius:var(--r);border:1px solid var(--c-border2);margin-bottom:6px;background:var(--c-bg)}
+.cart-item .ci-name{flex:1;font-size:12px;font-weight:500}
+.cart-item .ci-qty{display:flex;align-items:center;gap:6px}
+.cart-item .ci-qty button{width:22px;height:22px;border:1px solid var(--c-border);background:var(--c-surface);color:var(--c-text);border-radius:4px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:14px}
+.cart-item .ci-qty span{font-family:var(--mono);font-size:13px;width:20px;text-align:center}
+.cart-item .ci-price{font-family:var(--mono);font-size:12px;color:var(--c-primary2);white-space:nowrap}
+.cart-footer{padding:14px 16px;border-top:1px solid var(--c-border);background:var(--c-bg)}
+.cart-total-row{display:flex;justify-content:space-between;margin-bottom:6px;font-size:13px}
+.cart-total-row.big{font-size:16px;font-weight:700;color:var(--c-white);margin-top:8px;padding-top:8px;border-top:1px solid var(--c-border)}
+.cart-total-row .amount{font-family:var(--mono);color:var(--c-primary2)}
+.pay-btns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-top:12px}
+.pay-btn{padding:9px;border:1px solid var(--c-border);border-radius:var(--r);background:var(--c-surface);color:var(--c-text);cursor:pointer;font-size:12px;font-family:var(--font);transition:all .15s;text-align:center}
+.pay-btn:hover,.pay-btn.active{border-color:var(--c-primary);background:rgba(99,102,241,.1);color:var(--c-primary2)}
+
+/* ── Modal ── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);z-index:100;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--c-surface);border:1px solid var(--c-border);border-radius:16px;padding:24px;width:540px;max-height:85vh;overflow-y:auto;transform:scale(.96);transition:transform .2s}
+.modal-overlay.open .modal{transform:scale(1)}
+.modal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.modal-title{font-size:16px;font-weight:700;color:var(--c-white)}
+.modal-close{width:28px;height:28px;border:none;background:var(--c-border);border-radius:6px;color:var(--c-muted);cursor:pointer;font-size:16px;display:flex;align-items:center;justify-content:center}
+
+/* ── Chart placeholder ── */
+.chart-placeholder{background:var(--c-bg);border:1px solid var(--c-border2);border-radius:var(--r);height:200px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.chart-bars{display:flex;align-items:flex-end;gap:8px;height:140px;padding:0 20px;width:100%}
+.bar{flex:1;border-radius:4px 4px 0 0;transition:height .3s;cursor:pointer;position:relative}
+.bar:hover::after{content:attr(data-val);position:absolute;top:-24px;left:50%;transform:translateX(-50%);background:var(--c-surface);border:1px solid var(--c-border);border-radius:4px;padding:2px 6px;font-size:10px;white-space:nowrap;font-family:var(--mono)}
+
+/* ── Divider ── */
+.divider{height:1px;background:var(--c-border);margin:16px 0}
+
+/* ── Alert ── */
+.alert{padding:12px 14px;border-radius:var(--r);font-size:13px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.alert-warning{background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.25);color:var(--c-amber)}
+.alert-success{background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.25);color:var(--c-green)}
+.alert-info{background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);color:var(--c-primary2)}
+
+/* ── Timeline ── */
+.timeline{display:flex;flex-direction:column;gap:0}
+.tl-item{display:flex;gap:12px;padding-bottom:16px;position:relative}
+.tl-item::before{content:'';position:absolute;right:5px;top:22px;bottom:0;width:2px;background:var(--c-border)}
+.tl-item:last-child::before{display:none}
+.tl-dot{width:12px;height:12px;border-radius:50%;flex-shrink:0;margin-top:4px;border:2px solid var(--c-bg)}
+.tl-content{flex:1}
+.tl-title{font-size:12px;font-weight:500;color:var(--c-text)}
+.tl-sub{font-size:11px;color:var(--c-muted);margin-top:2px}
+
+/* ── Progress ── */
+.progress{height:6px;background:var(--c-border);border-radius:3px;overflow:hidden}
+.progress-bar{height:100%;border-radius:3px;transition:width .6s}
+
+/* ── Sidebar User ── */
+.nav-user{margin-top:auto;padding:12px 14px;border-top:1px solid var(--c-border);display:flex;align-items:center;gap:10px}
+.nav-user .avatar{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--c-primary),var(--c-accent));display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0}
+.nav-user .info .name{font-size:12px;font-weight:600;color:var(--c-text)}
+.nav-user .info .role{font-size:10px;color:var(--c-muted)}
+
+/* ── Topbar ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;border-bottom:1px solid var(--c-border);background:var(--c-surface);position:sticky;top:0;z-index:10}
+.topbar-left{display:flex;align-items:center;gap:12px}
+.topbar-breadcrumb{font-size:13px;color:var(--c-muted)}
+.topbar-breadcrumb span{color:var(--c-text)}
+.topbar-right{display:flex;align-items:center;gap:10px}
+.notif-btn{width:34px;height:34px;border:1px solid var(--c-border);border-radius:var(--r);background:transparent;color:var(--c-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;position:relative;font-size:16px}
+.notif-btn .dot{position:absolute;top:6px;left:6px;width:7px;height:7px;background:var(--c-red);border-radius:50%;border:2px solid var(--c-surface)}
+
+/* ── Empty State ── */
+.empty-state{text-align:center;padding:48px 24px;color:var(--c-muted)}
+.empty-state .ico{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty-state p{font-size:13px}
+
+/* ── Grid Layouts ── */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--c-border);border-radius:3px}
+
+/* ── WF Label ── */
+.wf-label{position:fixed;bottom:16px;left:16px;background:rgba(99,102,241,.9);color:#fff;padding:6px 12px;border-radius:20px;font-size:11px;font-family:var(--mono);z-index:200;backdrop-filter:blur(8px)}
+</style>
+</head>
+<body>
+
+<div class="wf-label" id="wfLabel">WF-01 · Login</div>
+
+<div class="shell">
+
+<!-- ══════════════════ SIDEBAR NAV ══════════════════ -->
+<nav class="nav">
+  <div class="nav-logo">
+    <div class="brand">⬡ Storify</div>
+    <div class="sub">wireframes v1.0</div>
+  </div>
+
+  <div class="nav-section">عام</div>
+  <div class="nav-item" data-page="login" onclick="show('login','WF-01 · Login')">
+    <span class="ico">🔐</span> تسجيل الدخول
+  </div>
+  <div class="nav-item" data-page="register" onclick="show('register','WF-02 · Register')">
+    <span class="ico">✨</span> تسجيل عميل جديد
+  </div>
+  <div class="nav-item active" data-page="dashboard" onclick="show('dashboard','WF-03 · Dashboard')">
+    <span class="ico">📊</span> الرئيسية
+  </div>
+
+  <div class="nav-section">المبيعات</div>
+  <div class="nav-item" data-page="pos" onclick="show('pos','WF-04 · POS — نقطة البيع')">
+    <span class="ico">🛒</span> نقطة البيع (POS)
+  </div>
+  <div class="nav-item" data-page="invoices" onclick="show('invoices','WF-05 · الفواتير')">
+    <span class="ico">🧾</span> الفواتير
+  </div>
+  <div class="nav-item" data-page="installments" onclick="show('installments','WF-06 · التقسيط')">
+    <span class="ico">📋</span> التقسيط <span class="badge">3</span>
+  </div>
+  <div class="nav-item" data-page="customers" onclick="show('customers','WF-07 · العملاء')">
+    <span class="ico">👥</span> العملاء
+  </div>
+
+  <div class="nav-section">المخزون</div>
+  <div class="nav-item" data-page="products" onclick="show('products','WF-08 · المنتجات')">
+    <span class="ico">📦</span> المنتجات
+  </div>
+  <div class="nav-item" data-page="stock" onclick="show('stock','WF-09 · المخزون')">
+    <span class="ico">🏭</span> المخزون
+  </div>
+  <div class="nav-item" data-page="transfers" onclick="show('transfers','WF-10 · تحويل المخزون')">
+    <span class="ico">🔄</span> تحويل المخزون
+  </div>
+
+  <div class="nav-section">المالية</div>
+  <div class="nav-item" data-page="suppliers" onclick="show('suppliers','WF-11 · الموردون')">
+    <span class="ico">🏪</span> الموردون
+  </div>
+  <div class="nav-item" data-page="purchases" onclick="show('purchases','WF-12 · المشتريات')">
+    <span class="ico">📥</span> المشتريات
+  </div>
+  <div class="nav-item" data-page="expenses" onclick="show('expenses','WF-13 · المصروفات')">
+    <span class="ico">💸</span> المصروفات
+  </div>
+
+  <div class="nav-section">التقارير</div>
+  <div class="nav-item" data-page="reports" onclick="show('reports','WF-14 · التقارير')">
+    <span class="ico">📈</span> التقارير
+  </div>
+
+  <div class="nav-section">الإعدادات</div>
+  <div class="nav-item" data-page="users" onclick="show('users','WF-15 · المستخدمون')">
+    <span class="ico">👤</span> المستخدمون والأدوار
+  </div>
+  <div class="nav-item" data-page="branches" onclick="show('branches','WF-16 · الفروع')">
+    <span class="ico">🏢</span> الفروع
+  </div>
+  <div class="nav-item" data-page="settings" onclick="show('settings','WF-17 · الإعدادات')">
+    <span class="ico">⚙️</span> الإعدادات
+  </div>
+  <div class="nav-item" data-page="payment-methods" onclick="show('payment-methods','WF-18 · طرق الدفع والرسوم')">
+    <span class="ico">💳</span> طرق الدفع والرسوم
+  </div>
+
+  <div class="nav-user">
+    <div class="avatar">أح</div>
+    <div class="info">
+      <div class="name">أحمد محمد</div>
+      <div class="role">Super Admin</div>
+    </div>
+  </div>
+</nav>
+
+<!-- ══════════════════ MAIN CONTENT ══════════════════ -->
+<div class="main">
+
+<!-- ────── WF-01: LOGIN ────── -->
+<div id="page-login" class="page" style="display:flex;align-items:center;justify-content:center;min-height:100vh;padding:0">
+  <div style="width:380px">
+    <div style="text-align:center;margin-bottom:32px">
+      <div style="font-size:32px;font-weight:800;color:var(--c-primary2);letter-spacing:-1px;margin-bottom:6px">⬡ Storify</div>
+      <div style="color:var(--c-muted);font-size:13px">تسجيل الدخول لمتجرك</div>
+    </div>
+    <div class="card" style="padding:28px">
+      <div class="form-grid" style="gap:14px">
+        <div class="form-group">
+          <div class="form-label">البريد الإلكتروني <span>*</span></div>
+          <input class="form-input" type="email" placeholder="ahmed@store.com" value="ahmed@store.com">
+        </div>
+        <div class="form-group">
+          <div class="form-label">كلمة المرور <span>*</span></div>
+          <input class="form-input" type="password" placeholder="••••••••" value="••••••••">
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--c-muted);cursor:pointer">
+            <input type="checkbox" checked> تذكرني
+          </label>
+          <span style="font-size:12px;color:var(--c-primary2);cursor:pointer">نسيت كلمة المرور؟</span>
+        </div>
+        <button class="btn btn-primary" style="width:100%;justify-content:center;padding:11px" onclick="show('dashboard','WF-03 · Dashboard')">
+          دخول ←
+        </button>
+      </div>
+      <div class="divider"></div>
+      <div style="text-align:center;font-size:12px;color:var(--c-muted)">
+        مش عندك حساب؟ <span style="color:var(--c-primary2);cursor:pointer" onclick="show('register','WF-02 · Register')">سجّل متجرك مجاناً</span>
+      </div>
+    </div>
+    <div style="text-align:center;margin-top:14px;font-size:11px;color:var(--c-muted)">
+      store1.storify.com
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-02: REGISTER ────── -->
+<div id="page-register" class="page" style="padding:40px;min-height:100vh">
+  <div style="max-width:600px;margin:0 auto">
+    <div style="text-align:center;margin-bottom:28px">
+      <div style="font-size:26px;font-weight:800;color:var(--c-white);margin-bottom:4px">⬡ Storify</div>
+      <div style="font-size:18px;font-weight:600;color:var(--c-text);margin-bottom:4px">أنشئ متجرك الآن</div>
+      <div style="color:var(--c-muted);font-size:12px">14 يوم مجاناً — بدون بطاقة ائتمان</div>
+    </div>
+
+    <div class="card" style="padding:28px;margin-bottom:16px">
+      <div class="card-title">بيانات المتجر</div>
+      <div class="form-grid form-grid-2" style="gap:14px">
+        <div class="form-group">
+          <div class="form-label">اسم المتجر <span>*</span></div>
+          <input class="form-input" placeholder="متجر أحمد للملابس" value="متجر أحمد للملابس">
+        </div>
+        <div class="form-group">
+          <div class="form-label">الرابط المخصص <span>*</span></div>
+          <div style="display:flex;align-items:center;gap:0">
+            <input class="form-input" placeholder="ahmed-store" value="ahmed-store" style="border-radius:var(--r) 0 0 var(--r)">
+            <div style="background:var(--c-border);padding:9px 12px;border:1px solid var(--c-border);border-right:none;border-radius:0 var(--r) var(--r) 0;font-size:12px;color:var(--c-muted);white-space:nowrap">.storify.com</div>
+          </div>
+          <div class="form-hint" style="color:var(--c-green)">✓ ahmed-store.storify.com متاح</div>
+        </div>
+        <div class="form-group">
+          <div class="form-label">اسم المالك <span>*</span></div>
+          <input class="form-input" placeholder="أحمد محمد" value="أحمد محمد">
+        </div>
+        <div class="form-group">
+          <div class="form-label">البريد الإلكتروني <span>*</span></div>
+          <input class="form-input" type="email" placeholder="ahmed@gmail.com" value="ahmed@gmail.com">
+        </div>
+        <div class="form-group">
+          <div class="form-label">كلمة المرور <span>*</span></div>
+          <input class="form-input" type="password" value="••••••••">
+        </div>
+        <div class="form-group">
+          <div class="form-label">تأكيد كلمة المرور <span>*</span></div>
+          <input class="form-input" type="password" value="••••••••">
+        </div>
+      </div>
+    </div>
+
+    <div class="card" style="padding:20px;margin-bottom:16px">
+      <div class="card-title">اختر باقتك</div>
+      <div class="grid-3">
+        <div style="border:1px solid var(--c-border);border-radius:var(--r);padding:14px;cursor:pointer;text-align:center">
+          <div style="font-size:13px;font-weight:600;color:var(--c-text);margin-bottom:4px">Starter</div>
+          <div style="font-size:20px;font-weight:700;color:var(--c-white);font-family:var(--mono);margin-bottom:6px">199<span style="font-size:11px;color:var(--c-muted)"> ج/شهر</span></div>
+          <div style="font-size:11px;color:var(--c-muted)">فرع · 3 مستخدمين</div>
+        </div>
+        <div style="border:2px solid var(--c-primary);border-radius:var(--r);padding:14px;cursor:pointer;text-align:center;background:rgba(99,102,241,.06);position:relative">
+          <div style="position:absolute;top:-10px;right:50%;transform:translateX(50%);background:var(--c-primary);color:#fff;font-size:9px;padding:2px 8px;border-radius:10px;font-weight:600">الأشهر</div>
+          <div style="font-size:13px;font-weight:600;color:var(--c-primary2);margin-bottom:4px">Professional</div>
+          <div style="font-size:20px;font-weight:700;color:var(--c-white);font-family:var(--mono);margin-bottom:6px">499<span style="font-size:11px;color:var(--c-muted)"> ج/شهر</span></div>
+          <div style="font-size:11px;color:var(--c-muted)">5 فروع · 15 مستخدم</div>
+        </div>
+        <div style="border:1px solid var(--c-border);border-radius:var(--r);padding:14px;cursor:pointer;text-align:center">
+          <div style="font-size:13px;font-weight:600;color:var(--c-text);margin-bottom:4px">Enterprise</div>
+          <div style="font-size:20px;font-weight:700;color:var(--c-white);font-family:var(--mono);margin-bottom:6px">999<span style="font-size:11px;color:var(--c-muted)"> ج/شهر</span></div>
+          <div style="font-size:11px;color:var(--c-muted)">فروع ومستخدمين غير محدودين</div>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:12px;font-size:14px" onclick="show('dashboard','WF-03 · Dashboard')">
+      إنشاء المتجر وبدء التجربة المجانية ←
+    </button>
+  </div>
+</div>
+
+<!-- ────── WF-03: DASHBOARD ────── -->
+<div id="page-dashboard" class="page active">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-breadcrumb">الرئيسية</span>
+    </div>
+    <div class="topbar-right">
+      <button class="notif-btn">🔔<span class="dot"></span></button>
+      <div style="display:flex;align-items:center;gap:8px;background:var(--c-border);padding:5px 10px;border-radius:var(--r);cursor:pointer">
+        <div style="width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,var(--c-primary),var(--c-accent));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700">أح</div>
+        <span style="font-size:12px">الفرع الرئيسي</span>
+      </div>
+    </div>
+  </div>
+
+  <div style="padding:24px 28px">
+    <div class="page-header">
+      <div>
+        <div class="page-title">لوحة التحكم</div>
+        <div class="page-sub">الثلاثاء، 28 أبريل 2026</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn btn-ghost btn-sm">📥 تصدير تقرير</button>
+        <button class="btn btn-primary btn-sm" onclick="show('pos','WF-04 · POS — نقطة البيع')">🛒 بيع جديد</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat green">
+        <div class="stat-label">مبيعات اليوم</div>
+        <div class="stat-value">12,450</div>
+        <div class="stat-change up">↑ 18% عن أمس</div>
+      </div>
+      <div class="stat blue">
+        <div class="stat-label">فواتير اليوم</div>
+        <div class="stat-value">34</div>
+        <div class="stat-change up">↑ 7 فواتير</div>
+      </div>
+      <div class="stat amber">
+        <div class="stat-label">أقساط معلّقة</div>
+        <div class="stat-value">8</div>
+        <div class="stat-change down">3 متأخرة</div>
+      </div>
+      <div class="stat purple">
+        <div class="stat-label">إجمالي الشهر</div>
+        <div class="stat-value">187K</div>
+        <div class="stat-change up">↑ 12% عن الشهر</div>
+      </div>
+    </div>
+
+    <div class="grid-2" style="margin-bottom:16px">
+      <div class="card">
+        <div class="card-title">مبيعات آخر 7 أيام</div>
+        <div class="chart-placeholder">
+          <div class="chart-bars">
+            <div class="bar" style="height:55%;background:rgba(99,102,241,.4)" data-val="8,200 ج"></div>
+            <div class="bar" style="height:72%;background:rgba(99,102,241,.5)" data-val="10,750 ج"></div>
+            <div class="bar" style="height:48%;background:rgba(99,102,241,.4)" data-val="7,100 ج"></div>
+            <div class="bar" style="height:88%;background:rgba(99,102,241,.6)" data-val="13,200 ج"></div>
+            <div class="bar" style="height:65%;background:rgba(99,102,241,.5)" data-val="9,600 ج"></div>
+            <div class="bar" style="height:79%;background:rgba(99,102,241,.55)" data-val="11,800 ج"></div>
+            <div class="bar" style="height:95%;background:var(--c-primary)" data-val="12,450 ج"></div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--c-muted);padding:0 8px">
+          <span>الإثنين</span><span>الثلاثاء</span><span>الأربعاء</span><span>الخميس</span><span>الجمعة</span><span>السبت</span><span>اليوم</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-title">أعلى المنتجات مبيعاً</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span>تيشيرت بيسيك أبيض</span><span style="font-family:var(--mono);color:var(--c-primary2)">142 قطعة</span>
+            </div>
+            <div class="progress"><div class="progress-bar" style="width:85%;background:var(--c-primary)"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span>بنطلون جينز كلاسيك</span><span style="font-family:var(--mono);color:var(--c-primary2)">98 قطعة</span>
+            </div>
+            <div class="progress"><div class="progress-bar" style="width:62%;background:var(--c-blue)"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span>كاب رياضي</span><span style="font-family:var(--mono);color:var(--c-primary2)">87 قطعة</span>
+            </div>
+            <div class="progress"><div class="progress-bar" style="width:55%;background:var(--c-green)"></div></div>
+          </div>
+          <div>
+            <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">
+              <span>جاكيت شتوي</span><span style="font-family:var(--mono);color:var(--c-primary2)">63 قطعة</span>
+            </div>
+            <div class="progress"><div class="progress-bar" style="width:40%;background:var(--c-amber)"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:0">آخر الفواتير</div>
+          <span style="font-size:12px;color:var(--c-primary2);cursor:pointer" onclick="show('invoices','WF-05 · الفواتير')">عرض الكل ←</span>
+        </div>
+        <div class="tbl-wrap">
+          <table>
+            <thead><tr><th>رقم الفاتورة</th><th>العميل</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+            <tbody>
+              <tr><td style="font-family:var(--mono);font-size:12px">#INV-0234</td><td>محمد علي</td><td style="font-family:var(--mono)">850 ج</td><td><span class="badge badge-green">مكتملة</span></td></tr>
+              <tr><td style="font-family:var(--mono);font-size:12px">#INV-0233</td><td>سارة أحمد</td><td style="font-family:var(--mono)">1,200 ج</td><td><span class="badge badge-purple">تقسيط</span></td></tr>
+              <tr><td style="font-family:var(--mono);font-size:12px">#INV-0232</td><td>—</td><td style="font-family:var(--mono)">340 ج</td><td><span class="badge badge-green">مكتملة</span></td></tr>
+              <tr><td style="font-family:var(--mono);font-size:12px">#INV-0231</td><td>خالد حسن</td><td style="font-family:var(--mono)">2,100 ج</td><td><span class="badge badge-amber">جزئي</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:0">تنبيهات المخزون</div>
+          <span style="font-size:12px;color:var(--c-primary2);cursor:pointer" onclick="show('stock','WF-09 · المخزون')">عرض الكل ←</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <div class="alert alert-warning">⚠️ تيشيرت أزرق — الكمية: 3 قطع (أقل من الحد: 10)</div>
+          <div class="alert alert-warning">⚠️ بنطلون جينز — الكمية: 1 قطعة</div>
+          <div class="alert alert-warning">⚠️ حذاء رياضي مقاس 42 — الكمية: 0</div>
+        </div>
+        <div class="divider"></div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div class="card-title" style="margin-bottom:0">أقساط متأخرة</div>
+          <span style="font-size:12px;color:var(--c-primary2);cursor:pointer" onclick="show('installments','WF-06 · التقسيط')">عرض الكل ←</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:var(--r)">
+            <div>
+              <div style="font-size:12px;font-weight:500">محمد سعيد</div>
+              <div style="font-size:11px;color:var(--c-muted)">قسط أبريل — متأخر 12 يوم</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:13px;color:var(--c-red)">500 ج</div>
+          </div>
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:8px;background:rgba(239,68,68,.05);border:1px solid rgba(239,68,68,.15);border-radius:var(--r)">
+            <div>
+              <div style="font-size:12px;font-weight:500">نورا إبراهيم</div>
+              <div style="font-size:11px;color:var(--c-muted)">قسط مارس — متأخر 42 يوم</div>
+            </div>
+            <div style="font-family:var(--mono);font-size:13px;color:var(--c-red)">750 ج</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-04: POS ────── -->
+<div id="page-pos" class="page">
+  <div class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-breadcrumb">نقطة البيع <span>← فاتورة جديدة</span></span>
+    </div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm">⌨️ اختصارات</button>
+      <button class="btn btn-ghost btn-sm">📋 فواتير معلّقة (2)</button>
+    </div>
+  </div>
+  <div style="padding:16px 20px">
+    <div class="pos-layout">
+      <div class="pos-products">
+        <div style="display:flex;gap:10px">
+          <div class="pos-search" style="flex:1">
+            <span class="ico">🔍</span>
+            <input placeholder="ابحث بالاسم أو الباركود... (F3)">
+          </div>
+          <select class="form-input form-select" style="width:160px">
+            <option>كل التصنيفات</option>
+            <option>تيشيرتات</option>
+            <option>بناطيل</option>
+            <option>أحذية</option>
+          </select>
+        </div>
+        <div class="product-grid" style="flex:1">
+          <div class="product-card"><div class="p-img">👕</div><div class="p-name">تيشيرت بيسيك أبيض</div><div class="p-price">150 ج</div><div class="p-stock">42 قطعة</div></div>
+          <div class="product-card"><div class="p-img">👖</div><div class="p-name">بنطلون جينز كلاسيك</div><div class="p-price">350 ج</div><div class="p-stock">18 قطعة</div></div>
+          <div class="product-card" style="border-color:var(--c-primary);background:rgba(99,102,241,.05)"><div class="p-img">🧢</div><div class="p-name">كاب رياضي</div><div class="p-price">120 ج</div><div class="p-stock">35 قطعة</div></div>
+          <div class="product-card"><div class="p-img">🧥</div><div class="p-name">جاكيت شتوي</div><div class="p-price">680 ج</div><div class="p-stock">7 قطع</div></div>
+          <div class="product-card"><div class="p-img">👟</div><div class="p-name">حذاء رياضي أبيض</div><div class="p-price">450 ج</div><div class="p-stock">12 قطعة</div></div>
+          <div class="product-card"><div class="p-img">👗</div><div class="p-name">فستان صيفي</div><div class="p-price">280 ج</div><div class="p-stock">9 قطع</div></div>
+          <div class="product-card"><div class="p-img">🧦</div><div class="p-name">جوارب قطن 3 pack</div><div class="p-price">85 ج</div><div class="p-stock">60 قطعة</div></div>
+          <div class="product-card"><div class="p-img">👔</div><div class="p-name">قميص أوكسفورد</div><div class="p-price">390 ج</div><div class="p-stock">14 قطعة</div></div>
+        </div>
+      </div>
+
+      <div class="pos-cart">
+        <div class="cart-header" style="display:flex;justify-content:space-between;align-items:center">
+          <span>🛒 الفاتورة الحالية</span>
+          <span style="font-family:var(--mono);font-size:12px;color:var(--c-muted)">#INV-0235</span>
+        </div>
+        <div style="padding:10px 12px;border-bottom:1px solid var(--c-border);display:flex;gap:8px;align-items:center">
+          <span style="font-size:12px;color:var(--c-muted)">العميل:</span>
+          <select class="form-input" style="flex:1;padding:5px 8px;font-size:12px">
+            <option>— بيع نقدي —</option>
+            <option>محمد علي</option>
+            <option>سارة أحمد</option>
+          </select>
+          <button class="btn btn-ghost btn-sm btn-icon" title="عميل جديد">+</button>
+        </div>
+        <div class="cart-items">
+          <div class="cart-item">
+            <div class="ci-name">تيشيرت بيسيك أبيض</div>
+            <div class="ci-qty">
+              <button>−</button><span>2</span><button>+</button>
+            </div>
+            <div class="ci-price">300 ج</div>
+          </div>
+          <div class="cart-item">
+            <div class="ci-name">كاب رياضي</div>
+            <div class="ci-qty">
+              <button>−</button><span>1</span><button>+</button>
+            </div>
+            <div class="ci-price">120 ج</div>
+          </div>
+        </div>
+        <div class="cart-footer">
+          <div style="display:flex;gap:8px;margin-bottom:10px">
+            <input class="form-input" placeholder="كوبون خصم..." style="flex:1;padding:7px 10px;font-size:12px">
+            <button class="btn btn-ghost btn-sm">تطبيق</button>
+          </div>
+          <div class="cart-total-row"><span style="color:var(--c-muted)">المجموع</span><span class="amount">420 ج</span></div>
+          <div class="cart-total-row"><span style="color:var(--c-muted)">خصم</span><span class="amount" style="color:var(--c-green)">−0 ج</span></div>
+          <div class="cart-total-row"><span style="color:var(--c-muted)">ضريبة</span><span class="amount">0 ج</span></div>
+          <div class="cart-total-row big"><span>الإجمالي</span><span class="amount" style="font-size:20px">420 ج</span></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:12px" id="payMethodGrid">
+            <div class="pay-btn active" onclick="selectPay(this,0)">💵 كاش<div style="font-size:9px;color:var(--c-green)">0%</div></div>
+            <div class="pay-btn" onclick="selectPay(this,7.35)">💳 فيزا<div style="font-size:9px;color:var(--c-muted)">1.75%</div></div>
+            <div class="pay-btn" onclick="selectPay(this,2)">📱 فلوسة<div style="font-size:9px;color:var(--c-muted)">2 ج ثابت</div></div>
+            <div class="pay-btn" onclick="selectPay(this,0)">📲 إنستاباي<div style="font-size:9px;color:var(--c-green)">0%</div></div>
+            <div class="pay-btn" onclick="selectPay(this,12.6)">🏦 Valu<div style="font-size:9px;color:var(--c-muted)">3%</div></div>
+            <div class="pay-btn" onclick="show('installments','WF-06 · التقسيط')">📋 تقسيط<div style="font-size:9px;color:var(--c-muted)">داخلي</div></div>
+          </div>
+          <div id="feeBox" style="display:none;margin-top:8px;background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.2);border-radius:var(--r);padding:8px 10px">
+            <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:6px">
+              <span style="color:var(--c-muted)">رسوم الدفع</span>
+              <span id="feeVal" style="color:var(--c-amber);font-family:var(--mono)">+0 ج</span>
+            </div>
+            <div style="font-size:11px;color:var(--c-muted);margin-bottom:6px">مين يتحمل الرسوم؟</div>
+            <div style="display:flex;gap:6px">
+              <button class="pay-btn active" style="flex:1;padding:5px" id="bearerCustomer" onclick="setBearerCustomer()">العميل يدفع</button>
+              <button class="pay-btn" style="flex:1;padding:5px" id="bearerMerchant" onclick="setBearerMerchant()">المحل يتحمل</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width:100%;justify-content:center;margin-top:8px;padding:10px;font-size:14px">
+            ✓ إتمام البيع — <span id="finalTotal">420</span> ج
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-05: INVOICES ────── -->
+<div id="page-invoices" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المبيعات <span>← الفواتير</span></span></div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm">📥 تصدير Excel</button>
+      <button class="btn btn-primary btn-sm" onclick="show('pos','WF-04 · POS — نقطة البيع')">+ فاتورة جديدة</button>
+    </div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header">
+      <div><div class="page-title">الفواتير</div><div class="page-sub">إجمالي هذا الشهر: 187,450 ج</div></div>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <input class="form-input" placeholder="🔍 بحث برقم الفاتورة أو اسم العميل..." style="width:280px">
+      <select class="form-input form-select" style="width:150px"><option>كل الحالات</option><option>مكتملة</option><option>تقسيط</option><option>مرتجع</option></select>
+      <select class="form-input form-select" style="width:150px"><option>كل طرق الدفع</option><option>كاش</option><option>كارت</option><option>تقسيط</option></select>
+      <input class="form-input" type="date" style="width:140px" value="2026-04-01">
+      <input class="form-input" type="date" style="width:140px" value="2026-04-28">
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>رقم الفاتورة</th><th>التاريخ</th><th>العميل</th><th>الكاشير</th><th>طريقة الدفع</th><th>الإجمالي</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td style="font-family:var(--mono)">#INV-0234</td><td style="color:var(--c-muted)">اليوم 2:14م</td><td>محمد علي</td><td>كريم سالم</td><td>كاش</td><td style="font-family:var(--mono)">850 ج</td><td><span class="badge badge-green">مكتملة</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td style="font-family:var(--mono)">#INV-0233</td><td style="color:var(--c-muted)">اليوم 11:42ص</td><td>سارة أحمد</td><td>منى خالد</td><td>تقسيط داخلي</td><td style="font-family:var(--mono)">3,600 ج</td><td><span class="badge badge-purple">تقسيط</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td style="font-family:var(--mono)">#INV-0232</td><td style="color:var(--c-muted)">اليوم 10:08ص</td><td>—</td><td>كريم سالم</td><td>كاش</td><td style="font-family:var(--mono)">340 ج</td><td><span class="badge badge-green">مكتملة</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td style="font-family:var(--mono)">#INV-0231</td><td style="color:var(--c-muted)">أمس 5:30م</td><td>خالد حسن</td><td>منى خالد</td><td>كارت</td><td style="font-family:var(--mono)">2,100 ج</td><td><span class="badge badge-green">مكتملة</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td style="font-family:var(--mono)">#INV-0230</td><td style="color:var(--c-muted)">أمس 3:15م</td><td>فاطمة محمود</td><td>كريم سالم</td><td>Valu</td><td style="font-family:var(--mono)">5,200 ج</td><td><span class="badge badge-blue">تمويل خارجي</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td style="font-family:var(--mono)">#INV-0229</td><td style="color:var(--c-muted)">أمس 1:00م</td><td>عمر سعيد</td><td>منى خالد</td><td>كاش</td><td style="font-family:var(--mono)">680 ج</td><td><span class="badge badge-red">مرتجع</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding:0 4px">
+      <span style="font-size:12px;color:var(--c-muted)">عرض 1-6 من 234 فاتورة</span>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-ghost btn-sm">← السابق</button>
+        <button class="btn btn-primary btn-sm">1</button>
+        <button class="btn btn-ghost btn-sm">2</button>
+        <button class="btn btn-ghost btn-sm">3</button>
+        <button class="btn btn-ghost btn-sm">التالي →</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-06: INSTALLMENTS ────── -->
+<div id="page-installments" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المبيعات <span>← التقسيط</span></span></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header">
+      <div><div class="page-title">عقود التقسيط</div><div class="page-sub">3 عقود تنتظر الموافقة</div></div>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn active">⏳ تنتظر الموافقة (3)</button>
+      <button class="tab-btn">✅ نشطة (18)</button>
+      <button class="tab-btn">🔴 متأخرة (3)</button>
+      <button class="tab-btn">🏁 مكتملة (42)</button>
+    </div>
+
+    <div class="alert alert-warning" style="margin-bottom:16px">⚠️ 3 عقود تقسيط تنتظر موافقتك — يجب الموافقة قبل إتمام البيع</div>
+
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="card card-sm">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-family:var(--mono);font-size:12px;color:var(--c-muted)">#CTR-0089</span>
+              <span class="badge badge-amber">⏳ تنتظر الموافقة</span>
+            </div>
+            <div class="grid-4" style="gap:12px">
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">العميل</div><div style="font-size:13px;font-weight:500">محمد سعيد</div></div>
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">إجمالي العقد</div><div style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--c-primary2)">6,000 ج</div></div>
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">المقدم</div><div style="font-size:13px;font-family:var(--mono)">1,000 ج</div></div>
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">القسط الشهري</div><div style="font-size:13px;font-family:var(--mono)">500 ج × 10</div></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+            <button class="btn btn-primary btn-sm">✓ موافقة</button>
+            <button class="btn btn-danger btn-sm">✗ رفض</button>
+            <button class="btn btn-ghost btn-sm">👁 تفاصيل</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-sm">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:16px">
+          <div style="flex:1">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+              <span style="font-family:var(--mono);font-size:12px;color:var(--c-muted)">#CTR-0088</span>
+              <span class="badge badge-amber">⏳ تنتظر الموافقة</span>
+            </div>
+            <div class="grid-4" style="gap:12px">
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">العميل</div><div style="font-size:13px;font-weight:500">نورا إبراهيم</div></div>
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">إجمالي العقد</div><div style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--c-primary2)">9,000 ج</div></div>
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">المقدم</div><div style="font-size:13px;font-family:var(--mono)">1,500 ج</div></div>
+              <div><div style="font-size:10px;color:var(--c-muted);margin-bottom:2px">القسط الشهري</div><div style="font-size:13px;font-family:var(--mono)">750 ج × 10</div></div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">
+            <button class="btn btn-primary btn-sm">✓ موافقة</button>
+            <button class="btn btn-danger btn-sm">✗ رفض</button>
+            <button class="btn btn-ghost btn-sm">👁 تفاصيل</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-07: CUSTOMERS ────── -->
+<div id="page-customers" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المبيعات <span>← العملاء</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ عميل جديد</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">العملاء</div><div class="page-sub">346 عميل مسجّل</div></div></div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <input class="form-input" placeholder="🔍 بحث بالاسم أو التليفون..." style="width:300px">
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>الاسم</th><th>التليفون</th><th>عدد الفواتير</th><th>إجمالي المشتريات</th><th>رصيد مرتجعات</th><th>عقود تقسيط</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:500">محمد علي</td><td style="font-family:var(--mono)">01012345678</td><td style="font-family:var(--mono)">12</td><td style="font-family:var(--mono)">8,400 ج</td><td style="font-family:var(--mono);color:var(--c-green)">0 ج</td><td><span class="badge badge-gray">لا يوجد</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td style="font-weight:500">سارة أحمد</td><td style="font-family:var(--mono)">01098765432</td><td style="font-family:var(--mono)">5</td><td style="font-family:var(--mono)">15,200 ج</td><td style="font-family:var(--mono);color:var(--c-amber)">200 ج</td><td><span class="badge badge-purple">عقدان نشطان</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td style="font-weight:500">خالد حسن</td><td style="font-family:var(--mono)">01234567890</td><td style="font-family:var(--mono)">8</td><td style="font-family:var(--mono)">6,750 ج</td><td style="font-family:var(--mono);color:var(--c-green)">0 ج</td><td><span class="badge badge-gray">لا يوجد</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-08: PRODUCTS ────── -->
+<div id="page-products" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المخزون <span>← المنتجات</span></span></div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm">📥 استيراد Excel</button>
+      <button class="btn btn-primary btn-sm">+ منتج جديد</button>
+    </div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">المنتجات</div><div class="page-sub">248 منتج نشط</div></div></div>
+    <div style="display:flex;gap:10px;margin-bottom:16px">
+      <input class="form-input" placeholder="🔍 بحث بالاسم أو الباركود..." style="width:280px">
+      <select class="form-input form-select" style="width:160px"><option>كل التصنيفات</option><option>تيشيرتات</option><option>بناطيل</option></select>
+      <select class="form-input form-select" style="width:130px"><option>كل المنتجات</option><option>أقل من الحد</option><option>نفذت</option></select>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>المنتج</th><th>الباركود</th><th>التصنيف</th><th>سعر التكلفة</th><th>سعر البيع</th><th>VAT</th><th>الكمية (الفرع الرئيسي)</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;background:var(--c-border);border-radius:6px;display:flex;align-items:center;justify-content:center">👕</div><span style="font-weight:500">تيشيرت بيسيك أبيض</span></div></td>
+            <td style="font-family:var(--mono);font-size:12px">8901234567890</td>
+            <td>تيشيرتات</td>
+            <td style="font-family:var(--mono)">80 ج</td>
+            <td style="font-family:var(--mono);color:var(--c-primary2)">150 ج</td>
+            <td><span class="badge badge-gray">0%</span></td>
+            <td style="font-family:var(--mono)"><span style="color:var(--c-green)">42</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+          <tr>
+            <td><div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;background:var(--c-border);border-radius:6px;display:flex;align-items:center;justify-content:center">👖</div><span style="font-weight:500">بنطلون جينز كلاسيك</span></div></td>
+            <td style="font-family:var(--mono);font-size:12px">8901234567891</td>
+            <td>بناطيل</td>
+            <td style="font-family:var(--mono)">180 ج</td>
+            <td style="font-family:var(--mono);color:var(--c-primary2)">350 ج</td>
+            <td><span class="badge badge-blue">14%</span></td>
+            <td style="font-family:var(--mono)"><span style="color:var(--c-amber)">3 ⚠️</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+          <tr>
+            <td><div style="display:flex;align-items:center;gap:8px"><div style="width:32px;height:32px;background:var(--c-border);border-radius:6px;display:flex;align-items:center;justify-content:center">👟</div><span style="font-weight:500">حذاء رياضي أبيض 42</span></div></td>
+            <td style="font-family:var(--mono);font-size:12px">8901234567892</td>
+            <td>أحذية</td>
+            <td style="font-family:var(--mono)">220 ج</td>
+            <td style="font-family:var(--mono);color:var(--c-primary2)">450 ج</td>
+            <td><span class="badge badge-blue">14%</span></td>
+            <td style="font-family:var(--mono)"><span style="color:var(--c-red)">0 🔴</span></td>
+            <td><span class="badge badge-amber">نفذ</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-09: STOCK ────── -->
+<div id="page-stock" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المخزون <span>← المخزون الحالي</span></span></div>
+    <div class="topbar-right">
+      <button class="btn btn-ghost btn-sm">📥 جرد يدوي</button>
+      <button class="btn btn-primary btn-sm" onclick="show('transfers','WF-10 · تحويل المخزون')">🔄 تحويل بين فروع</button>
+    </div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">المخزون الحالي</div><div class="page-sub">الفرع الرئيسي — القاهرة</div></div></div>
+    <div class="stats" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat green"><div class="stat-label">إجمالي المنتجات</div><div class="stat-value">248</div></div>
+      <div class="stat amber"><div class="stat-label">منتجات أقل من الحد</div><div class="stat-value">12</div></div>
+      <div class="stat" style="--c-stat:var(--c-red)"><div class="stat-label">منتجات نفذت</div><div class="stat-value" style="color:var(--c-red)">4</div></div>
+    </div>
+    <div class="alert alert-warning">⚠️ 4 منتجات نفذت — ينصح بإنشاء أوامر شراء</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>المنتج</th><th>التصنيف</th><th>الكمية الحالية</th><th>الحد الأدنى</th><th>الحالة</th><th>آخر حركة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:500">تيشيرت بيسيك أبيض</td><td>تيشيرتات</td><td style="font-family:var(--mono);color:var(--c-green)">42</td><td style="font-family:var(--mono)">10</td><td><span class="badge badge-green">كافٍ</span></td><td style="color:var(--c-muted)">اليوم</td><td><button class="btn btn-ghost btn-sm">📋 حركات</button></td></tr>
+          <tr><td style="font-weight:500">بنطلون جينز كلاسيك</td><td>بناطيل</td><td style="font-family:var(--mono);color:var(--c-amber)">3</td><td style="font-family:var(--mono)">10</td><td><span class="badge badge-amber">⚠️ أقل من الحد</span></td><td style="color:var(--c-muted)">اليوم</td><td><button class="btn btn-ghost btn-sm">📋 حركات</button></td></tr>
+          <tr><td style="font-weight:500">حذاء رياضي أبيض 42</td><td>أحذية</td><td style="font-family:var(--mono);color:var(--c-red)">0</td><td style="font-family:var(--mono)">5</td><td><span class="badge badge-red">🔴 نفذ</span></td><td style="color:var(--c-muted)">أمس</td><td><button class="btn btn-ghost btn-sm">📋 حركات</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-10: TRANSFERS ────── -->
+<div id="page-transfers" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المخزون <span>← تحويل بين الفروع</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ طلب تحويل جديد</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">تحويلات المخزون</div><div class="page-sub">1 طلب ينتظر الموافقة</div></div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>رقم الطلب</th><th>من فرع</th><th>إلى فرع</th><th>عدد المنتجات</th><th>طلب بواسطة</th><th>التاريخ</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td style="font-family:var(--mono)">#TRF-012</td><td>الفرع الرئيسي</td><td>فرع الإسكندرية</td><td style="font-family:var(--mono)">3 منتجات</td><td>أمين المخزن</td><td style="color:var(--c-muted)">اليوم</td><td><span class="badge badge-amber">⏳ انتظار</span></td><td><button class="btn btn-primary btn-sm">✓ موافقة</button></td></tr>
+          <tr><td style="font-family:var(--mono)">#TRF-011</td><td>فرع الإسكندرية</td><td>الفرع الرئيسي</td><td style="font-family:var(--mono)">5 منتجات</td><td>مدير الفرع</td><td style="color:var(--c-muted)">أمس</td><td><span class="badge badge-green">✅ مكتمل</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-11: SUPPLIERS ────── -->
+<div id="page-suppliers" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المالية <span>← الموردون</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ مورد جديد</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">الموردون</div><div class="page-sub">إجمالي المديونية: 45,200 ج</div></div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>المورد</th><th>التليفون</th><th>عدد الطلبات</th><th>الرصيد</th><th>آخر معاملة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td style="font-weight:500">شركة النيل للملابس</td><td style="font-family:var(--mono)">0222345678</td><td style="font-family:var(--mono)">8</td><td style="font-family:var(--mono);color:var(--c-red)">−15,200 ج</td><td style="color:var(--c-muted)">منذ 3 أيام</td><td><div style="display:flex;gap:6px"><button class="btn btn-primary btn-sm">💳 دفعة</button><button class="btn btn-ghost btn-sm">👁</button></div></td></tr>
+          <tr><td style="font-weight:500">مصنع القاهرة للأقمشة</td><td style="font-family:var(--mono)">0233456789</td><td style="font-family:var(--mono)">5</td><td style="font-family:var(--mono);color:var(--c-green)">+2,400 ج</td><td style="color:var(--c-muted)">الأسبوع الماضي</td><td><div style="display:flex;gap:6px"><button class="btn btn-ghost btn-sm">💸 مرتجع</button><button class="btn btn-ghost btn-sm">👁</button></div></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-12: PURCHASES ────── -->
+<div id="page-purchases" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المالية <span>← المشتريات</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ أمر شراء جديد</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">أوامر الشراء</div><div class="page-sub">2 طلب ينتظران الموافقة</div></div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>رقم الأمر</th><th>المورد</th><th>الفرع</th><th>الإجمالي</th><th>المدفوع</th><th>تاريخ التسليم</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td style="font-family:var(--mono)">#PO-0045</td><td>شركة النيل للملابس</td><td>الفرع الرئيسي</td><td style="font-family:var(--mono)">12,500 ج</td><td style="font-family:var(--mono)">0 ج</td><td style="color:var(--c-muted)">1 مايو 2026</td><td><span class="badge badge-amber">⏳ انتظار</span></td><td><button class="btn btn-primary btn-sm">✓ موافقة</button></td></tr>
+          <tr><td style="font-family:var(--mono)">#PO-0044</td><td>مصنع القاهرة</td><td>الفرع الرئيسي</td><td style="font-family:var(--mono)">8,200 ج</td><td style="font-family:var(--mono);color:var(--c-green)">8,200 ج</td><td style="color:var(--c-muted)">25 أبريل 2026</td><td><span class="badge badge-green">✅ مكتمل</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-13: EXPENSES ────── -->
+<div id="page-expenses" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">المالية <span>← المصروفات</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ مصروف جديد</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">المصروفات</div><div class="page-sub">إجمالي هذا الشهر: 28,500 ج</div></div></div>
+    <div class="stats" style="grid-template-columns:repeat(4,1fr)">
+      <div class="stat green"><div class="stat-label">إيجار</div><div class="stat-value">15K</div></div>
+      <div class="stat amber"><div class="stat-label">كهرباء وماء</div><div class="stat-value">3.5K</div></div>
+      <div class="stat blue"><div class="stat-label">رواتب</div><div class="stat-value">8K</div></div>
+      <div class="stat purple"><div class="stat-label">متنوع</div><div class="stat-value">2K</div></div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>التصنيف</th><th>الوصف</th><th>المبلغ</th><th>طريقة الدفع</th><th>التاريخ</th><th>سُجّل بواسطة</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td><span class="badge badge-red">إيجار</span></td><td>إيجار أبريل 2026</td><td style="font-family:var(--mono)">15,000 ج</td><td>تحويل بنكي</td><td style="color:var(--c-muted)">1 أبريل</td><td>Super Admin</td><td><span class="badge badge-green">✅ معتمد</span></td><td><button class="btn btn-ghost btn-sm">👁</button></td></tr>
+          <tr><td><span class="badge badge-amber">صيانة</span></td><td>إصلاح تكييف الفرع</td><td style="font-family:var(--mono)">800 ج</td><td>كاش</td><td style="color:var(--c-muted)">20 أبريل</td><td>مدير الفرع</td><td><span class="badge badge-amber">⏳ انتظار</span></td><td><button class="btn btn-primary btn-sm">✓ اعتماد</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-14: REPORTS ────── -->
+<div id="page-reports" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">التقارير</span></div>
+    <div class="topbar-right">
+      <input class="form-input" type="date" value="2026-04-01" style="width:130px">
+      <input class="form-input" type="date" value="2026-04-28" style="width:130px">
+      <button class="btn btn-ghost btn-sm">📥 Excel</button>
+      <button class="btn btn-ghost btn-sm">📄 PDF</button>
+    </div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">التقارير والتحليلات</div></div></div>
+    <div class="tabs">
+      <button class="tab-btn active">📊 المبيعات</button>
+      <button class="tab-btn">📦 المخزون</button>
+      <button class="tab-btn">📋 التقسيط</button>
+      <button class="tab-btn">🏪 الموردون</button>
+      <button class="tab-btn">💸 المصروفات</button>
+      <button class="tab-btn">📈 الأرباح والخسائر</button>
+    </div>
+    <div class="stats">
+      <div class="stat green"><div class="stat-label">إجمالي المبيعات</div><div class="stat-value">187K</div><div class="stat-change up">↑ 12% عن الشهر السابق</div></div>
+      <div class="stat blue"><div class="stat-label">عدد الفواتير</div><div class="stat-value">234</div><div class="stat-change up">↑ 18 فاتورة</div></div>
+      <div class="stat amber"><div class="stat-label">متوسط قيمة الفاتورة</div><div class="stat-value">799</div><div class="stat-change up">↑ 5%</div></div>
+      <div class="stat purple"><div class="stat-label">صافي الربح</div><div class="stat-value">62K</div><div class="stat-change up">هامش 33%</div></div>
+    </div>
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-title">المبيعات اليومية — أبريل 2026</div>
+        <div class="chart-placeholder">
+          <div class="chart-bars">
+            <div class="bar" style="height:45%;background:rgba(99,102,241,.4)" data-val="5.2K"></div>
+            <div class="bar" style="height:60%;background:rgba(99,102,241,.45)" data-val="6.8K"></div>
+            <div class="bar" style="height:38%;background:rgba(99,102,241,.4)" data-val="4.4K"></div>
+            <div class="bar" style="height:75%;background:rgba(99,102,241,.5)" data-val="8.5K"></div>
+            <div class="bar" style="height:55%;background:rgba(99,102,241,.45)" data-val="6.2K"></div>
+            <div class="bar" style="height:85%;background:rgba(99,102,241,.55)" data-val="9.6K"></div>
+            <div class="bar" style="height:70%;background:rgba(99,102,241,.5)" data-val="7.9K"></div>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">توزيع طرق الدفع</div>
+        <div style="display:flex;flex-direction:column;gap:10px;margin-top:8px">
+          <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>💵 كاش</span><span style="font-family:var(--mono)">58% — 108,521 ج</span></div><div class="progress"><div class="progress-bar" style="width:58%;background:var(--c-green)"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>💳 كارت</span><span style="font-family:var(--mono)">24% — 44,988 ج</span></div><div class="progress"><div class="progress-bar" style="width:24%;background:var(--c-blue)"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>📋 تقسيط داخلي</span><span style="font-family:var(--mono)">12% — 22,494 ج</span></div><div class="progress"><div class="progress-bar" style="width:12%;background:var(--c-primary)"></div></div></div>
+          <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span>🏦 تمويل خارجي</span><span style="font-family:var(--mono)">6% — 11,247 ج</span></div><div class="progress"><div class="progress-bar" style="width:6%;background:var(--c-accent)"></div></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-15: USERS ────── -->
+<div id="page-users" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">الإعدادات <span>← المستخدمون والأدوار</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ مستخدم جديد</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">المستخدمون والأدوار</div><div class="page-sub">8 مستخدمين نشطين</div></div></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>المستخدم</th><th>البريد</th><th>الدور</th><th>الفرع</th><th>آخر دخول</th><th>الحالة</th><th>إجراءات</th></tr></thead>
+        <tbody>
+          <tr><td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,var(--c-primary),var(--c-accent));display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;font-weight:700">أح</div><span style="font-weight:500">أحمد محمد</span></div></td><td style="color:var(--c-muted)">ahmed@store.com</td><td><span class="badge badge-purple">Super Admin</span></td><td>كل الفروع</td><td style="color:var(--c-muted)">الآن</td><td><span class="badge badge-green">نشط</span></td><td><button class="btn btn-ghost btn-sm">✏️</button></td></tr>
+          <tr><td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:7px;background:var(--c-border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--c-muted);font-weight:700">كر</div><span style="font-weight:500">كريم سالم</span></div></td><td style="color:var(--c-muted)">karim@store.com</td><td><span class="badge badge-green">Cashier</span></td><td>الفرع الرئيسي</td><td style="color:var(--c-muted)">منذ ساعة</td><td><span class="badge badge-green">نشط</span></td><td><button class="btn btn-ghost btn-sm">✏️</button></td></tr>
+          <tr><td><div style="display:flex;align-items:center;gap:8px"><div style="width:28px;height:28px;border-radius:7px;background:var(--c-border);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--c-muted);font-weight:700">من</div><span style="font-weight:500">منى خالد</span></div></td><td style="color:var(--c-muted)">mona@store.com</td><td><span class="badge badge-blue">Branch Manager</span></td><td>فرع الإسكندرية</td><td style="color:var(--c-muted)">منذ 3 ساعات</td><td><span class="badge badge-green">نشط</span></td><td><button class="btn btn-ghost btn-sm">✏️</button></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-16: BRANCHES ────── -->
+<div id="page-branches" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">الإعدادات <span>← الفروع</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ فرع جديد</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">الفروع</div><div class="page-sub">3 فروع نشطة</div></div></div>
+    <div class="grid-3">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div><div style="font-size:15px;font-weight:600;color:var(--c-white)">الفرع الرئيسي</div><div style="font-size:11px;color:var(--c-muted);margin-top:2px">القاهرة — المعادي</div></div>
+          <span class="badge badge-green">نشط</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--c-muted)">المستخدمون</span><span style="font-family:var(--mono)">5</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--c-muted)">مبيعات اليوم</span><span style="font-family:var(--mono);color:var(--c-primary2)">8,450 ج</span></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:12px">إدارة الفرع</button>
+      </div>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px">
+          <div><div style="font-size:15px;font-weight:600;color:var(--c-white)">فرع الإسكندرية</div><div style="font-size:11px;color:var(--c-muted);margin-top:2px">الإسكندرية — سموحة</div></div>
+          <span class="badge badge-green">نشط</span>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;font-size:12px">
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--c-muted)">المستخدمون</span><span style="font-family:var(--mono)">2</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:var(--c-muted)">مبيعات اليوم</span><span style="font-family:var(--mono);color:var(--c-primary2)">4,000 ج</span></div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center;margin-top:12px">إدارة الفرع</button>
+      </div>
+      <div class="card" style="border-style:dashed;display:flex;align-items:center;justify-content:center;cursor:pointer;min-height:140px" onclick="">
+        <div style="text-align:center;color:var(--c-muted)">
+          <div style="font-size:28px;margin-bottom:8px">+</div>
+          <div style="font-size:13px">إضافة فرع جديد</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ────── WF-17: SETTINGS ────── -->
+<div id="page-settings" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">الإعدادات</span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">💾 حفظ التغييرات</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header"><div><div class="page-title">إعدادات النظام</div></div></div>
+    <div class="grid-2" style="gap:20px">
+      <div class="card">
+        <div class="card-title">إعدادات المتجر</div>
+        <div class="form-grid" style="gap:12px">
+          <div class="form-group"><div class="form-label">اسم المتجر</div><input class="form-input" value="متجر أحمد للملابس"></div>
+          <div class="form-group"><div class="form-label">العملة الافتراضية</div><select class="form-input form-select"><option>جنيه مصري (EGP)</option><option>دولار أمريكي (USD)</option></select></div>
+          <div class="form-group"><div class="form-label">اللغة</div><select class="form-input form-select"><option>العربية</option><option>English</option></select></div>
+          <div class="form-group"><div class="form-label">المنطقة الزمنية</div><select class="form-input form-select"><option>Africa/Cairo (GMT+3)</option></select></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">إعدادات الضرائب</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <span style="font-size:13px">تفعيل ضريبة القيمة المضافة (VAT)</span>
+          <div style="width:40px;height:22px;background:var(--c-green);border-radius:11px;position:relative;cursor:pointer"><div style="width:18px;height:18px;background:#fff;border-radius:50%;position:absolute;top:2px;left:2px;transition:.2s"></div></div>
+        </div>
+        <div class="form-group"><div class="form-label">النسبة الافتراضية للـ VAT</div><input class="form-input" value="14" type="number"><div class="form-hint">يمكن تحديد نسبة مختلفة لكل منتج</div></div>
+      </div>
+      <div class="card">
+        <div class="card-title">الباقة الحالية</div>
+        <div style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.2);border-radius:var(--r);padding:14px;margin-bottom:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <div><div style="font-size:14px;font-weight:600;color:var(--c-primary2)">Professional</div><div style="font-size:11px;color:var(--c-muted);margin-top:2px">تجديد في 28 مايو 2026</div></div>
+            <div style="font-family:var(--mono);font-size:18px;font-weight:700">499 ج<span style="font-size:11px;color:var(--c-muted)">/شهر</span></div>
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" style="width:100%;justify-content:center">⬆️ ترقية للـ Enterprise</button>
+      </div>
+      <div class="card">
+        <div class="card-title">إعدادات الطباعة</div>
+        <div class="form-group" style="margin-bottom:12px"><div class="form-label">حجم الطباعة الافتراضي</div><select class="form-input form-select"><option>A4</option><option>A5</option></select></div>
+        <div class="form-group"><div class="form-label">ظهور اللوجو في الفاتورة</div>
+          <div style="display:flex;align-items:center;gap:8px"><input type="checkbox" checked><span style="font-size:12px;color:var(--c-muted2)">نعم، أضف اللوجو للفواتير والعقود</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ────── WF-18: PAYMENT METHODS ────── -->
+<div id="page-payment-methods" class="page">
+  <div class="topbar">
+    <div class="topbar-left"><span class="topbar-breadcrumb">الإعدادات <span>← طرق الدفع والرسوم</span></span></div>
+    <div class="topbar-right"><button class="btn btn-primary btn-sm">+ طريقة دفع جديدة</button></div>
+  </div>
+  <div style="padding:24px 28px">
+    <div class="page-header">
+      <div><div class="page-title">طرق الدفع والرسوم</div><div class="page-sub">إعداد الـ fees لكل طريقة دفع</div></div>
+    </div>
+    <div class="alert alert-info" style="margin-bottom:16px">💡 الـ fees تُحسب تلقائياً في شاشة البيع — ولو المحل يتحمل الرسوم بتتسجل كمصروف تلقائياً</div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr><th>طريقة الدفع</th><th>النوع</th><th>نوع الـ Fee</th><th>النسبة %</th><th>ثابت ج</th><th>من يتحمل؟</th><th>الحالة</th><th>إجراءات</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:500">💵 كاش</td>
+            <td><span class="badge badge-gray">cash</span></td>
+            <td><span class="badge badge-green">none</span></td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td><span class="badge badge-gray">—</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:500">💳 فيزا / ماستركارد</td>
+            <td><span class="badge badge-blue">card</span></td>
+            <td><span class="badge badge-blue">percentage</span></td>
+            <td style="font-family:var(--mono);color:var(--c-amber)">1.75%</td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td><span class="badge badge-amber">merchant</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:500">📱 فلوسة</td>
+            <td><span class="badge badge-purple">wallet</span></td>
+            <td><span class="badge badge-amber">fixed</span></td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td style="font-family:var(--mono);color:var(--c-amber)">2.00 ج</td>
+            <td><span class="badge badge-amber">merchant</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:500">📲 إنستاباي</td>
+            <td><span class="badge badge-purple">wallet</span></td>
+            <td><span class="badge badge-green">none</span></td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td><span class="badge badge-gray">—</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:500">🏦 Valu</td>
+            <td><span class="badge badge-red">bnpl</span></td>
+            <td><span class="badge badge-blue">percentage</span></td>
+            <td style="font-family:var(--mono);color:var(--c-amber)">3.00%</td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td><span class="badge badge-amber">merchant</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+          <tr>
+            <td style="font-weight:500">🔄 تحويل بنكي</td>
+            <td><span class="badge badge-gray">bank_transfer</span></td>
+            <td><span class="badge badge-amber">fixed</span></td>
+            <td style="font-family:var(--mono);color:var(--c-muted)">—</td>
+            <td style="font-family:var(--mono);color:var(--c-amber)">5.00 ج</td>
+            <td><span class="badge badge-blue">negotiable</span></td>
+            <td><span class="badge badge-green">نشط</span></td>
+            <td><button class="btn btn-ghost btn-sm">✏️</button></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:24px">
+      <div class="page-header" style="margin-bottom:16px">
+        <div><div style="font-size:16px;font-weight:600;color:var(--c-white)">تقرير الرسوم — أبريل 2026</div></div>
+        <button class="btn btn-ghost btn-sm">📥 تصدير Excel</button>
+      </div>
+      <div class="stats">
+        <div class="stat amber"><div class="stat-label">إجمالي الرسوم</div><div class="stat-value">2,293</div><div class="stat-change down">هذا الشهر</div></div>
+        <div class="stat red"><div class="stat-label">تحملها المحل</div><div class="stat-value">1,579</div><div class="stat-change down">↑ تحتاج مراجعة</div></div>
+        <div class="stat green"><div class="stat-label">تحملها العميل</div><div class="stat-value">714</div><div class="stat-change up">مُحوَّلة للعميل</div></div>
+        <div class="stat blue"><div class="stat-label">صافي الخسارة</div><div class="stat-value">1,579</div><div class="stat-change down">مصروف تلقائي</div></div>
+      </div>
+      <div class="tbl-wrap">
+        <table>
+          <thead><tr><th>طريقة الدفع</th><th>العمليات</th><th>إجمالي المبيعات</th><th>إجمالي الـ Fees</th><th>تحملها العميل</th><th>تحملها المحل</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:500">💳 فيزا/ماستركارد</td><td style="font-family:var(--mono)">45</td><td style="font-family:var(--mono)">38,250 ج</td><td style="font-family:var(--mono);color:var(--c-amber)">892 ج</td><td style="font-family:var(--mono);color:var(--c-green)">634 ج</td><td style="font-family:var(--mono);color:var(--c-red)">258 ج</td></tr>
+            <tr><td style="font-weight:500">📱 فلوسة</td><td style="font-family:var(--mono)">23</td><td style="font-family:var(--mono)">11,500 ج</td><td style="font-family:var(--mono);color:var(--c-amber)">201 ج</td><td style="font-family:var(--mono);color:var(--c-green)">80 ج</td><td style="font-family:var(--mono);color:var(--c-red)">121 ج</td></tr>
+            <tr><td style="font-weight:500">📲 إنستاباي</td><td style="font-family:var(--mono)">18</td><td style="font-family:var(--mono)">9,000 ج</td><td style="font-family:var(--mono);color:var(--c-green)">0 ج</td><td style="font-family:var(--mono)">—</td><td style="font-family:var(--mono)">—</td></tr>
+            <tr><td style="font-weight:500">🏦 Valu/Sympl</td><td style="font-family:var(--mono)">8</td><td style="font-family:var(--mono)">24,000 ج</td><td style="font-family:var(--mono);color:var(--c-amber)">1,200 ج</td><td style="font-family:var(--mono)">0 ج</td><td style="font-family:var(--mono);color:var(--c-red)">1,200 ج</td></tr>
+            <tr style="font-weight:600;background:rgba(99,102,241,.05)"><td>الإجمالي</td><td style="font-family:var(--mono)">94</td><td style="font-family:var(--mono)">82,750 ج</td><td style="font-family:var(--mono);color:var(--c-amber)">2,293 ج</td><td style="font-family:var(--mono);color:var(--c-green)">714 ج</td><td style="font-family:var(--mono);color:var(--c-red)">1,579 ج</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+</div><!-- /main -->
+</div><!-- /shell -->
+
+<script>
+function show(pageId, label){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const page = document.getElementById('page-'+pageId);
+  if(page){ page.classList.add('active'); page.scrollTop=0; }
+  const item = document.querySelector(`.nav-item[data-page="${pageId}"]`);
+  if(item) item.classList.add('active');
+  document.getElementById('wfLabel').textContent = label;
+  document.querySelector('.main').scrollTop = 0;
+}
+// init
+show('dashboard','WF-03 · Dashboard');
+</script>
+</body>
+</html>

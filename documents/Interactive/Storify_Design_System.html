@@ -1,0 +1,1506 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Storify — Design System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Syne:wght@700;800&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════
+   DESIGN TOKENS
+═══════════════════════════════════════ */
+:root {
+  /* ── Brand Colors ── */
+  --brand-50:  #EEF2FF;
+  --brand-100: #E0E7FF;
+  --brand-200: #C7D2FE;
+  --brand-300: #A5B4FC;
+  --brand-400: #818CF8;
+  --brand-500: #6366F1;
+  --brand-600: #4F46E5;
+  --brand-700: #4338CA;
+  --brand-800: #3730A3;
+  --brand-900: #312E81;
+
+  /* ── Neutral Grays ── */
+  --gray-0:   #FFFFFF;
+  --gray-50:  #F8FAFC;
+  --gray-100: #F1F5F9;
+  --gray-200: #E2E8F0;
+  --gray-300: #CBD5E1;
+  --gray-400: #94A3B8;
+  --gray-500: #64748B;
+  --gray-600: #475569;
+  --gray-700: #334155;
+  --gray-800: #1E293B;
+  --gray-900: #0F172A;
+  --gray-950: #020617;
+
+  /* ── Semantic Colors ── */
+  --success-50:  #ECFDF5; --success-500: #10B981; --success-700: #047857;
+  --warning-50:  #FFFBEB; --warning-500: #F59E0B; --warning-700: #B45309;
+  --danger-50:   #FEF2F2; --danger-500:  #EF4444; --danger-700:  #B91C1C;
+  --info-50:     #EFF6FF; --info-500:    #3B82F6; --info-700:    #1D4ED8;
+
+  /* ── Accent Colors ── */
+  --accent-pink:   #EC4899;
+  --accent-cyan:   #06B6D4;
+  --accent-amber:  #F59E0B;
+  --accent-violet: #8B5CF6;
+  --accent-teal:   #14B8A6;
+
+  /* ── Typography ── */
+  --font-display: 'Syne', sans-serif;
+  --font-body:    'IBM Plex Sans Arabic', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* ── Font Sizes ── */
+  --text-xs:   0.75rem;   /* 12px */
+  --text-sm:   0.875rem;  /* 14px */
+  --text-base: 1rem;      /* 16px */
+  --text-lg:   1.125rem;  /* 18px */
+  --text-xl:   1.25rem;   /* 20px */
+  --text-2xl:  1.5rem;    /* 24px */
+  --text-3xl:  1.875rem;  /* 30px */
+  --text-4xl:  2.25rem;   /* 36px */
+  --text-5xl:  3rem;      /* 48px */
+
+  /* ── Font Weights ── */
+  --fw-light:   300;
+  --fw-regular: 400;
+  --fw-medium:  500;
+  --fw-semibold:600;
+  --fw-bold:    700;
+
+  /* ── Line Heights ── */
+  --lh-tight:  1.25;
+  --lh-snug:   1.375;
+  --lh-normal: 1.5;
+  --lh-relaxed:1.625;
+  --lh-loose:  2;
+
+  /* ── Spacing Scale (4px base) ── */
+  --sp-1:  0.25rem;  /* 4px  */
+  --sp-2:  0.5rem;   /* 8px  */
+  --sp-3:  0.75rem;  /* 12px */
+  --sp-4:  1rem;     /* 16px */
+  --sp-5:  1.25rem;  /* 20px */
+  --sp-6:  1.5rem;   /* 24px */
+  --sp-8:  2rem;     /* 32px */
+  --sp-10: 2.5rem;   /* 40px */
+  --sp-12: 3rem;     /* 48px */
+  --sp-16: 4rem;     /* 64px */
+  --sp-20: 5rem;     /* 80px */
+
+  /* ── Border Radius ── */
+  --r-sm:  0.25rem;  /* 4px  */
+  --r-md:  0.5rem;   /* 8px  */
+  --r-lg:  0.75rem;  /* 12px */
+  --r-xl:  1rem;     /* 16px */
+  --r-2xl: 1.5rem;   /* 24px */
+  --r-full:9999px;
+
+  /* ── Shadows ── */
+  --shadow-sm:  0 1px 2px 0 rgb(0 0 0 / .05);
+  --shadow-md:  0 4px 6px -1px rgb(0 0 0 / .1), 0 2px 4px -2px rgb(0 0 0 / .1);
+  --shadow-lg:  0 10px 15px -3px rgb(0 0 0 / .1), 0 4px 6px -4px rgb(0 0 0 / .1);
+  --shadow-xl:  0 20px 25px -5px rgb(0 0 0 / .1), 0 8px 10px -6px rgb(0 0 0 / .1);
+  --shadow-brand: 0 4px 14px 0 rgb(99 102 241 / .3);
+
+  /* ── Transitions ── */
+  --ease-fast:   150ms ease;
+  --ease-normal: 200ms ease;
+  --ease-slow:   300ms ease;
+
+  /* ── Z-Index Scale ── */
+  --z-base:    0;
+  --z-raised:  10;
+  --z-dropdown:100;
+  --z-sticky:  200;
+  --z-overlay: 300;
+  --z-modal:   400;
+  --z-toast:   500;
+}
+
+/* ═══════════════════════════════════════
+   RESET & BASE
+═══════════════════════════════════════ */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  line-height: var(--lh-normal);
+  color: var(--gray-800);
+  background: var(--gray-50);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ═══════════════════════════════════════
+   LAYOUT
+═══════════════════════════════════════ */
+.ds-shell { display: flex; min-height: 100vh; }
+.ds-sidebar {
+  width: 260px; flex-shrink: 0;
+  background: var(--gray-900);
+  position: fixed; top: 0; right: 0; bottom: 0;
+  overflow-y: auto; z-index: var(--z-sticky);
+  display: flex; flex-direction: column;
+}
+.ds-main { margin-right: 260px; flex: 1; }
+
+/* ── Sidebar ── */
+.sidebar-logo {
+  padding: 24px 20px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+}
+.sidebar-logo .brand {
+  font-family: var(--font-display);
+  font-size: 20px; font-weight: 800;
+  color: var(--brand-400);
+  letter-spacing: -0.5px;
+}
+.sidebar-logo .tag {
+  font-size: 10px; color: var(--gray-500);
+  font-family: var(--font-mono);
+  margin-top: 2px;
+}
+.sidebar-section {
+  padding: 14px 16px 4px;
+  font-size: 10px; font-weight: 600;
+  color: var(--gray-600);
+  text-transform: uppercase; letter-spacing: .1em;
+}
+.sidebar-link {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; font-size: 13px;
+  color: var(--gray-400); cursor: pointer;
+  border-right: 2px solid transparent;
+  transition: var(--ease-fast);
+  text-decoration: none;
+}
+.sidebar-link:hover { color: var(--gray-200); background: rgba(255,255,255,.04); }
+.sidebar-link.active { color: var(--brand-400); border-right-color: var(--brand-500); background: rgba(99,102,241,.08); }
+.sidebar-link .icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+.sidebar-version {
+  margin-top: auto; padding: 12px 16px;
+  border-top: 1px solid rgba(255,255,255,.06);
+  font-size: 10px; color: var(--gray-600);
+  font-family: var(--font-mono);
+}
+
+/* ── Topbar ── */
+.ds-topbar {
+  position: sticky; top: 0; z-index: var(--z-sticky);
+  background: rgba(248,250,252,.95);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--gray-200);
+  padding: 14px 40px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.topbar-title { font-size: 20px; font-weight: 700; color: var(--gray-900); letter-spacing: -0.3px; }
+.topbar-badge {
+  background: var(--brand-50); color: var(--brand-700);
+  border: 1px solid var(--brand-200);
+  font-size: 11px; font-weight: 600;
+  padding: 3px 10px; border-radius: var(--r-full);
+  font-family: var(--font-mono);
+}
+
+/* ── Sections ── */
+.ds-section { padding: 48px 40px; border-bottom: 1px solid var(--gray-200); }
+.section-title {
+  font-family: var(--font-display);
+  font-size: 28px; font-weight: 800;
+  color: var(--gray-900); letter-spacing: -0.5px;
+  margin-bottom: 6px;
+}
+.section-sub { font-size: 15px; color: var(--gray-500); margin-bottom: 32px; }
+.subsection-title { font-size: 16px; font-weight: 600; color: var(--gray-800); margin-bottom: 12px; margin-top: 32px; }
+.subsection-sub { font-size: 13px; color: var(--gray-500); margin-bottom: 16px; }
+
+/* ── Demo frame ── */
+.demo-frame {
+  background: var(--gray-0);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--r-xl);
+  padding: 32px;
+  margin-bottom: 16px;
+}
+.demo-frame.dark {
+  background: var(--gray-900);
+  border-color: rgba(255,255,255,.08);
+}
+.demo-frame.grid { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-start; }
+.demo-frame.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+
+/* ── Code block ── */
+.code-block {
+  background: var(--gray-900); color: var(--brand-300);
+  font-family: var(--font-mono); font-size: 12px;
+  line-height: 1.7; padding: 20px 24px;
+  border-radius: var(--r-lg); overflow-x: auto;
+  border: 1px solid rgba(255,255,255,.06);
+}
+.code-block .c-comment { color: var(--gray-500); }
+.code-block .c-key { color: var(--accent-pink); }
+.code-block .c-val { color: var(--accent-cyan); }
+.code-block .c-str { color: var(--success-500); }
+
+/* ── Token pill ── */
+.token-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-mono); font-size: 11px;
+  background: var(--gray-100); color: var(--gray-700);
+  padding: 3px 10px; border-radius: var(--r-full);
+  border: 1px solid var(--gray-200);
+}
+.token-pill .swatch { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+/* ── Tables ── */
+.ds-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ds-table th { text-align: right; padding: 10px 14px; background: var(--gray-100); color: var(--gray-600); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--gray-200); }
+.ds-table td { padding: 10px 14px; border-bottom: 1px solid var(--gray-100); color: var(--gray-700); }
+.ds-table tr:last-child td { border-bottom: none; }
+.ds-table code { font-family: var(--font-mono); font-size: 11px; background: var(--gray-100); padding: 2px 6px; border-radius: 4px; color: var(--brand-700); }
+
+/* ═══════════════════════════════════════
+   COMPONENT DEMOS
+═══════════════════════════════════════ */
+
+/* ── COLORS ── */
+.color-grid { display: grid; grid-template-columns: repeat(10,1fr); gap: 0; border-radius: var(--r-lg); overflow: hidden; height: 64px; }
+.color-swatch { height: 100%; transition: transform var(--ease-fast); cursor: pointer; position: relative; }
+.color-swatch:hover { transform: scaleY(1.08); z-index: 1; }
+.color-swatch::after { content: attr(data-val); position: absolute; bottom: -22px; left: 50%; transform: translateX(-50%); font-size: 9px; font-family: var(--font-mono); color: var(--gray-500); white-space: nowrap; opacity: 0; transition: opacity var(--ease-fast); }
+.color-swatch:hover::after { opacity: 1; }
+.color-row { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+.color-big { width: 48px; height: 48px; border-radius: var(--r-md); flex-shrink: 0; box-shadow: var(--shadow-sm); }
+.color-info .name { font-size: 13px; font-weight: 600; color: var(--gray-800); }
+.color-info .hex  { font-family: var(--font-mono); font-size: 11px; color: var(--gray-500); }
+.color-info .use  { font-size: 11px; color: var(--gray-400); }
+
+/* ── TYPOGRAPHY ── */
+.type-scale { display: flex; flex-direction: column; gap: 0; }
+.type-row { display: flex; align-items: baseline; gap: 20px; padding: 14px 0; border-bottom: 1px solid var(--gray-100); }
+.type-row:last-child { border-bottom: none; }
+.type-meta { width: 120px; flex-shrink: 0; }
+.type-meta .size { font-family: var(--font-mono); font-size: 11px; color: var(--brand-600); font-weight: 600; }
+.type-meta .name { font-size: 11px; color: var(--gray-400); }
+.type-sample { flex: 1; color: var(--gray-800); line-height: 1.2; }
+
+/* ── SPACING ── */
+.spacing-demo { display: flex; flex-direction: column; gap: 8px; }
+.spacing-row { display: flex; align-items: center; gap: 12px; }
+.spacing-bar { background: var(--brand-200); border-radius: 2px; height: 20px; flex-shrink: 0; }
+.spacing-info .label { font-family: var(--font-mono); font-size: 11px; color: var(--brand-600); font-weight: 600; }
+.spacing-info .val   { font-size: 11px; color: var(--gray-400); }
+
+/* ── BUTTONS ── */
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-family: var(--font-body); font-weight: 500;
+  border: none; cursor: pointer;
+  transition: all var(--ease-fast);
+  white-space: nowrap; text-decoration: none;
+}
+/* Sizes */
+.btn-xs  { padding: 4px 10px;  font-size: 11px; border-radius: var(--r-md); }
+.btn-sm  { padding: 6px 12px;  font-size: 12px; border-radius: var(--r-md); }
+.btn-md  { padding: 8px 16px;  font-size: 13px; border-radius: var(--r-md); }
+.btn-lg  { padding: 11px 22px; font-size: 15px; border-radius: var(--r-lg); }
+.btn-xl  { padding: 14px 28px; font-size: 16px; border-radius: var(--r-lg); }
+/* Variants */
+.btn-primary   { background: var(--brand-600); color: #fff; box-shadow: var(--shadow-brand); }
+.btn-primary:hover   { background: var(--brand-700); transform: translateY(-1px); box-shadow: 0 6px 20px rgba(99,102,241,.4); }
+.btn-secondary { background: var(--gray-100); color: var(--gray-800); border: 1px solid var(--gray-200); }
+.btn-secondary:hover { background: var(--gray-200); }
+.btn-outline   { background: transparent; color: var(--brand-600); border: 1.5px solid var(--brand-300); }
+.btn-outline:hover   { background: var(--brand-50); border-color: var(--brand-500); }
+.btn-ghost     { background: transparent; color: var(--gray-600); }
+.btn-ghost:hover     { background: var(--gray-100); color: var(--gray-800); }
+.btn-danger    { background: var(--danger-500); color: #fff; }
+.btn-danger:hover    { background: var(--danger-700); }
+.btn-success   { background: var(--success-500); color: #fff; }
+.btn-success:hover   { background: var(--success-700); }
+.btn-loading   { opacity: .7; cursor: not-allowed; pointer-events: none; }
+.btn:active    { transform: translateY(0) scale(.98); }
+.btn-icon-only { padding: 8px; border-radius: var(--r-md); }
+
+/* ── FORM ELEMENTS ── */
+.form-group { display: flex; flex-direction: column; gap: 5px; }
+.form-label { font-size: 13px; font-weight: 500; color: var(--gray-700); }
+.form-label .req { color: var(--danger-500); margin-right: 2px; }
+.form-hint  { font-size: 11px; color: var(--gray-400); }
+.form-error { font-size: 11px; color: var(--danger-600); }
+
+.input {
+  width: 100%; font-family: var(--font-body); font-size: 13px;
+  color: var(--gray-800); background: var(--gray-0);
+  border: 1.5px solid var(--gray-200);
+  border-radius: var(--r-md); padding: 9px 12px;
+  outline: none; transition: border-color var(--ease-fast), box-shadow var(--ease-fast);
+}
+.input::placeholder { color: var(--gray-400); }
+.input:hover  { border-color: var(--gray-300); }
+.input:focus  { border-color: var(--brand-500); box-shadow: 0 0 0 3px rgba(99,102,241,.12); }
+.input.error  { border-color: var(--danger-500); }
+.input.error:focus { box-shadow: 0 0 0 3px rgba(239,68,68,.12); }
+.input.success{ border-color: var(--success-500); }
+.input[disabled] { background: var(--gray-100); color: var(--gray-400); cursor: not-allowed; }
+
+.input-group { position: relative; }
+.input-group .input { padding-right: 40px; }
+.input-group .input-icon { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--gray-400); font-size: 15px; }
+
+.select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: left 12px center;
+  padding-left: 32px;
+}
+
+.textarea { resize: vertical; min-height: 80px; }
+
+.checkbox-group { display: flex; align-items: center; gap: 8px; cursor: pointer; }
+.checkbox-group input[type=checkbox] { width: 16px; height: 16px; accent-color: var(--brand-600); cursor: pointer; }
+
+/* ── BADGES ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 11px; font-weight: 600; line-height: 1;
+  padding: 3px 8px; border-radius: var(--r-full);
+}
+.badge-brand   { background: var(--brand-100);   color: var(--brand-800); }
+.badge-success { background: var(--success-50);  color: var(--success-700); }
+.badge-warning { background: var(--warning-50);  color: var(--warning-700); }
+.badge-danger  { background: var(--danger-50);   color: var(--danger-700); }
+.badge-info    { background: var(--info-50);     color: var(--info-700); }
+.badge-gray    { background: var(--gray-100);    color: var(--gray-700); }
+.badge-dot::before { content:''; width:6px; height:6px; border-radius:50%; background:currentColor; display:inline-block; }
+
+/* ── ALERTS ── */
+.alert {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 12px 16px; border-radius: var(--r-lg);
+  font-size: 13px; line-height: var(--lh-relaxed);
+  border: 1px solid;
+}
+.alert .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+.alert .alert-body .alert-title { font-weight: 600; margin-bottom: 2px; }
+.alert-success { background: var(--success-50); color: var(--success-700); border-color: rgba(16,185,129,.2); }
+.alert-warning { background: var(--warning-50); color: var(--warning-700); border-color: rgba(245,158,11,.2); }
+.alert-danger  { background: var(--danger-50);  color: var(--danger-700);  border-color: rgba(239,68,68,.2); }
+.alert-info    { background: var(--info-50);    color: var(--info-700);    border-color: rgba(59,130,246,.2); }
+
+/* ── CARDS ── */
+.card {
+  background: var(--gray-0);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--r-xl);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+.card:hover { box-shadow: var(--shadow-md); }
+.card-elevated { box-shadow: var(--shadow-md); }
+.card-flat { border: 1px solid var(--gray-200); box-shadow: none; }
+.card-brand { border-color: var(--brand-200); background: var(--brand-50); }
+
+/* ── STATS ── */
+.stat-card {
+  background: var(--gray-0); border: 1px solid var(--gray-200);
+  border-radius: var(--r-xl); padding: 20px;
+  position: relative; overflow: hidden;
+}
+.stat-card::before {
+  content: ''; position: absolute;
+  top: 0; right: 0; width: 3px; height: 100%;
+}
+.stat-card.brand::before { background: var(--brand-500); }
+.stat-card.success::before { background: var(--success-500); }
+.stat-card.warning::before { background: var(--warning-500); }
+.stat-card.danger::before  { background: var(--danger-500); }
+.stat-label { font-size: 11px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+.stat-value { font-family: var(--font-mono); font-size: 28px; font-weight: 700; color: var(--gray-900); letter-spacing: -1px; line-height: 1; }
+.stat-change { font-size: 11px; margin-top: 6px; }
+.stat-change.up   { color: var(--success-600); }
+.stat-change.down { color: var(--danger-600); }
+
+/* ── TABLE ── */
+.data-table { width: 100%; border-collapse: collapse; }
+.data-table thead th { text-align: right; padding: 10px 14px; background: var(--gray-50); font-size: 11px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: .06em; border-bottom: 1px solid var(--gray-200); }
+.data-table tbody tr { border-bottom: 1px solid var(--gray-100); transition: background var(--ease-fast); }
+.data-table tbody tr:hover { background: var(--gray-50); }
+.data-table tbody tr:last-child { border-bottom: none; }
+.data-table tbody td { padding: 12px 14px; font-size: 13px; color: var(--gray-700); }
+
+/* ── AVATAR ── */
+.avatar {
+  display: flex; align-items: center; justify-content: center;
+  border-radius: var(--r-lg); font-weight: 700; color: #fff;
+  flex-shrink: 0;
+}
+.avatar-xs  { width: 24px; height: 24px; font-size: 9px;  border-radius: var(--r-sm); }
+.avatar-sm  { width: 32px; height: 32px; font-size: 11px; border-radius: var(--r-md); }
+.avatar-md  { width: 40px; height: 40px; font-size: 14px; border-radius: var(--r-lg); }
+.avatar-lg  { width: 48px; height: 48px; font-size: 16px; border-radius: var(--r-lg); }
+.avatar-xl  { width: 64px; height: 64px; font-size: 20px; border-radius: var(--r-xl); }
+
+/* ── PROGRESS ── */
+.progress { height: 6px; background: var(--gray-200); border-radius: var(--r-full); overflow: hidden; }
+.progress-bar { height: 100%; border-radius: var(--r-full); transition: width .6s cubic-bezier(.4,0,.2,1); }
+.progress-lg { height: 10px; }
+.progress-sm { height: 4px; }
+
+/* ── TOGGLE ── */
+.toggle { position: relative; width: 44px; height: 24px; cursor: pointer; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0;
+  background: var(--gray-300); border-radius: var(--r-full);
+  transition: background var(--ease-normal);
+}
+.toggle-slider::before {
+  content: ''; position: absolute;
+  height: 18px; width: 18px;
+  right: 3px; top: 3px;
+  background: #fff; border-radius: 50%;
+  transition: transform var(--ease-normal);
+  box-shadow: var(--shadow-sm);
+}
+.toggle input:checked ~ .toggle-slider { background: var(--brand-500); }
+.toggle input:checked ~ .toggle-slider::before { transform: translateX(-20px); }
+
+/* ── TABS ── */
+.tabs-bar { display: flex; gap: 2px; background: var(--gray-100); border-radius: var(--r-lg); padding: 3px; width: fit-content; }
+.tabs-btn {
+  padding: 7px 16px; border-radius: var(--r-md); border: none;
+  background: transparent; color: var(--gray-500); cursor: pointer;
+  font-size: 13px; font-family: var(--font-body); font-weight: 500;
+  transition: all var(--ease-fast);
+}
+.tabs-btn.active { background: var(--gray-0); color: var(--gray-900); box-shadow: var(--shadow-sm); }
+.tabs-btn:hover:not(.active) { color: var(--gray-700); }
+
+/* ── DIVIDER ── */
+.divider { height: 1px; background: var(--gray-200); margin: 20px 0; }
+.divider-label { display: flex; align-items: center; gap: 12px; color: var(--gray-400); font-size: 12px; }
+.divider-label::before, .divider-label::after { content: ''; flex: 1; height: 1px; background: var(--gray-200); }
+
+/* ── SKELETON ── */
+.skeleton {
+  background: linear-gradient(90deg, var(--gray-200) 25%, var(--gray-100) 50%, var(--gray-200) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--r-md);
+}
+@keyframes shimmer { 0%{background-position:200% 0} 100%{background-position:-200% 0} }
+
+/* ── TOOLTIP ── */
+.tooltip-wrap { position: relative; display: inline-flex; }
+.tooltip {
+  position: absolute; bottom: calc(100% + 8px); right: 50%;
+  transform: translateX(50%);
+  background: var(--gray-900); color: var(--gray-0);
+  font-size: 11px; padding: 5px 10px;
+  border-radius: var(--r-md); white-space: nowrap;
+  pointer-events: none; opacity: 0;
+  transition: opacity var(--ease-fast);
+}
+.tooltip-wrap:hover .tooltip { opacity: 1; }
+
+/* ── MODAL ── */
+.modal-demo {
+  background: rgba(15,23,42,.6); backdrop-filter: blur(4px);
+  border-radius: var(--r-xl); padding: 20px;
+  display: flex; align-items: center; justify-content: center;
+  min-height: 240px;
+}
+.modal-box {
+  background: var(--gray-0);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--r-xl);
+  padding: 24px; width: 360px;
+  box-shadow: var(--shadow-xl);
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+.modal-title { font-size: 16px; font-weight: 700; color: var(--gray-900); }
+.modal-close { width: 28px; height: 28px; background: var(--gray-100); border: none; border-radius: var(--r-md); cursor: pointer; font-size: 15px; color: var(--gray-500); }
+
+/* ── EMPTY STATE ── */
+.empty-state { text-align: center; padding: 48px 24px; }
+.empty-state .empty-icon { font-size: 48px; margin-bottom: 12px; opacity: .3; }
+.empty-state .empty-title { font-size: 16px; font-weight: 600; color: var(--gray-700); margin-bottom: 6px; }
+.empty-state .empty-sub   { font-size: 13px; color: var(--gray-400); margin-bottom: 20px; }
+
+/* ── TOAST ── */
+.toast {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--gray-900); color: var(--gray-100);
+  padding: 14px 16px; border-radius: var(--r-lg);
+  box-shadow: var(--shadow-xl); font-size: 13px;
+  border-right: 3px solid;
+}
+.toast-success { border-right-color: var(--success-500); }
+.toast-error   { border-right-color: var(--danger-500); }
+.toast-warning { border-right-color: var(--warning-500); }
+.toast-icon    { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+
+/* ── GRID SYSTEM ── */
+.grid-demo { display: grid; gap: 8px; }
+.grid-col  { background: var(--brand-100); border: 1px solid var(--brand-200); border-radius: var(--r-md); padding: 10px; text-align: center; font-size: 11px; font-family: var(--font-mono); color: var(--brand-700); font-weight: 600; }
+
+/* ── ICON GRID ── */
+.icon-grid { display: flex; flex-wrap: wrap; gap: 8px; }
+.icon-item { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px; background: var(--gray-50); border: 1px solid var(--gray-200); border-radius: var(--r-md); cursor: pointer; transition: all var(--ease-fast); width: 72px; }
+.icon-item:hover { background: var(--brand-50); border-color: var(--brand-200); }
+.icon-item .ico { font-size: 20px; }
+.icon-item .ico-name { font-size: 9px; color: var(--gray-400); font-family: var(--font-mono); text-align: center; line-height: 1.3; }
+
+/* ── MOTION ── */
+.motion-demo { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.motion-box {
+  width: 48px; height: 48px;
+  background: var(--brand-500); border-radius: var(--r-md);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 20px; cursor: pointer;
+}
+.motion-fade    { animation: fadeInUp .4s ease forwards; }
+.motion-bounce  { animation: bounce .6s ease infinite; }
+.motion-pulse   { animation: pulse 1.5s ease infinite; }
+.motion-spin    { animation: spin 1s linear infinite; }
+@keyframes fadeInUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes bounce   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-10px)} }
+@keyframes pulse    { 0%,100%{opacity:1} 50%{opacity:.5} }
+@keyframes spin     { from{transform:rotate(0)} to{transform:rotate(360deg)} }
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--gray-300); border-radius: 3px; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+  .ds-sidebar { transform: translateX(260px); }
+  .ds-main { margin-right: 0; }
+}
+</style>
+</head>
+<body>
+
+<div class="ds-shell">
+
+<!-- ══════════════════ SIDEBAR ══════════════════ -->
+<nav class="ds-sidebar">
+  <div class="sidebar-logo">
+    <div class="brand">⬡ Storify</div>
+    <div class="tag">Design System v1.0</div>
+  </div>
+
+  <div class="sidebar-section">Foundation</div>
+  <a class="sidebar-link active" href="#colors" onclick="setActive(this)"><span class="icon">🎨</span>Colors</a>
+  <a class="sidebar-link" href="#typography" onclick="setActive(this)"><span class="icon">✍️</span>Typography</a>
+  <a class="sidebar-link" href="#spacing" onclick="setActive(this)"><span class="icon">📐</span>Spacing & Grid</a>
+  <a class="sidebar-link" href="#icons" onclick="setActive(this)"><span class="icon">✨</span>Icons</a>
+  <a class="sidebar-link" href="#motion" onclick="setActive(this)"><span class="icon">💫</span>Motion</a>
+
+  <div class="sidebar-section">Components</div>
+  <a class="sidebar-link" href="#buttons" onclick="setActive(this)"><span class="icon">🔘</span>Buttons</a>
+  <a class="sidebar-link" href="#forms" onclick="setActive(this)"><span class="icon">📝</span>Form Elements</a>
+  <a class="sidebar-link" href="#badges" onclick="setActive(this)"><span class="icon">🏷️</span>Badges & Tags</a>
+  <a class="sidebar-link" href="#alerts" onclick="setActive(this)"><span class="icon">⚠️</span>Alerts</a>
+  <a class="sidebar-link" href="#cards" onclick="setActive(this)"><span class="icon">🃏</span>Cards & Stats</a>
+  <a class="sidebar-link" href="#tables" onclick="setActive(this)"><span class="icon">📊</span>Tables</a>
+  <a class="sidebar-link" href="#navigation" onclick="setActive(this)"><span class="icon">🧭</span>Navigation</a>
+  <a class="sidebar-link" href="#feedback" onclick="setActive(this)"><span class="icon">💬</span>Feedback</a>
+
+  <div class="sidebar-section">Patterns</div>
+  <a class="sidebar-link" href="#patterns" onclick="setActive(this)"><span class="icon">🧩</span>UI Patterns</a>
+  <a class="sidebar-link" href="#accessibility" onclick="setActive(this)"><span class="icon">♿</span>Accessibility</a>
+  <a class="sidebar-link" href="#rtl" onclick="setActive(this)"><span class="icon">🌐</span>RTL Guidelines</a>
+
+  <div class="sidebar-version">Storify DS v1.0 · أبريل 2026</div>
+</nav>
+
+<!-- ══════════════════ MAIN ══════════════════ -->
+<main class="ds-main">
+
+<!-- ── Topbar ── -->
+<div class="ds-topbar">
+  <div class="topbar-title">Design System</div>
+  <span class="topbar-badge">v1.0.0</span>
+</div>
+
+<!-- ══════════════════════════════════════════
+   COLORS
+══════════════════════════════════════════ -->
+<section id="colors" class="ds-section">
+  <div class="section-title">🎨 Color System</div>
+  <div class="section-sub">نظام الألوان — مبني على HSL scale مع 10 درجات لكل لون</div>
+
+  <div class="subsection-title">Brand Colors — Indigo</div>
+  <div class="color-grid" style="margin-bottom:28px">
+    <div class="color-swatch" style="background:#EEF2FF" data-val="#EEF2FF / 50"></div>
+    <div class="color-swatch" style="background:#E0E7FF" data-val="#E0E7FF / 100"></div>
+    <div class="color-swatch" style="background:#C7D2FE" data-val="#C7D2FE / 200"></div>
+    <div class="color-swatch" style="background:#A5B4FC" data-val="#A5B4FC / 300"></div>
+    <div class="color-swatch" style="background:#818CF8" data-val="#818CF8 / 400"></div>
+    <div class="color-swatch" style="background:#6366F1" data-val="#6366F1 / 500 ★"></div>
+    <div class="color-swatch" style="background:#4F46E5" data-val="#4F46E5 / 600"></div>
+    <div class="color-swatch" style="background:#4338CA" data-val="#4338CA / 700"></div>
+    <div class="color-swatch" style="background:#3730A3" data-val="#3730A3 / 800"></div>
+    <div class="color-swatch" style="background:#312E81" data-val="#312E81 / 900"></div>
+  </div>
+
+  <div class="subsection-title">Neutral Gray Scale</div>
+  <div class="color-grid" style="margin-bottom:28px">
+    <div class="color-swatch" style="background:#F8FAFC" data-val="#F8FAFC / 50"></div>
+    <div class="color-swatch" style="background:#F1F5F9" data-val="#F1F5F9 / 100"></div>
+    <div class="color-swatch" style="background:#E2E8F0" data-val="#E2E8F0 / 200"></div>
+    <div class="color-swatch" style="background:#CBD5E1" data-val="#CBD5E1 / 300"></div>
+    <div class="color-swatch" style="background:#94A3B8" data-val="#94A3B8 / 400"></div>
+    <div class="color-swatch" style="background:#64748B" data-val="#64748B / 500"></div>
+    <div class="color-swatch" style="background:#475569" data-val="#475569 / 600"></div>
+    <div class="color-swatch" style="background:#334155" data-val="#334155 / 700"></div>
+    <div class="color-swatch" style="background:#1E293B" data-val="#1E293B / 800"></div>
+    <div class="color-swatch" style="background:#0F172A" data-val="#0F172A / 900"></div>
+  </div>
+
+  <div class="subsection-title">Semantic Colors</div>
+  <div class="demo-frame grid" style="align-items:center">
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div class="color-row">
+        <div class="color-big" style="background:#10B981"></div>
+        <div class="color-info"><div class="name">Success</div><div class="hex">#10B981</div><div class="use">عمليات ناجحة، تأكيد، كميات كافية</div></div>
+      </div>
+      <div class="color-row">
+        <div class="color-big" style="background:#F59E0B"></div>
+        <div class="color-info"><div class="name">Warning</div><div class="hex">#F59E0B</div><div class="use">تنبيهات، انتظار موافقة، مخزون منخفض</div></div>
+      </div>
+      <div class="color-row">
+        <div class="color-big" style="background:#EF4444"></div>
+        <div class="color-info"><div class="name">Danger</div><div class="hex">#EF4444</div><div class="use">أخطاء، حذف، نفاد مخزون، أقساط متأخرة</div></div>
+      </div>
+      <div class="color-row">
+        <div class="color-big" style="background:#3B82F6"></div>
+        <div class="color-info"><div class="name">Info</div><div class="hex">#3B82F6</div><div class="use">معلومات، تلميحات، روابط</div></div>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <div class="color-row">
+        <div class="color-big" style="background:#EC4899"></div>
+        <div class="color-info"><div class="name">Accent Pink</div><div class="hex">#EC4899</div><div class="use">highlights، badges مميزة</div></div>
+      </div>
+      <div class="color-row">
+        <div class="color-big" style="background:#06B6D4"></div>
+        <div class="color-info"><div class="name">Accent Cyan</div><div class="hex">#06B6D4</div><div class="use">تمييز إضافي، charts</div></div>
+      </div>
+      <div class="color-row">
+        <div class="color-big" style="background:#8B5CF6"></div>
+        <div class="color-info"><div class="name">Accent Violet</div><div class="hex">#8B5CF6</div><div class="use">تقسيط، عقود، مميز</div></div>
+      </div>
+      <div class="color-row">
+        <div class="color-big" style="background:#14B8A6"></div>
+        <div class="color-info"><div class="name">Accent Teal</div><div class="hex">#14B8A6</div><div class="use">تحويلات، حركات مخزون</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection-title">CSS Variables — كيف تستخدمها</div>
+  <div class="code-block"><span class="c-comment">/* استخدام الألوان في CSS */</span>
+<span class="c-key">.element</span> {
+  <span class="c-comment">/* Brand */</span>
+  background: <span class="c-val">var(--brand-600)</span>;      <span class="c-comment">/* الـ CTA الرئيسي */</span>
+  color: <span class="c-val">var(--brand-50)</span>;           <span class="c-comment">/* نص على خلفية داكنة */</span>
+  border-color: <span class="c-val">var(--brand-200)</span>;   <span class="c-comment">/* حدود خفيفة */</span>
+  
+  <span class="c-comment">/* Semantic */</span>
+  background: <span class="c-val">var(--success-50)</span>;   <span class="c-comment">/* خلفية ناجح */</span>
+  color: <span class="c-val">var(--danger-700)</span>;       <span class="c-comment">/* نص خطأ */</span>
+}</div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   TYPOGRAPHY
+══════════════════════════════════════════ -->
+<section id="typography" class="ds-section">
+  <div class="section-title">✍️ Typography</div>
+  <div class="section-sub">نظام الخطوط — 3 عائلات خطوط لأغراض مختلفة</div>
+
+  <div class="demo-frame grid-2">
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Display / Headlines</div>
+      <div style="font-family:'Syne',sans-serif;font-size:32px;font-weight:800;color:var(--gray-900);letter-spacing:-1px;line-height:1.15">Storify POS</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:6px;font-family:var(--font-mono)">Syne — weight 800 — للعناوين الكبيرة فقط</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Body / UI Text</div>
+      <div style="font-family:'IBM Plex Sans Arabic',sans-serif;font-size:16px;color:var(--gray-700);line-height:1.6">متجر أحمد للملابس — نقطة البيع المتكاملة</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:6px;font-family:var(--font-mono)">IBM Plex Sans Arabic — الـ UI والمحتوى العربي</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Monospace / Data</div>
+      <div style="font-family:'JetBrains Mono',monospace;font-size:16px;color:var(--brand-700)">#INV-0234 &nbsp; 1,250.00 ج &nbsp; 01:45 PM</div>
+      <div style="font-size:11px;color:var(--gray-400);margin-top:6px;font-family:var(--font-mono)">JetBrains Mono — أرقام، كود، timestamps</div>
+    </div>
+    <div>
+      <div style="font-size:11px;font-weight:600;color:var(--gray-400);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px">Font Weights</div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        <div style="font-weight:300;font-size:14px;color:var(--gray-600)">Light 300 — نادر الاستخدام</div>
+        <div style="font-weight:400;font-size:14px;color:var(--gray-700)">Regular 400 — النص العادي</div>
+        <div style="font-weight:500;font-size:14px;color:var(--gray-800)">Medium 500 — Labels والـ UI</div>
+        <div style="font-weight:600;font-size:14px;color:var(--gray-900)">SemiBold 600 — Headings</div>
+        <div style="font-weight:700;font-size:14px;color:var(--gray-900)">Bold 700 — Strong emphasis</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Type Scale</div>
+  <div class="demo-frame">
+    <div class="type-scale">
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-5xl</div><div class="name">48px / 700</div></div>
+        <div class="type-sample" style="font-size:48px;font-weight:700;line-height:1.1;letter-spacing:-1.5px">Storify</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-4xl</div><div class="name">36px / 700</div></div>
+        <div class="type-sample" style="font-size:36px;font-weight:700;line-height:1.2;letter-spacing:-1px">لوحة التحكم</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-3xl</div><div class="name">30px / 600</div></div>
+        <div class="type-sample" style="font-size:30px;font-weight:600;letter-spacing:-.5px">الفواتير والمبيعات</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-2xl</div><div class="name">24px / 600</div></div>
+        <div class="type-sample" style="font-size:24px;font-weight:600">إدارة المنتجات</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-xl</div><div class="name">20px / 500</div></div>
+        <div class="type-sample" style="font-size:20px;font-weight:500">نقطة البيع المتكاملة</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-lg</div><div class="name">18px / 500</div></div>
+        <div class="type-sample" style="font-size:18px;font-weight:500">إجمالي الفاتورة: 1,250 جنيه</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-base</div><div class="name">16px / 400</div></div>
+        <div class="type-sample" style="font-size:16px">تيشيرت بيسيك أبيض — 2 قطعة × 150 جنيه</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-sm</div><div class="name">14px / 400</div></div>
+        <div class="type-sample" style="font-size:14px;color:var(--gray-600)">الباقة الحالية: Professional — تجديد في 28 مايو 2026</div>
+      </div>
+      <div class="type-row">
+        <div class="type-meta"><div class="size">text-xs</div><div class="name">12px / 500</div></div>
+        <div class="type-sample" style="font-size:12px;font-weight:500;color:var(--gray-500);text-transform:uppercase;letter-spacing:.06em">رقم الفاتورة · التاريخ · الكاشير</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   SPACING & GRID
+══════════════════════════════════════════ -->
+<section id="spacing" class="ds-section">
+  <div class="section-title">📐 Spacing & Grid</div>
+  <div class="section-sub">نظام المسافات — مبني على قاعدة 4px</div>
+
+  <div class="demo-frame">
+    <div class="spacing-demo">
+      <div class="spacing-row"><div class="spacing-bar" style="width:4px"></div><div class="spacing-info"><div class="label">sp-1</div><div class="val">4px — padding داخلي صغير</div></div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:8px"></div><div class="spacing-info"><div class="label">sp-2</div><div class="val">8px — gap بين العناصر الصغيرة</div></div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:12px"></div><div class="spacing-info"><div class="label">sp-3</div><div class="val">12px — padding الـ badges</div></div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:16px"></div><div class="spacing-info"><div class="label">sp-4</div><div class="val">16px — padding الـ cards وgap الـ columns</div></div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:20px"></div><div class="spacing-info"><div class="label">sp-5</div><div class="val">20px — padding الـ sections</div></div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:24px"></div><div class="spacing-info"><div class="label">sp-6</div><div class="val">24px — margin بين الـ groups</div></div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:32px"></div><div class="spacing-info"><div class="label">sp-8</div><div class="val">32px — padding الصفحات</div></div></div>
+      <div class="spacing-row"><div class="spacing-bar" style="width:48px"></div><div class="spacing-info"><div class="label">sp-12</div><div class="val">48px — padding الـ sections الكبيرة</div></div></div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Grid System — 12 Columns</div>
+  <div class="demo-frame">
+    <div class="grid-demo" style="grid-template-columns:repeat(12,1fr)">
+      <div class="grid-col">1</div><div class="grid-col">2</div><div class="grid-col">3</div><div class="grid-col">4</div>
+      <div class="grid-col">5</div><div class="grid-col">6</div><div class="grid-col">7</div><div class="grid-col">8</div>
+      <div class="grid-col">9</div><div class="grid-col">10</div><div class="grid-col">11</div><div class="grid-col">12</div>
+    </div>
+    <div class="grid-demo" style="grid-template-columns:repeat(4,1fr);margin-top:8px">
+      <div class="grid-col" style="grid-column:span 3">span 3 — Sidebar</div>
+      <div class="grid-col">span 1 — Actions</div>
+    </div>
+    <div class="grid-demo" style="grid-template-columns:repeat(4,1fr);margin-top:8px">
+      <div class="grid-col">col-3 Stats</div>
+      <div class="grid-col">col-3 Stats</div>
+      <div class="grid-col">col-3 Stats</div>
+      <div class="grid-col">col-3 Stats</div>
+    </div>
+    <div class="grid-demo" style="grid-template-columns:1fr 360px;margin-top:8px">
+      <div class="grid-col">POS Products (fluid)</div>
+      <div class="grid-col">Cart Sidebar (360px fixed)</div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Border Radius Scale</div>
+  <div class="demo-frame grid">
+    <div style="text-align:center"><div style="width:48px;height:48px;background:var(--brand-500);border-radius:4px;margin:0 auto 6px"></div><div style="font-size:11px;font-family:var(--font-mono);color:var(--gray-500)">r-sm<br>4px</div></div>
+    <div style="text-align:center"><div style="width:48px;height:48px;background:var(--brand-500);border-radius:8px;margin:0 auto 6px"></div><div style="font-size:11px;font-family:var(--font-mono);color:var(--gray-500)">r-md<br>8px</div></div>
+    <div style="text-align:center"><div style="width:48px;height:48px;background:var(--brand-500);border-radius:12px;margin:0 auto 6px"></div><div style="font-size:11px;font-family:var(--font-mono);color:var(--gray-500)">r-lg<br>12px</div></div>
+    <div style="text-align:center"><div style="width:48px;height:48px;background:var(--brand-500);border-radius:16px;margin:0 auto 6px"></div><div style="font-size:11px;font-family:var(--font-mono);color:var(--gray-500)">r-xl<br>16px</div></div>
+    <div style="text-align:center"><div style="width:48px;height:48px;background:var(--brand-500);border-radius:24px;margin:0 auto 6px"></div><div style="font-size:11px;font-family:var(--font-mono);color:var(--gray-500)">r-2xl<br>24px</div></div>
+    <div style="text-align:center"><div style="width:48px;height:48px;background:var(--brand-500);border-radius:9999px;margin:0 auto 6px"></div><div style="font-size:11px;font-family:var(--font-mono);color:var(--gray-500)">r-full<br>9999px</div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   ICONS
+══════════════════════════════════════════ -->
+<section id="icons" class="ds-section">
+  <div class="section-title">✨ Icons</div>
+  <div class="section-sub">النظام يستخدم Lucide React — مفتوح المصدر، متسق، يدعم RTL</div>
+
+  <div class="demo-frame">
+    <div class="subsection-title" style="margin-top:0">أيقونات الـ Navigation</div>
+    <div class="icon-grid">
+      <div class="icon-item"><span class="ico">📊</span><span class="ico-name">LayoutDashboard</span></div>
+      <div class="icon-item"><span class="ico">🛒</span><span class="ico-name">ShoppingCart</span></div>
+      <div class="icon-item"><span class="ico">🧾</span><span class="ico-name">FileText</span></div>
+      <div class="icon-item"><span class="ico">📦</span><span class="ico-name">Package</span></div>
+      <div class="icon-item"><span class="ico">🏭</span><span class="ico-name">Warehouse</span></div>
+      <div class="icon-item"><span class="ico">👥</span><span class="ico-name">Users</span></div>
+      <div class="icon-item"><span class="ico">🏪</span><span class="ico-name">Store</span></div>
+      <div class="icon-item"><span class="ico">💸</span><span class="ico-name">DollarSign</span></div>
+      <div class="icon-item"><span class="ico">📈</span><span class="ico-name">TrendingUp</span></div>
+      <div class="icon-item"><span class="ico">⚙️</span><span class="ico-name">Settings</span></div>
+    </div>
+    <div class="subsection-title">أيقونات الـ Actions</div>
+    <div class="icon-grid">
+      <div class="icon-item"><span class="ico">➕</span><span class="ico-name">Plus</span></div>
+      <div class="icon-item"><span class="ico">✏️</span><span class="ico-name">Pencil</span></div>
+      <div class="icon-item"><span class="ico">🗑️</span><span class="ico-name">Trash2</span></div>
+      <div class="icon-item"><span class="ico">👁️</span><span class="ico-name">Eye</span></div>
+      <div class="icon-item"><span class="ico">🔍</span><span class="ico-name">Search</span></div>
+      <div class="icon-item"><span class="ico">🔔</span><span class="ico-name">Bell</span></div>
+      <div class="icon-item"><span class="ico">📥</span><span class="ico-name">Download</span></div>
+      <div class="icon-item"><span class="ico">🖨️</span><span class="ico-name">Printer</span></div>
+      <div class="icon-item"><span class="ico">✅</span><span class="ico-name">CheckCircle</span></div>
+      <div class="icon-item"><span class="ico">❌</span><span class="ico-name">XCircle</span></div>
+    </div>
+    <div class="subsection-title">Icon Sizes</div>
+    <div style="display:flex;gap:20px;align-items:flex-end;padding:8px 0">
+      <div style="text-align:center"><span style="font-size:12px">📦</span><div style="font-size:10px;color:var(--gray-400);margin-top:4px;font-family:var(--font-mono)">12px<br>xs</div></div>
+      <div style="text-align:center"><span style="font-size:16px">📦</span><div style="font-size:10px;color:var(--gray-400);margin-top:4px;font-family:var(--font-mono)">16px<br>sm</div></div>
+      <div style="text-align:center"><span style="font-size:20px">📦</span><div style="font-size:10px;color:var(--gray-400);margin-top:4px;font-family:var(--font-mono)">20px<br>md ★</div></div>
+      <div style="text-align:center"><span style="font-size:24px">📦</span><div style="font-size:10px;color:var(--gray-400);margin-top:4px;font-family:var(--font-mono)">24px<br>lg</div></div>
+      <div style="text-align:center"><span style="font-size:32px">📦</span><div style="font-size:10px;color:var(--gray-400);margin-top:4px;font-family:var(--font-mono)">32px<br>xl</div></div>
+      <div style="text-align:center"><span style="font-size:48px">📦</span><div style="font-size:10px;color:var(--gray-400);margin-top:4px;font-family:var(--font-mono)">48px<br>2xl</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   MOTION
+══════════════════════════════════════════ -->
+<section id="motion" class="ds-section">
+  <div class="section-title">💫 Motion & Animation</div>
+  <div class="section-sub">الحركة تضيف حياة للـ UI — بس بحكمة ومعتدل</div>
+
+  <div class="demo-frame">
+    <div class="motion-demo">
+      <div><div class="motion-box motion-fade">↑</div><div style="font-size:11px;color:var(--gray-400);text-align:center;margin-top:6px;font-family:var(--font-mono)">fadeInUp<br>400ms</div></div>
+      <div><div class="motion-box motion-bounce">↕</div><div style="font-size:11px;color:var(--gray-400);text-align:center;margin-top:6px;font-family:var(--font-mono)">bounce<br>600ms ∞</div></div>
+      <div><div class="motion-box motion-pulse" style="background:var(--success-500)">●</div><div style="font-size:11px;color:var(--gray-400);text-align:center;margin-top:6px;font-family:var(--font-mono)">pulse<br>1500ms ∞</div></div>
+      <div><div class="motion-box motion-spin" style="background:var(--gray-600)">↻</div><div style="font-size:11px;color:var(--gray-400);text-align:center;margin-top:6px;font-family:var(--font-mono)">spin<br>loading</div></div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Transition Durations</div>
+  <table class="ds-table" style="border:1px solid var(--gray-200);border-radius:var(--r-lg);overflow:hidden">
+    <thead><tr><th>Token</th><th>Duration</th><th>Easing</th><th>متى تستخدم؟</th></tr></thead>
+    <tbody>
+      <tr><td><code>ease-fast</code></td><td>150ms</td><td>ease</td><td>Hover states، color changes، border</td></tr>
+      <tr><td><code>ease-normal</code></td><td>200ms</td><td>ease</td><td>الـ default — buttons، toggles، فتح dropdowns</td></tr>
+      <tr><td><code>ease-slow</code></td><td>300ms</td><td>ease</td><td>Page transitions، modals، sidebars</td></tr>
+      <tr><td><code>spring</code></td><td>400ms</td><td>cubic-bezier(.4,0,.2,1)</td><td>Cards expand، drag & drop، confirmations</td></tr>
+    </tbody>
+  </table>
+</section>
+
+<!-- ══════════════════════════════════════════
+   BUTTONS
+══════════════════════════════════════════ -->
+<section id="buttons" class="ds-section">
+  <div class="section-title">🔘 Buttons</div>
+  <div class="section-sub">أزرار التفاعل — 6 variants × 5 sizes</div>
+
+  <div class="subsection-title">Variants</div>
+  <div class="demo-frame grid">
+    <button class="btn btn-primary btn-md">Primary</button>
+    <button class="btn btn-secondary btn-md">Secondary</button>
+    <button class="btn btn-outline btn-md">Outline</button>
+    <button class="btn btn-ghost btn-md">Ghost</button>
+    <button class="btn btn-danger btn-md">Danger</button>
+    <button class="btn btn-success btn-md">Success</button>
+    <button class="btn btn-primary btn-md btn-loading">Loading...</button>
+  </div>
+
+  <div class="subsection-title">Sizes</div>
+  <div class="demo-frame grid" style="align-items:center">
+    <button class="btn btn-primary btn-xs">XS Button</button>
+    <button class="btn btn-primary btn-sm">SM Button</button>
+    <button class="btn btn-primary btn-md">MD Button ★</button>
+    <button class="btn btn-primary btn-lg">LG Button</button>
+    <button class="btn btn-primary btn-xl">XL Button</button>
+  </div>
+
+  <div class="subsection-title">With Icons</div>
+  <div class="demo-frame grid">
+    <button class="btn btn-primary btn-md">➕ إضافة منتج</button>
+    <button class="btn btn-secondary btn-md">📥 تصدير Excel</button>
+    <button class="btn btn-outline btn-md">🖨️ طباعة</button>
+    <button class="btn btn-danger btn-md">🗑️ حذف</button>
+    <button class="btn btn-ghost btn-md btn-icon-only">👁️</button>
+    <button class="btn btn-ghost btn-md btn-icon-only">✏️</button>
+    <button class="btn btn-ghost btn-md btn-icon-only">⋯</button>
+  </div>
+
+  <div class="subsection-title">Button Group</div>
+  <div class="demo-frame grid">
+    <div style="display:flex;border:1px solid var(--gray-200);border-radius:var(--r-md);overflow:hidden">
+      <button class="btn btn-secondary" style="border-radius:0;border:none;border-left:1px solid var(--gray-200)">اليوم</button>
+      <button class="btn btn-primary" style="border-radius:0;border:none;border-left:1px solid var(--brand-400)">الأسبوع</button>
+      <button class="btn btn-secondary" style="border-radius:0;border:none">الشهر</button>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   FORMS
+══════════════════════════════════════════ -->
+<section id="forms" class="ds-section">
+  <div class="section-title">📝 Form Elements</div>
+  <div class="section-sub">عناصر الإدخال — مصممة للاستخدام العربي RTL</div>
+
+  <div class="demo-frame grid-2">
+    <div class="form-group">
+      <label class="form-label">اسم المنتج <span class="req">*</span></label>
+      <input class="input" type="text" placeholder="مثال: تيشيرت بيسيك أبيض" value="تيشيرت بيسيك أبيض">
+      <span class="form-hint">الاسم كما سيظهر في شاشة البيع</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">السعر <span class="req">*</span></label>
+      <div class="input-group">
+        <input class="input" type="number" placeholder="0.00" value="150.00">
+        <span class="input-icon">ج</span>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">التصنيف</label>
+      <select class="input select">
+        <option>اختر تصنيف...</option>
+        <option selected>تيشيرتات</option>
+        <option>بناطيل</option>
+        <option>أحذية</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">الكمية</label>
+      <input class="input" type="number" placeholder="0" value="42">
+      <span class="form-hint">الكمية الحالية في المخزون</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">البريد الإلكتروني — حالة خطأ</label>
+      <input class="input error" type="email" value="invalid-email">
+      <span class="form-error">⚠️ البريد الإلكتروني غير صحيح</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">الباركود — حالة نجاح</label>
+      <input class="input success" type="text" value="8901234567890">
+      <span class="form-hint" style="color:var(--success-600)">✓ الباركود غير مكرر</span>
+    </div>
+    <div class="form-group">
+      <label class="form-label">حقل معطّل</label>
+      <input class="input" disabled value="لا يمكن التعديل">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ملاحظات</label>
+      <textarea class="input textarea" placeholder="أي ملاحظات إضافية..."></textarea>
+    </div>
+  </div>
+
+  <div class="subsection-title">Checkbox, Radio & Toggle</div>
+  <div class="demo-frame grid">
+    <label class="checkbox-group"><input type="checkbox" checked><span style="font-size:13px">تفعيل VAT على هذا المنتج</span></label>
+    <label class="checkbox-group"><input type="checkbox"><span style="font-size:13px">عرض في شاشة البيع</span></label>
+    <label class="checkbox-group"><input type="radio" name="r" checked><span style="font-size:13px">كاش</span></label>
+    <label class="checkbox-group"><input type="radio" name="r"><span style="font-size:13px">تقسيط</span></label>
+    <div style="display:flex;align-items:center;gap:10px">
+      <label class="toggle"><input type="checkbox" checked><span class="toggle-slider"></span></label>
+      <span style="font-size:13px">تفعيل VAT للمتجر</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <label class="toggle"><input type="checkbox"><span class="toggle-slider"></span></label>
+      <span style="font-size:13px;color:var(--gray-500)">معطّل حالياً</span>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   BADGES
+══════════════════════════════════════════ -->
+<section id="badges" class="ds-section">
+  <div class="section-title">🏷️ Badges & Tags</div>
+  <div class="section-sub">مؤشرات الحالة والتصنيف</div>
+
+  <div class="demo-frame grid">
+    <span class="badge badge-brand">Professional</span>
+    <span class="badge badge-success badge-dot">مكتملة</span>
+    <span class="badge badge-warning badge-dot">⏳ انتظار</span>
+    <span class="badge badge-danger badge-dot">🔴 نفذ</span>
+    <span class="badge badge-info">تمويل خارجي</span>
+    <span class="badge badge-gray">معطّل</span>
+    <span class="badge" style="background:rgba(139,92,246,.12);color:#6D28D9">تقسيط داخلي</span>
+    <span class="badge" style="background:rgba(20,184,166,.12);color:#0F766E">تحويل مخزون</span>
+    <span class="badge" style="background:rgba(236,72,153,.12);color:#BE185D">Valu</span>
+    <span class="badge" style="background:rgba(6,182,212,.12);color:#0E7490">فلوسة</span>
+  </div>
+
+  <div class="subsection-title">استخدام الـ Badges في الجداول</div>
+  <div class="demo-frame">
+    <table class="data-table">
+      <thead><tr><th>الفاتورة</th><th>العميل</th><th>المبلغ</th><th>طريقة الدفع</th><th>الحالة</th></tr></thead>
+      <tbody>
+        <tr><td style="font-family:var(--font-mono);font-size:12px">#INV-0234</td><td>محمد علي</td><td style="font-family:var(--font-mono)">850 ج</td><td><span class="badge badge-gray">💵 كاش</span></td><td><span class="badge badge-success badge-dot">مكتملة</span></td></tr>
+        <tr><td style="font-family:var(--font-mono);font-size:12px">#INV-0233</td><td>سارة أحمد</td><td style="font-family:var(--font-mono)">3,600 ج</td><td><span class="badge" style="background:rgba(139,92,246,.12);color:#6D28D9">📋 تقسيط داخلي</span></td><td><span class="badge badge-warning badge-dot">⏳ موافقة</span></td></tr>
+        <tr><td style="font-family:var(--font-mono);font-size:12px">#INV-0232</td><td>—</td><td style="font-family:var(--font-mono)">340 ج</td><td><span class="badge badge-info">💳 فيزا — 1.75%</span></td><td><span class="badge badge-success badge-dot">مكتملة</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   ALERTS
+══════════════════════════════════════════ -->
+<section id="alerts" class="ds-section">
+  <div class="section-title">⚠️ Alerts & Notifications</div>
+  <div class="section-sub">رسائل النظام والتنبيهات</div>
+
+  <div class="demo-frame" style="display:flex;flex-direction:column;gap:10px">
+    <div class="alert alert-success"><span class="alert-icon">✅</span><div class="alert-body"><div class="alert-title">تمت العملية بنجاح</div>الفاتورة #INV-0234 تم إنشاؤها وتحديث المخزون تلقائياً</div></div>
+    <div class="alert alert-warning"><span class="alert-icon">⚠️</span><div class="alert-body"><div class="alert-title">تنبيه مخزون منخفض</div>بنطلون جينز كلاسيك — الكمية الحالية 3 قطع (أقل من الحد الأدنى 10)</div></div>
+    <div class="alert alert-danger"><span class="alert-icon">🚫</span><div class="alert-body"><div class="alert-title">الاشتراك منتهي</div>يجب تجديد اشتراكك للاستمرار في استخدام النظام. <strong>جدّد الآن</strong></div></div>
+    <div class="alert alert-info"><span class="alert-icon">💡</span><div class="alert-body"><div class="alert-title">ملاحظة</div>3 عقود تقسيط تنتظر موافقتك — البيع لن يكتمل حتى تتم الموافقة</div></div>
+  </div>
+
+  <div class="subsection-title">Toast Notifications</div>
+  <div class="demo-frame dark" style="display:flex;flex-direction:column;gap:8px;padding:20px">
+    <div class="toast toast-success"><span class="toast-icon">✅</span><div><div style="font-weight:600;margin-bottom:2px">تم البيع بنجاح</div><div style="font-size:12px;color:var(--gray-400)">#INV-0234 — 420 جنيه</div></div></div>
+    <div class="toast toast-error"><span class="toast-icon">❌</span><div><div style="font-weight:600;margin-bottom:2px">خطأ في الاتصال</div><div style="font-size:12px;color:var(--gray-400)">لم يتم حفظ الفاتورة — حاول مرة أخرى</div></div></div>
+    <div class="toast toast-warning"><span class="toast-icon">⚠️</span><div><div style="font-weight:600;margin-bottom:2px">قسط متأخر</div><div style="font-size:12px;color:var(--gray-400)">محمد سعيد — متأخر 12 يوم</div></div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   CARDS & STATS
+══════════════════════════════════════════ -->
+<section id="cards" class="ds-section">
+  <div class="section-title">🃏 Cards & Stats</div>
+  <div class="section-sub">بطاقات المحتوى والإحصائيات</div>
+
+  <div class="subsection-title">Stat Cards — لوحة التحكم</div>
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:24px">
+    <div class="stat-card success">
+      <div class="stat-label">مبيعات اليوم</div>
+      <div class="stat-value">12,450</div>
+      <div class="stat-change up">↑ 18% عن أمس</div>
+    </div>
+    <div class="stat-card brand">
+      <div class="stat-label">فواتير اليوم</div>
+      <div class="stat-value">34</div>
+      <div class="stat-change up">↑ 7 فواتير</div>
+    </div>
+    <div class="stat-card warning">
+      <div class="stat-label">أقساط معلّقة</div>
+      <div class="stat-value">8</div>
+      <div class="stat-change down">3 متأخرة</div>
+    </div>
+    <div class="stat-card danger">
+      <div class="stat-label">نفاد المخزون</div>
+      <div class="stat-value">4</div>
+      <div class="stat-change down">منتجات</div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Content Cards</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;margin-bottom:12px">
+        <span style="font-size:13px;font-weight:600;color:var(--gray-700)">الفرع الرئيسي</span>
+        <span class="badge badge-success badge-dot">نشط</span>
+      </div>
+      <div style="font-size:22px;font-weight:700;font-family:var(--font-mono);color:var(--gray-900);margin-bottom:4px">8,450 ج</div>
+      <div style="font-size:12px;color:var(--gray-400)">مبيعات اليوم</div>
+      <div class="progress" style="margin-top:12px"><div class="progress-bar" style="width:72%;background:var(--brand-500)"></div></div>
+    </div>
+    <div class="card card-brand">
+      <div style="font-size:13px;font-weight:600;color:var(--brand-700);margin-bottom:8px">✨ Professional Plan</div>
+      <div style="font-size:11px;color:var(--brand-600);margin-bottom:12px">تجديد في 28 مايو 2026</div>
+      <div style="display:flex;justify-content:space-between;font-size:12px">
+        <span style="color:var(--brand-600)">5 فروع / 5</span>
+        <span style="color:var(--brand-600)">12 مستخدم / 15</span>
+      </div>
+    </div>
+    <div class="card card-elevated">
+      <div style="font-size:13px;font-weight:600;color:var(--gray-700);margin-bottom:10px">أقساط هذا الشهر</div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--gray-500)">مُستلَمة</span><span style="font-family:var(--font-mono);color:var(--success-600)">8,500 ج</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px"><span style="color:var(--gray-500)">متأخرة</span><span style="font-family:var(--font-mono);color:var(--danger-600)">1,250 ج</span></div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;border-top:1px solid var(--gray-100);padding-top:8px"><span style="font-weight:600">إجمالي متبقي</span><span style="font-family:var(--font-mono);font-weight:700">24,000 ج</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   TABLES
+══════════════════════════════════════════ -->
+<section id="tables" class="ds-section">
+  <div class="section-title">📊 Tables</div>
+  <div class="section-sub">جداول البيانات — الركيزة الأساسية لنظام الـ ERP</div>
+
+  <div class="demo-frame" style="padding:0">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th><input type="checkbox"></th>
+          <th>المنتج</th>
+          <th>الباركود</th>
+          <th>سعر البيع</th>
+          <th>الكمية</th>
+          <th>VAT</th>
+          <th>الحالة</th>
+          <th>إجراءات</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><input type="checkbox" checked></td>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar avatar-sm" style="background:linear-gradient(135deg,var(--brand-400),var(--accent-violet))">👕</div><div><div style="font-weight:500;font-size:13px">تيشيرت بيسيك أبيض</div><div style="font-size:11px;color:var(--gray-400)">تيشيرتات</div></div></div></td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:var(--gray-500)">8901234567890</td>
+          <td style="font-family:var(--font-mono);color:var(--brand-700);font-weight:600">150.00 ج</td>
+          <td><span style="font-family:var(--font-mono);color:var(--success-600);font-weight:600">42</span></td>
+          <td><span class="badge badge-gray">0%</span></td>
+          <td><span class="badge badge-success badge-dot">نشط</span></td>
+          <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm btn-icon-only">👁️</button><button class="btn btn-ghost btn-sm btn-icon-only">✏️</button></div></td>
+        </tr>
+        <tr>
+          <td><input type="checkbox"></td>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar avatar-sm" style="background:linear-gradient(135deg,#1E40AF,var(--accent-cyan))">👖</div><div><div style="font-weight:500;font-size:13px">بنطلون جينز كلاسيك</div><div style="font-size:11px;color:var(--gray-400)">بناطيل</div></div></div></td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:var(--gray-500)">8901234567891</td>
+          <td style="font-family:var(--font-mono);color:var(--brand-700);font-weight:600">350.00 ج</td>
+          <td><span style="font-family:var(--font-mono);color:var(--warning-600);font-weight:600">3 ⚠️</span></td>
+          <td><span class="badge badge-info">14%</span></td>
+          <td><span class="badge badge-success badge-dot">نشط</span></td>
+          <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm btn-icon-only">👁️</button><button class="btn btn-ghost btn-sm btn-icon-only">✏️</button></div></td>
+        </tr>
+        <tr style="background:rgba(239,68,68,.02)">
+          <td><input type="checkbox"></td>
+          <td><div style="display:flex;align-items:center;gap:8px"><div class="avatar avatar-sm" style="background:linear-gradient(135deg,#92400E,var(--accent-amber))">👟</div><div><div style="font-weight:500;font-size:13px">حذاء رياضي أبيض 42</div><div style="font-size:11px;color:var(--gray-400)">أحذية</div></div></div></td>
+          <td style="font-family:var(--font-mono);font-size:11px;color:var(--gray-500)">8901234567892</td>
+          <td style="font-family:var(--font-mono);color:var(--brand-700);font-weight:600">450.00 ج</td>
+          <td><span style="font-family:var(--font-mono);color:var(--danger-600);font-weight:700">0 🔴</span></td>
+          <td><span class="badge badge-info">14%</span></td>
+          <td><span class="badge badge-warning badge-dot">نفذ</span></td>
+          <td><div style="display:flex;gap:4px"><button class="btn btn-ghost btn-sm btn-icon-only">👁️</button><button class="btn btn-ghost btn-sm btn-icon-only">✏️</button></div></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   NAVIGATION
+══════════════════════════════════════════ -->
+<section id="navigation" class="ds-section">
+  <div class="section-title">🧭 Navigation</div>
+  <div class="section-sub">عناصر التنقل — Tabs, Breadcrumbs, Pagination</div>
+
+  <div class="subsection-title">Tabs</div>
+  <div class="demo-frame grid">
+    <div class="tabs-bar">
+      <button class="tabs-btn active">📊 المبيعات</button>
+      <button class="tabs-btn">📦 المخزون</button>
+      <button class="tabs-btn">📋 التقسيط</button>
+      <button class="tabs-btn">💸 المصروفات</button>
+    </div>
+  </div>
+
+  <div class="subsection-title">Breadcrumb</div>
+  <div class="demo-frame">
+    <div style="display:flex;align-items:center;gap:6px;font-size:13px">
+      <span style="color:var(--brand-600);cursor:pointer">الرئيسية</span>
+      <span style="color:var(--gray-300)">/</span>
+      <span style="color:var(--brand-600);cursor:pointer">المبيعات</span>
+      <span style="color:var(--gray-300)">/</span>
+      <span style="color:var(--brand-600);cursor:pointer">الفواتير</span>
+      <span style="color:var(--gray-300)">/</span>
+      <span style="color:var(--gray-500);font-family:var(--font-mono)">#INV-0234</span>
+    </div>
+  </div>
+
+  <div class="subsection-title">Pagination</div>
+  <div class="demo-frame">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <span style="font-size:12px;color:var(--gray-500)">عرض 1–20 من 234 نتيجة</span>
+      <div style="display:flex;gap:4px">
+        <button class="btn btn-ghost btn-sm">← السابق</button>
+        <button class="btn btn-primary btn-sm">1</button>
+        <button class="btn btn-ghost btn-sm">2</button>
+        <button class="btn btn-ghost btn-sm">3</button>
+        <span style="display:flex;align-items:center;padding:0 4px;color:var(--gray-400)">...</span>
+        <button class="btn btn-ghost btn-sm">12</button>
+        <button class="btn btn-ghost btn-sm">التالي →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Progress Bar</div>
+  <div class="demo-frame" style="display:flex;flex-direction:column;gap:12px">
+    <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>تيشيرت بيسيك أبيض</span><span style="font-family:var(--font-mono);color:var(--brand-600)">142 قطعة</span></div><div class="progress"><div class="progress-bar" style="width:85%;background:var(--brand-500)"></div></div></div>
+    <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>بنطلون جينز كلاسيك</span><span style="font-family:var(--font-mono);color:var(--success-600)">98 قطعة</span></div><div class="progress"><div class="progress-bar" style="width:62%;background:var(--success-500)"></div></div></div>
+    <div><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px"><span>حذاء رياضي — نفذ</span><span style="font-family:var(--font-mono);color:var(--danger-600)">0 قطعة</span></div><div class="progress"><div class="progress-bar" style="width:0%;background:var(--danger-500)"></div></div></div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   FEEDBACK
+══════════════════════════════════════════ -->
+<section id="feedback" class="ds-section">
+  <div class="section-title">💬 Feedback Components</div>
+  <div class="section-sub">Modal, Empty State, Skeleton Loading, Tooltips</div>
+
+  <div class="subsection-title">Modal</div>
+  <div class="modal-demo">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="modal-title">موافقة على عقد تقسيط</div>
+        <button class="modal-close">✕</button>
+      </div>
+      <div style="font-size:13px;color:var(--gray-600);margin-bottom:16px;line-height:1.6">هل توافق على عقد التقسيط رقم <strong>#CTR-0089</strong> للعميل <strong>محمد سعيد</strong>؟ المبلغ الإجمالي <strong>6,000 ج</strong> على 10 أقساط شهرية.</div>
+      <div style="display:flex;justify-content:flex-end;gap:8px">
+        <button class="btn btn-ghost btn-md">إلغاء</button>
+        <button class="btn btn-primary btn-md">✓ موافقة</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Empty State</div>
+  <div class="demo-frame">
+    <div class="empty-state">
+      <div class="empty-icon">📦</div>
+      <div class="empty-title">لا يوجد منتجات</div>
+      <div class="empty-sub">لم تتم إضافة أي منتجات بعد. ابدأ بإضافة أول منتج لمتجرك.</div>
+      <button class="btn btn-primary btn-md">➕ إضافة منتج</button>
+    </div>
+  </div>
+
+  <div class="subsection-title">Skeleton Loading</div>
+  <div class="demo-frame" style="display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="skeleton" style="width:40px;height:40px;border-radius:var(--r-lg)"></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+        <div class="skeleton" style="height:12px;width:60%"></div>
+        <div class="skeleton" style="height:10px;width:40%"></div>
+      </div>
+      <div class="skeleton" style="height:22px;width:60px;border-radius:var(--r-full)"></div>
+    </div>
+    <div style="display:flex;align-items:center;gap:12px">
+      <div class="skeleton" style="width:40px;height:40px;border-radius:var(--r-lg)"></div>
+      <div style="flex:1;display:flex;flex-direction:column;gap:6px">
+        <div class="skeleton" style="height:12px;width:50%"></div>
+        <div class="skeleton" style="height:10px;width:30%"></div>
+      </div>
+      <div class="skeleton" style="height:22px;width:60px;border-radius:var(--r-full)"></div>
+    </div>
+  </div>
+
+  <div class="subsection-title">Tooltips</div>
+  <div class="demo-frame grid">
+    <div class="tooltip-wrap">
+      <button class="btn btn-ghost btn-md btn-icon-only">👁️</button>
+      <div class="tooltip">عرض التفاصيل</div>
+    </div>
+    <div class="tooltip-wrap">
+      <button class="btn btn-ghost btn-md btn-icon-only">✏️</button>
+      <div class="tooltip">تعديل المنتج</div>
+    </div>
+    <div class="tooltip-wrap">
+      <button class="btn btn-danger btn-md btn-icon-only">🗑️</button>
+      <div class="tooltip">حذف نهائي</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   PATTERNS
+══════════════════════════════════════════ -->
+<section id="patterns" class="ds-section">
+  <div class="section-title">🧩 UI Patterns</div>
+  <div class="section-sub">أنماط متكررة في الـ UI خاصة بـ Storify</div>
+
+  <div class="subsection-title">الـ Divider مع Label</div>
+  <div class="demo-frame">
+    <div class="divider-label">البيانات الأساسية</div>
+    <div style="height:20px"></div>
+    <div class="divider-label">بيانات التقسيط</div>
+  </div>
+
+  <div class="subsection-title">Avatar Group</div>
+  <div class="demo-frame grid">
+    <div style="display:flex;align-items:center;gap:-8px">
+      <div class="avatar avatar-md" style="background:linear-gradient(135deg,var(--brand-500),var(--accent-violet));border:2px solid #fff;z-index:4">أح</div>
+      <div class="avatar avatar-md" style="background:linear-gradient(135deg,var(--success-500),var(--accent-teal));border:2px solid #fff;z-index:3;margin-right:-10px">كر</div>
+      <div class="avatar avatar-md" style="background:linear-gradient(135deg,var(--accent-pink),#F97316);border:2px solid #fff;z-index:2;margin-right:-10px">من</div>
+      <div class="avatar avatar-md" style="background:var(--gray-300);border:2px solid #fff;z-index:1;margin-right:-10px;font-size:12px;color:var(--gray-700)">+5</div>
+    </div>
+    <div>
+      <div class="avatar avatar-lg" style="background:linear-gradient(135deg,var(--brand-500),var(--accent-violet))">أح</div>
+    </div>
+  </div>
+
+  <div class="subsection-title">الـ Sidebar Item States</div>
+  <div class="demo-frame dark">
+    <div style="display:flex;flex-direction:column;gap:2px">
+      <div style="display:flex;align-items:center;gap:9px;padding:9px 14px;font-size:13px;color:rgba(255,255,255,.5)">🛒 نقطة البيع — Default</div>
+      <div style="display:flex;align-items:center;gap:9px;padding:9px 14px;font-size:13px;color:rgba(255,255,255,.8);background:rgba(255,255,255,.04)">🧾 الفواتير — Hover</div>
+      <div style="display:flex;align-items:center;gap:9px;padding:9px 14px;font-size:13px;color:var(--brand-400);background:rgba(99,102,241,.12);border-right:2px solid var(--brand-500)">📊 الرئيسية — Active</div>
+    </div>
+  </div>
+
+  <div class="subsection-title">الـ POS Product Card States</div>
+  <div class="demo-frame grid" style="align-items:flex-start">
+    <div style="background:var(--gray-0);border:1px solid var(--gray-200);border-radius:var(--r-lg);padding:12px;text-align:center;width:120px">
+      <div style="width:44px;height:44px;background:var(--gray-100);border-radius:8px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:20px">👕</div>
+      <div style="font-size:11px;font-weight:500;margin-bottom:3px">تيشيرت بيسيك</div>
+      <div style="font-size:12px;font-weight:700;color:var(--brand-600);font-family:var(--font-mono)">150 ج</div>
+      <div style="font-size:10px;color:var(--gray-400)">Default</div>
+    </div>
+    <div style="background:rgba(99,102,241,.04);border:1.5px solid var(--brand-400);border-radius:var(--r-lg);padding:12px;text-align:center;width:120px;box-shadow:0 0 0 3px rgba(99,102,241,.1)">
+      <div style="width:44px;height:44px;background:var(--brand-100);border-radius:8px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:20px">🧢</div>
+      <div style="font-size:11px;font-weight:500;margin-bottom:3px">كاب رياضي</div>
+      <div style="font-size:12px;font-weight:700;color:var(--brand-600);font-family:var(--font-mono)">120 ج</div>
+      <div style="font-size:10px;color:var(--brand-500)">Selected ✓</div>
+    </div>
+    <div style="background:var(--gray-50);border:1px solid var(--gray-200);border-radius:var(--r-lg);padding:12px;text-align:center;width:120px;opacity:.5;cursor:not-allowed">
+      <div style="width:44px;height:44px;background:var(--gray-200);border-radius:8px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:20px">👟</div>
+      <div style="font-size:11px;font-weight:500;margin-bottom:3px">حذاء رياضي</div>
+      <div style="font-size:12px;font-weight:700;color:var(--gray-400);font-family:var(--font-mono)">450 ج</div>
+      <div style="font-size:10px;color:var(--danger-500)">نفذ 🔴</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   ACCESSIBILITY
+══════════════════════════════════════════ -->
+<section id="accessibility" class="ds-section">
+  <div class="section-title">♿ Accessibility</div>
+  <div class="section-sub">معايير الوصولية — WCAG 2.1 AA</div>
+
+  <div class="demo-frame">
+    <table class="ds-table" style="border:1px solid var(--gray-200);border-radius:var(--r-lg);overflow:hidden">
+      <thead><tr><th>المعيار</th><th>التطبيق في Storify</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Color Contrast</strong></td><td>نسبة تباين 4.5:1 على الأقل للنص — تم التحقق بـ Lighthouse</td></tr>
+        <tr><td><strong>Focus States</strong></td><td>كل الأزرار والـ inputs عندها focus ring واضح (3px brand-500)</td></tr>
+        <tr><td><strong>Keyboard Navigation</strong></td><td>Tab order منطقي — كل الـ modals تدعم Escape للإغلاق</td></tr>
+        <tr><td><strong>Screen Readers</strong></td><td>aria-label على الأيقونات — aria-live للـ toast notifications</td></tr>
+        <tr><td><strong>Form Labels</strong></td><td>كل input عنده label مرتبط بـ htmlFor/id</td></tr>
+        <tr><td><strong>Error States</strong></td><td>الأخطاء مش بس بالـ color — في icon وnص واضح</td></tr>
+        <tr><td><strong>Motion</strong></td><td>prefers-reduced-motion يوقف الـ animations</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<!-- ══════════════════════════════════════════
+   RTL GUIDELINES
+══════════════════════════════════════════ -->
+<section id="rtl" class="ds-section">
+  <div class="section-title">🌐 RTL Guidelines</div>
+  <div class="section-sub">تصميم الـ RTL (Arabic) — قواعد خاصة بـ Storify</div>
+
+  <div class="demo-frame">
+    <table class="ds-table" style="border:1px solid var(--gray-200);border-radius:var(--r-lg);overflow:hidden">
+      <thead><tr><th>العنصر</th><th>قاعدة RTL</th><th>مثال</th></tr></thead>
+      <tbody>
+        <tr><td><strong>Layout Direction</strong></td><td><code>dir="rtl"</code> على الـ html element</td><td>Sidebar على اليمين، Content على اليسار</td></tr>
+        <tr><td><strong>Text Alignment</strong></td><td><code>text-align: right</code> افتراضي</td><td>الأرقام والكود لازم تفضل LTR</td></tr>
+        <tr><td><strong>Numbers & Amounts</strong></td><td><code>dir="ltr"</code> على الأرقام</td><td>1,250.00 ج — مش ج 1,250.00</td></tr>
+        <tr><td><strong>Icons Direction</strong></td><td>Lucide بتدعم RTL تلقائياً</td><td>الأسهم والشيفرون بتتعكس</td></tr>
+        <tr><td><strong>Form Fields</strong></td><td>الـ placeholder والـ value عربي</td><td>placeholder="مثال: تيشيرت..."</td></tr>
+        <tr><td><strong>Keyboard Shortcuts</strong></td><td>نفس الـ shortcuts — مفيش تغيير</td><td>F3 = بحث، Enter = تأكيد</td></tr>
+        <tr><td><strong>Date Format</strong></td><td>يوم/شهر/سنة</td><td>28/04/2026 أو 28 أبريل 2026</td></tr>
+        <tr><td><strong>Time Format</strong></td><td>12-hour مع AM/PM بالعربي</td><td>2:30 م أو 02:30 PM</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="subsection-title">CSS Variables — RTL Specific</div>
+  <div class="code-block"><span class="c-comment">/* RTL — في Storify دائماً dir="rtl" */</span>
+<span class="c-comment">/* Padding: Right يعني في اتجاه النص (Start) */</span>
+<span class="c-key">.sidebar-link</span> {
+  padding-right: <span class="c-val">16px</span>;        <span class="c-comment">/* بجانب الـ nav item */</span>
+  border-right: <span class="c-val">2px solid transparent</span>;  <span class="c-comment">/* الـ active indicator */</span>
+}
+
+<span class="c-comment">/* الأرقام المالية — دائماً LTR */</span>
+<span class="c-key">.amount</span> {
+  direction: <span class="c-val">ltr</span>;
+  font-family: <span class="c-val">var(--font-mono)</span>;
+  display: <span class="c-val">inline-block</span>;
+}
+
+<span class="c-comment">/* Input مع icon على اليمين (RTL = Start) */</span>
+<span class="c-key">.input-group .input</span> { padding-right: <span class="c-val">40px</span>; }
+<span class="c-key">.input-group .icon</span>  { right: <span class="c-val">12px</span>; }</div>
+</section>
+
+</main>
+</div>
+
+<script>
+function setActive(el) {
+  document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+  el.classList.add('active');
+}
+
+// Smooth scroll + active on scroll
+const sections = document.querySelectorAll('.ds-section');
+const links = document.querySelectorAll('.sidebar-link');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      const id = entry.target.getAttribute('id');
+      links.forEach(l => {
+        l.classList.remove('active');
+        if (l.getAttribute('href') === `#${id}`) l.classList.add('active');
+      });
+    }
+  });
+}, { threshold: .3, rootMargin: '-80px 0px -50% 0px' });
+
+sections.forEach(s => observer.observe(s));
+
+// Tab clicks demo
+document.querySelectorAll('.tabs-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    btn.closest('.tabs-bar').querySelectorAll('.tabs-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+  });
+});
+</script>
+</body>
+</html>

@@ -17,6 +17,7 @@ import { installmentRoutes } from './modules/installments/installment.routes'
 import { supplierRoutes } from './modules/suppliers/supplier.routes'
 import { purchaseOrderRoutes } from './modules/purchase-orders/po.routes'
 import { expenseRoutes } from './modules/expenses/expense.routes'
+import { reportRoutes } from './modules/reports/report.routes'
 
 const app = Fastify({
   logger: {
@@ -64,6 +65,7 @@ app.register(async function tenantScoped(sub) {
   sub.register(supplierRoutes, { prefix: '/api/suppliers' })
   sub.register(purchaseOrderRoutes, { prefix: '/api/purchase-orders' })
   sub.register(expenseRoutes, { prefix: '/api/expenses' })
+  sub.register(reportRoutes, { prefix: '/api/reports' })
 })
 
 const start = async () => {

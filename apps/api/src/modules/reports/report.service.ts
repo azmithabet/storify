@@ -1,0 +1,429 @@
+import type { TenantPrismaClient } from '@storify/database'
+import { redis } from '../../config/redis'
+import { toDecimal, ZERO } from '../../shared/utils/decimal'
+
+// ─── Date helpers ─────────────────────────────────────────────────────────────
+
+function todayRange() {
+  const start = new Date()
+  start.setHours(0, 0, 0, 0)
+  const end = new Date()
+  end.setHours(23, 59, 59, 999)
+  return { start, end }
+}
+
+function buildDateFilter(from?: string, to?: string) {
+  if (!from && !to) return undefined
+  return {
+    ...(from ? { gte: new Date(from) } : {}),
+    ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+  }
+}
+
+// ─── Dashboard ────────────────────────────────────────────────────────────────
+
+export async function getDashboard(db: TenantPrismaClient, tenantId: string, branchId?: string) {
+  const cacheKey = `dashboard:${tenantId}:${branchId ?? 'all'}`
+  const cached = await redis.get(cacheKey)
+  if (cached) return JSON.parse(cached) as object
+
+  const { start, end } = todayRange()
+  const branchFilter = branchId ? { branchId } : {}
+
+  const [
+    todaySalesAgg,
+    todayInvoiceCount,
+    pendingInstallments,
+    overduePayments,
+    lowStockCount,
+    pendingExpenses,
+    todayFeeExpenses,
+  ] = await Promise.all([
+    // Today's revenue
+    db.invoice.aggregate({
+      where: { ...branchFilter, status: 'completed', createdAt: { gte: start, lte: end } },
+      _sum: { totalAmount: true },
+      _count: true,
+    }),
+    // Invoice count today
+    db.invoice.count({
+      where: { ...branchFilter, status: 'completed', createdAt: { gte: start, lte: end } },
+    }),
+    // Pending installment approvals
+    db.installmentContract.count({ where: { status: 'pending_approval' } }),
+    // Overdue installment payments
+    db.installmentPayment.count({
+      where: { status: 'pending', dueDate: { lt: new Date() } },
+    }),
+    // Low-stock variants
+    db.stock.count({
+      where: {
+        ...branchFilter,
+        quantity: { lte: db.stock.fields.minQuantity },
+      },
+    }),
+    // Pending expense approvals
+    db.expense.count({ where: { ...branchFilter, status: 'pending' } }),
+    // Today's merchant fee costs
+    db.paymentFeeExpense.aggregate({
+      where: { ...branchFilter, createdAt: { gte: start, lte: end } },
+      _sum: { feeAmount: true },
+    }),
+  ])
+
+  const result = {
+    today: {
+      revenue: toDecimal(todaySalesAgg._sum.totalAmount ?? 0).toNumber(),
+      invoiceCount: todayInvoiceCount,
+      feeExpenses: toDecimal(todayFeeExpenses._sum.feeAmount ?? 0).toNumber(),
+    },
+    pending: {
+      installmentApprovals: pendingInstallments,
+      overdueInstallmentPayments: overduePayments,
+      expenseApprovals: pendingExpenses,
+    },
+    lowStockAlerts: lowStockCount,
+  }
+
+  await redis.set(cacheKey, JSON.stringify(result), 'EX', 120) // 2 min TTL
+  return result
+}
+
+// ─── Sales report ─────────────────────────────────────────────────────────────
+
+export async function getSalesReport(
+  db: TenantPrismaClient,
+  opts: {
+    from?: string
+    to?: string
+    branchId?: string
+    cashierId?: string
+    paymentMethodId?: string
+    groupBy: 'day' | 'week' | 'month'
+  },
+) {
+  const dateFilter = buildDateFilter(opts.from, opts.to)
+  const where = {
+    status: 'completed',
+    ...(opts.branchId ? { branchId: opts.branchId } : {}),
+    ...(opts.cashierId ? { cashierId: opts.cashierId } : {}),
+    ...(opts.paymentMethodId ? { paymentMethodId: opts.paymentMethodId } : {}),
+    ...(dateFilter ? { createdAt: dateFilter } : {}),
+  }
+
+  const [totals, byPaymentMethod, invoices] = await Promise.all([
+    db.invoice.aggregate({
+      where,
+      _sum: { totalAmount: true, subtotal: true, taxTotal: true, discountAmount: true, feeAmount: true },
+      _count: true,
+    }),
+    db.invoice.groupBy({
+      by: ['paymentMethodId'],
+      where,
+      _sum: { totalAmount: true, feeAmount: true },
+      _count: true,
+    }),
+    db.invoice.findMany({
+      where,
+      select: {
+        id: true,
+        createdAt: true,
+        totalAmount: true,
+        subtotal: true,
+        taxTotal: true,
+        discountAmount: true,
+        feeAmount: true,
+        feeBearer: true,
+        paymentMethod: { select: { id: true, name: true } },
+        cashier: { select: { id: true, fullName: true } },
+        branch: { select: { id: true, name: true } },
+        customer: { select: { id: true, fullName: true } },
+        _count: { select: { items: true } },
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 500,
+    }),
+  ])
+
+  // Resolve payment method names for groupBy result
+  const pmIds = byPaymentMethod.map((r) => r.paymentMethodId)
+  const paymentMethods = await db.paymentMethod.findMany({
+    where: { id: { in: pmIds } },
+    select: { id: true, name: true, type: true },
+  })
+  const pmMap = new Map(paymentMethods.map((p) => [p.id, p]))
+
+  // Group invoices by period
+  const grouped: Record<string, { period: string; revenue: number; count: number }> = {}
+  for (const inv of invoices) {
+    const d = inv.createdAt
+    let period: string
+    if (opts.groupBy === 'month') {
+      period = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+    } else if (opts.groupBy === 'week') {
+      // ISO week
+      const jan4 = new Date(d.getFullYear(), 0, 4)
+      const weekNum = Math.ceil(((d.getTime() - jan4.getTime()) / 86400000 + jan4.getDay() + 1) / 7)
+      period = `${d.getFullYear()}-W${String(weekNum).padStart(2, '0')}`
+    } else {
+      period = d.toISOString().slice(0, 10)
+    }
+    if (!grouped[period]) grouped[period] = { period, revenue: 0, count: 0 }
+    grouped[period].revenue += toDecimal(inv.totalAmount).toNumber()
+    grouped[period].count += 1
+  }
+
+  return {
+    summary: {
+      totalRevenue: toDecimal(totals._sum.totalAmount ?? 0).toNumber(),
+      subtotal: toDecimal(totals._sum.subtotal ?? 0).toNumber(),
+      taxTotal: toDecimal(totals._sum.taxTotal ?? 0).toNumber(),
+      discountTotal: toDecimal(totals._sum.discountAmount ?? 0).toNumber(),
+      feeTotal: toDecimal(totals._sum.feeAmount ?? 0).toNumber(),
+      invoiceCount: totals._count,
+    },
+    byPaymentMethod: byPaymentMethod.map((r) => ({
+      paymentMethod: pmMap.get(r.paymentMethodId) ?? { id: r.paymentMethodId },
+      totalRevenue: toDecimal(r._sum.totalAmount ?? 0).toNumber(),
+      feeTotal: toDecimal(r._sum.feeAmount ?? 0).toNumber(),
+      count: r._count,
+    })),
+    byPeriod: Object.values(grouped).sort((a, b) => a.period.localeCompare(b.period)),
+    invoices,
+  }
+}
+
+// ─── Stock report ─────────────────────────────────────────────────────────────
+
+export async function getStockReport(
+  db: TenantPrismaClient,
+  opts: { branchId?: string; lowStockOnly: boolean },
+) {
+  const branchFilter = opts.branchId ? { branchId: opts.branchId } : {}
+
+  const stock = await db.stock.findMany({
+    where: {
+      ...branchFilter,
+      ...(opts.lowStockOnly ? {} : {}), // filter applied client-side after fetch
+    },
+    include: {
+      variant: {
+        include: {
+          product: { select: { id: true, name: true, category: { select: { id: true, name: true } } } },
+        },
+      },
+      branch: { select: { id: true, name: true } },
+    },
+    orderBy: [{ branchId: 'asc' }, { variant: { product: { name: 'asc' } } }],
+  })
+
+  const filtered = opts.lowStockOnly ? stock.filter((s) => s.quantity <= s.minQuantity) : stock
+
+  const totalVariants = filtered.length
+  const lowStockCount = filtered.filter((s) => s.quantity <= s.minQuantity).length
+  const totalValue = filtered.reduce(
+    (sum, s) => sum + toDecimal(s.variant.costPrice).times(s.quantity).toNumber(),
+    0,
+  )
+
+  return {
+    summary: { totalVariants, lowStockCount, totalStockValue: totalValue },
+    items: filtered.map((s) => ({
+      variantId: s.variantId,
+      branchId: s.branchId,
+      branch: s.branch,
+      product: s.variant.product,
+      sku: s.variant.sku,
+      quantity: s.quantity,
+      minQuantity: s.minQuantity,
+      isLowStock: s.quantity <= s.minQuantity,
+      costPrice: toDecimal(s.variant.costPrice).toNumber(),
+      stockValue: toDecimal(s.variant.costPrice).times(s.quantity).toNumber(),
+    })),
+  }
+}
+
+// ─── Installments report ──────────────────────────────────────────────────────
+
+export async function getInstallmentsReport(
+  db: TenantPrismaClient,
+  opts: { branchId?: string; status?: string },
+) {
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+
+  const branchFilter = opts.branchId ? { invoice: { branchId: opts.branchId } } : {}
+  const statusFilter = opts.status ? { status: opts.status } : {}
+
+  const [active, overdue, completed, pendingApproval, totalReceivables] = await Promise.all([
+    db.installmentContract.count({ where: { ...branchFilter, status: 'active' } }),
+    db.installmentPayment.count({ where: { status: 'pending', dueDate: { lt: today } } }),
+    db.installmentContract.count({ where: { ...branchFilter, status: 'completed' } }),
+    db.installmentContract.count({ where: { ...branchFilter, status: 'pending_approval' } }),
+    db.installmentPayment.aggregate({
+      where: { status: 'pending', contract: branchFilter },
+      _sum: { amountPaid: true },
+    }),
+  ])
+
+  const contracts = await db.installmentContract.findMany({
+    where: { ...branchFilter, ...statusFilter },
+    include: {
+      customer: { select: { id: true, fullName: true, phone: true } },
+      invoice: { select: { id: true, totalAmount: true, branchId: true, branch: { select: { name: true } } } },
+      payments: { where: { status: 'pending' }, select: { amountPaid: true, dueDate: true } },
+    },
+    orderBy: { createdAt: 'desc' },
+    take: 200,
+  })
+
+  return {
+    summary: {
+      active,
+      overdue,
+      completed,
+      pendingApproval,
+      totalReceivables: toDecimal(totalReceivables._sum.amountPaid ?? 0).toNumber(),
+    },
+    contracts: contracts.map((c) => ({
+      ...c,
+      overduePaymentsCount: c.payments.filter((p) => p.dueDate < today).length,
+      nextDue: c.payments.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime())[0]?.dueDate ?? null,
+    })),
+  }
+}
+
+// ─── Fees report ──────────────────────────────────────────────────────────────
+
+export async function getFeesReport(
+  db: TenantPrismaClient,
+  opts: { from?: string; to?: string; branchId?: string },
+) {
+  const dateFilter = buildDateFilter(opts.from, opts.to)
+  const branchFilter = opts.branchId ? { branchId: opts.branchId } : {}
+  const where = {
+    ...branchFilter,
+    ...(dateFilter ? { createdAt: dateFilter } : {}),
+  }
+
+  const [merchantFees, invoiceFees] = await Promise.all([
+    // Merchant-bearing fees (recorded as expenses)
+    db.paymentFeeExpense.groupBy({
+      by: ['paymentMethodId'],
+      where,
+      _sum: { feeAmount: true },
+      _count: true,
+    }),
+    // All fees on invoices (customer + merchant bearing)
+    db.invoice.groupBy({
+      by: ['paymentMethodId', 'feeBearer'],
+      where: { ...branchFilter, ...(dateFilter ? { createdAt: dateFilter } : {}), status: 'completed' },
+      _sum: { feeAmount: true, totalAmount: true },
+      _count: true,
+    }),
+  ])
+
+  const pmIds = [...new Set([...merchantFees.map((r) => r.paymentMethodId), ...invoiceFees.map((r) => r.paymentMethodId)])]
+  const paymentMethods = await db.paymentMethod.findMany({
+    where: { id: { in: pmIds } },
+    select: { id: true, name: true, type: true },
+  })
+  const pmMap = new Map(paymentMethods.map((p) => [p.id, p]))
+
+  const totalMerchantFees = merchantFees.reduce((s, r) => s + toDecimal(r._sum.feeAmount ?? 0).toNumber(), 0)
+  const totalCustomerFees = invoiceFees
+    .filter((r) => r.feeBearer === 'customer')
+    .reduce((s, r) => s + toDecimal(r._sum.feeAmount ?? 0).toNumber(), 0)
+
+  return {
+    summary: {
+      totalMerchantFees,
+      totalCustomerFees,
+      totalFees: totalMerchantFees + totalCustomerFees,
+    },
+    byPaymentMethod: invoiceFees.map((r) => ({
+      paymentMethod: pmMap.get(r.paymentMethodId) ?? { id: r.paymentMethodId },
+      feeBearer: r.feeBearer,
+      totalFees: toDecimal(r._sum.feeAmount ?? 0).toNumber(),
+      invoiceCount: r._count,
+    })),
+    merchantFeeDetails: merchantFees.map((r) => ({
+      paymentMethod: pmMap.get(r.paymentMethodId) ?? { id: r.paymentMethodId },
+      totalFeeExpense: toDecimal(r._sum.feeAmount ?? 0).toNumber(),
+      transactionCount: r._count,
+    })),
+  }
+}
+
+// ─── Profit & Loss ────────────────────────────────────────────────────────────
+
+export async function getProfitLoss(
+  db: TenantPrismaClient,
+  opts: { from?: string; to?: string; branchId?: string },
+) {
+  const dateFilter = buildDateFilter(opts.from, opts.to)
+  const branchFilter = opts.branchId ? { branchId: opts.branchId } : {}
+  const invoiceWhere = {
+    ...branchFilter,
+    status: 'completed',
+    ...(dateFilter ? { createdAt: dateFilter } : {}),
+  }
+
+  // Revenue
+  const revenueAgg = await db.invoice.aggregate({
+    where: invoiceWhere,
+    _sum: { totalAmount: true, taxTotal: true, discountAmount: true },
+    _count: true,
+  })
+
+  // COGS — cost_price × quantity for all sold items in the period
+  const soldItems = await db.invoiceItem.findMany({
+    where: { invoice: invoiceWhere },
+    include: { variant: { select: { costPrice: true } } },
+  })
+  const cogs = soldItems.reduce(
+    (sum, item) => sum + toDecimal(item.variant.costPrice).times(item.quantity).toNumber(),
+    0,
+  )
+
+  // Approved expenses
+  const expenseAgg = await db.expense.aggregate({
+    where: { ...branchFilter, status: 'approved', ...(dateFilter ? { expenseDate: dateFilter } : {}) },
+    _sum: { amount: true },
+  })
+
+  // Payment fee expenses (merchant-bearing fees)
+  const feeExpenseAgg = await db.paymentFeeExpense.aggregate({
+    where: { ...branchFilter, ...(dateFilter ? { createdAt: dateFilter } : {}) },
+    _sum: { feeAmount: true },
+  })
+
+  // Returns (refunds reduce revenue)
+  const returnAgg = await db.return.aggregate({
+    where: { invoice: invoiceWhere, returnType: 'refund' },
+    _sum: { amount: true },
+  })
+
+  const revenue = toDecimal(revenueAgg._sum.totalAmount ?? 0).toNumber()
+  const refunds = toDecimal(returnAgg._sum.amount ?? 0).toNumber()
+  const netRevenue = revenue - refunds
+  const grossProfit = netRevenue - cogs
+  const operatingExpenses = toDecimal(expenseAgg._sum.amount ?? 0).toNumber()
+  const feeExpenses = toDecimal(feeExpenseAgg._sum.feeAmount ?? 0).toNumber()
+  const netProfit = grossProfit - operatingExpenses - feeExpenses
+
+  return {
+    revenue,
+    refunds,
+    netRevenue,
+    cogs,
+    grossProfit,
+    grossMarginPct: netRevenue > 0 ? Number(((grossProfit / netRevenue) * 100).toFixed(2)) : 0,
+    operatingExpenses,
+    feeExpenses,
+    totalExpenses: operatingExpenses + feeExpenses,
+    netProfit,
+    netMarginPct: netRevenue > 0 ? Number(((netProfit / netRevenue) * 100).toFixed(2)) : 0,
+    invoiceCount: revenueAgg._count,
+  }
+}

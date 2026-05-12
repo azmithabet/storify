@@ -5,7 +5,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { Input, Table, Money, SkeletonTable } from '@/components/ui'
 import { api } from '@/api/client'
 
-interface Customer { id: string; name: string; phone?: string; email?: string; creditBalance: number; totalInvoices: number }
+interface Customer { id: string; fullName: string; phone?: string; email?: string; creditBalance: number; totalInvoices: number }
 
 export default function Customers() {
   const [search, setSearch] = useState('')
@@ -20,7 +20,7 @@ export default function Customers() {
         {isLoading ? <SkeletonTable rows={8} cols={5} /> : (
           <Table
             columns={[
-              { key: 'name', header: 'الاسم', render: (c) => <span className="font-medium text-gray-100">{c.name}</span> },
+              { key: 'fullName', header: 'الاسم', render: (c) => <span className="font-medium text-gray-100">{c.fullName}</span> },
               { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
               { key: 'email', header: 'البريد الإلكتروني', className: 'text-gray-500' },
               { key: 'totalInvoices', header: 'الفواتير', className: 'text-center font-mono' },

@@ -32,15 +32,15 @@ interface PaymentMethod {
   id: string
   name: string
   type: string
-  feeType: 'percentage' | 'fixed' | 'both' | 'none'
-  feeValue: number
-  feeFixed?: number
-  feeBearerDefault: 'merchant' | 'customer' | 'negotiable'
+  feeType: 'percent' | 'fixed' | 'both' | 'none'
+  feePercentage: string | number
+  feeFixed?: string | number
+  feeBearer: 'merchant' | 'customer' | 'negotiable'
 }
 
 interface Customer {
   id: string
-  name: string
+  fullName: string
   phone?: string
 }
 
@@ -51,11 +51,11 @@ interface CompletedInvoice {
 }
 
 function calculateFee(total: number, pm: PaymentMethod): number {
-  const pct = Number(pm.feeValue)
+  const pct = Number(pm.feePercentage)
   const fixed = Number(pm.feeFixed ?? 0)
   if (pm.feeType === 'none') return 0
-  if (pm.feeType === 'percentage') return total * (pct / 100)
-  if (pm.feeType === 'fixed') return fixed || pct
+  if (pm.feeType === 'percent') return total * (pct / 100)
+  if (pm.feeType === 'fixed') return fixed
   if (pm.feeType === 'both') return total * (pct / 100) + fixed
   return 0
 }
@@ -285,7 +285,7 @@ export default function POS() {
             {customer ? (
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-100">{customer.name}</p>
+                  <p className="text-sm font-medium text-gray-100">{customer.fullName}</p>
                   {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
                 </div>
                 <button onClick={() => setCustomer(null)} className="text-gray-500 hover:text-danger-500">
@@ -313,7 +313,7 @@ export default function POS() {
                     key={pm.id}
                     onClick={() => {
                       setSelectedPM(pm)
-                      setFeeBearer(pm.feeBearerDefault === 'customer' ? 'customer' : 'merchant')
+                      setFeeBearer(pm.feeBearer === 'customer' ? 'customer' : 'merchant')
                     }}
                     className={cn(
                       'flex items-center justify-between rounded-md px-3 py-2 text-sm border transition-all',
@@ -331,7 +331,7 @@ export default function POS() {
               })}
             </div>
 
-            {selectedPM && fee > 0 && selectedPM.feeBearerDefault === 'negotiable' && (
+            {selectedPM && fee > 0 && selectedPM.feeBearer === 'negotiable' && (
               <div className="flex gap-2 mt-1">
                 <button
                   onClick={() => setFeeBearer('merchant')}
@@ -420,7 +420,7 @@ export default function POS() {
                 }}
                 className="text-right px-3 py-2 rounded hover:bg-gray-700 text-sm text-gray-200"
               >
-                {c.name}
+                {c.fullName}
                 {c.phone && <span className="text-gray-500 mr-2 num">{c.phone}</span>}
               </button>
             ))}

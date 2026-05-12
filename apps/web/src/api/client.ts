@@ -7,10 +7,11 @@ export const api = axios.create({
   withCredentials: true,
 })
 
-// Attach access token to every request
+// Attach access token + tenant subdomain to every request
 api.interceptors.request.use((config) => {
-  const token = useAuthStore.getState().accessToken
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  const { accessToken, tenantSubdomain } = useAuthStore.getState()
+  if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
+  if (tenantSubdomain) config.headers['X-Tenant-Subdomain'] = tenantSubdomain
   return config
 })
 

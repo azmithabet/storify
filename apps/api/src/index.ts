@@ -48,7 +48,15 @@ app.get('/health', async () => {
   return { status: 'ok', env: config.NODE_ENV, timestamp: new Date().toISOString() }
 })
 
+// also expose under /api/plans so the Vite proxy (/api → :3000) works
 app.get('/plans', async (_req, reply) => {
+  const plans = await masterDb.plan.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+  })
+  return reply.send({ data: plans })
+})
+app.get('/api/plans', async (_req, reply) => {
   const plans = await masterDb.plan.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },

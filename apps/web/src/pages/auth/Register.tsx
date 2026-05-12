@@ -20,7 +20,7 @@ const schema = z.object({
     .string()
     .min(3, 'الاسم يجب أن يكون 3 أحرف على الأقل')
     .regex(/^[a-z0-9-]+$/, 'يسمح فقط بالأحرف الإنجليزية الصغيرة والأرقام والشرطة'),
-  planId: z.string().min(1, 'اختر الباقة'),
+  planSlug: z.string().min(1, 'اختر الباقة'),
   ownerName: z.string().min(2, 'الاسم مطلوب'),
   ownerEmail: z.string().email('بريد إلكتروني غير صالح'),
   ownerPassword: z.string().min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'),
@@ -33,8 +33,8 @@ export default function Register() {
   const { data: plans } = useQuery<Plan[]>({
     queryKey: ['plans'],
     queryFn: async () => {
-      const res = await api.get<Plan[]>('/plans')
-      return res.data
+      const res = await api.get<{ data: Plan[] }>('/plans')
+      return res.data.data
     },
   })
 
@@ -47,7 +47,7 @@ export default function Register() {
       await api.post('/tenants/register', {
         name: data.name,
         subdomain: data.subdomain,
-        planId: data.planId,
+        planSlug: data.planSlug,
         ownerName: data.ownerName,
         ownerEmail: data.ownerEmail,
         ownerPassword: data.ownerPassword,
@@ -94,18 +94,18 @@ export default function Register() {
             <div>
               <label className="text-sm font-medium text-gray-300 block mb-1.5">الباقة</label>
               <select
-                {...register('planId')}
+                {...register('planSlug')}
                 className="w-full rounded-r-md border-[1.5px] border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
               >
                 <option value="">اختر الباقة</option>
                 {plans?.map((p) => (
-                  <option key={p.id} value={p.id}>
+                  <option key={p.id} value={p.slug}>
                     {p.name} — {p.priceMonthly} ج.م / شهر
                   </option>
                 ))}
               </select>
-              {errors.planId && (
-                <p className="text-xs text-danger-500 mt-1">{errors.planId.message}</p>
+              {errors.planSlug && (
+                <p className="text-xs text-danger-500 mt-1">{errors.planSlug.message}</p>
               )}
             </div>
 

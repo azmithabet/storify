@@ -10,9 +10,15 @@ export async function tenantMiddleware(
   reply: FastifyReply,
 ): Promise<void> {
   const hostname = request.hostname
-  const subdomain = hostname.split('.')[0]
+  let subdomain = hostname.split('.')[0]
 
-  if (SYSTEM_HOSTS.has(subdomain) || !subdomain) return
+  // In dev the frontend runs on localhost — fall back to the X-Tenant-Subdomain header
+  if (SYSTEM_HOSTS.has(subdomain) || !subdomain) {
+    const header = request.headers['x-tenant-subdomain']
+    subdomain = Array.isArray(header) ? header[0] : (header ?? '')
+  }
+
+  if (!subdomain || SYSTEM_HOSTS.has(subdomain)) return
 
   const cacheKey = `tenant:${subdomain}`
 

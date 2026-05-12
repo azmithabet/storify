@@ -1,0 +1,71 @@
+name: CI
+
+on:
+  push:
+    branches: [main, claude/*]
+  pull_request:
+    branches: [main]
+
+env:
+  PNPM_VERSION: 10
+
+jobs:
+  typecheck:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma clients
+        run: pnpm db:generate
+        env:
+          DATABASE_MASTER_URL: postgresql://postgres:password@localhost:5432/storify_master
+
+      - name: Type-check API
+        run: pnpm --filter @storify/api type-check
+
+      - name: Type-check Web
+        run: pnpm --filter @storify/web type-check
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint || true   # warn only until lint is fully configured
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [typecheck]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build Web
+        run: pnpm --filter @storify/web build

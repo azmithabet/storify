@@ -6,6 +6,23 @@ interface SendPasswordResetOptions {
   rawToken: string
 }
 
+export async function sendEmail({ to, template, data }: {
+  to: string; template: string; data: Record<string, string>
+}) {
+  if (!config.RESEND_API_KEY) {
+    console.log(`[DEV] Email template=${template} to=${to}`, data)
+    return
+  }
+  const { Resend } = await import('resend')
+  const resend = new Resend(config.RESEND_API_KEY)
+  await resend.emails.send({
+    from: config.EMAIL_FROM ?? 'noreply@storify.app',
+    to,
+    subject: `Storify — ${template}`,
+    html: `<pre>${JSON.stringify(data, null, 2)}</pre>`,
+  })
+}
+
 export async function sendPasswordResetEmail({ to, subdomain, rawToken }: SendPasswordResetOptions) {
   const resetUrl = `http://${subdomain}.localhost:5173/reset?token=${rawToken}`
 

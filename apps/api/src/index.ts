@@ -5,6 +5,7 @@ import { masterDb } from './config/database'
 import { redis } from './config/redis'
 import jwtPlugin from './shared/plugins/jwt.plugin'
 import cookiePlugin from './shared/plugins/cookie.plugin'
+import sentryPlugin from './shared/plugins/sentry.plugin'
 import { tenantMiddleware } from './shared/middleware/tenant.middleware'
 import { tenantRoutes } from './modules/tenants/tenant.routes'
 import { authRoutes } from './modules/auth/auth.routes'
@@ -18,6 +19,10 @@ import { supplierRoutes } from './modules/suppliers/supplier.routes'
 import { purchaseOrderRoutes } from './modules/purchase-orders/po.routes'
 import { expenseRoutes } from './modules/expenses/expense.routes'
 import { reportRoutes } from './modules/reports/report.routes'
+import { etaRoutes } from './modules/eta/eta.routes'
+import { billingRoutes } from './modules/billing/billing.routes'
+import { startEtaWorker } from './jobs/eta-submission.job'
+import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
 
 const app = Fastify({
   logger: {
@@ -30,6 +35,7 @@ const app = Fastify({
 })
 
 // ─── Global plugins ───────────────────────────────────────────────────────────
+app.register(sentryPlugin)
 app.register(jwtPlugin)
 app.register(cookiePlugin)
 app.register(rateLimit, {
@@ -66,12 +72,19 @@ app.register(async function tenantScoped(sub) {
   sub.register(purchaseOrderRoutes, { prefix: '/api/purchase-orders' })
   sub.register(expenseRoutes, { prefix: '/api/expenses' })
   sub.register(reportRoutes, { prefix: '/api/reports' })
+  sub.register(etaRoutes, { prefix: '/api' })
+  sub.register(billingRoutes, { prefix: '/api' })
 })
 
 const start = async () => {
   try {
     await app.listen({ port: config.API_PORT, host: config.API_HOST })
     console.log(`Server running on port ${config.API_PORT}`)
+
+    // Start background workers
+    startEtaWorker()
+    startDunningWorker()
+    await scheduleDunning()
   } catch (err) {
     app.log.error(err)
     process.exit(1)

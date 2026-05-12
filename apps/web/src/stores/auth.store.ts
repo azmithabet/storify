@@ -6,6 +6,7 @@ export interface AuthUser {
   fullName: string
   email: string
   roleSlug: string
+  branchId?: string
   permissions?: Record<string, string[]>
 }
 

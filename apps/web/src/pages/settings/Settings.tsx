@@ -1,14 +1,19 @@
 import { useState } from 'react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Plus, Edit2, ToggleLeft, ToggleRight } from 'lucide-react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
+import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer } from '@/components/ui'
+import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 
 const tabs = [
   { id: 'store', label: 'بيانات المتجر' },
   { id: 'payment', label: 'طرق الدفع' },
-  { id: 'users', label: 'المستخدمون والصلاحيات' },
-  { id: 'eta', label: 'إعدادات الضريبة ETA' },
-  { id: 'billing', label: 'الاشتراك والفوترة' },
+  { id: 'users', label: 'المستخدمون' },
 ]
 
 export default function Settings() {
@@ -27,13 +32,15 @@ export default function Settings() {
         </nav>
         <div className="flex-1 bg-gray-800 rounded-r-xl border border-gray-700 p-6">
           {tab === 'store' && <StoreSettings />}
-          {tab !== 'store' && <div className="text-gray-500 text-center py-20">قريباً...</div>}
+          {tab === 'payment' && <PaymentMethodsSettings />}
+          {tab === 'users' && <UsersSettings />}
         </div>
       </div>
     </AppShell>
   )
 }
 
+// ─── Store Settings ───────────────────────────────────────────────────────────
 function StoreSettings() {
   return (
     <div className="flex flex-col gap-6 max-w-lg">
@@ -51,6 +58,180 @@ function StoreSettings() {
         </div>
         <Button className="w-fit">حفظ التغييرات</Button>
       </div>
+    </div>
+  )
+}
+
+// ─── Payment Methods Settings ─────────────────────────────────────────────────
+interface PaymentMethod {
+  id: string; name: string; type: string
+  feeType: string; feePercentage: string | number; feeFixed: string | number
+  feeBearer: string; isActive: boolean
+}
+
+const pmSchema = z.object({
+  name: z.string().min(1, 'الاسم مطلوب'),
+  type: z.enum(['cash', 'card', 'ewallet', 'bnpl', 'bank_transfer']),
+  feeType: z.enum(['none', 'percentage', 'fixed', 'both']).default('none'),
+  feePercentage: z.coerce.number().min(0).default(0),
+  feeFixed: z.coerce.number().min(0).default(0),
+  feeBearer: z.enum(['customer', 'merchant', 'negotiable']).default('merchant'),
+})
+type PmFormData = z.infer<typeof pmSchema>
+
+const typeLabels: Record<string, string> = { cash: 'نقدي', card: 'بطاقة', ewallet: 'محفظة', bnpl: 'تقسيط', bank_transfer: 'تحويل بنكي' }
+const feeTypeLabels: Record<string, string> = { none: 'بدون', percentage: 'نسبة مئوية', fixed: 'مبلغ ثابت', both: 'نسبة + ثابت' }
+
+function PaymentMethodsSettings() {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState<PaymentMethod | null>(null)
+
+  const { data: methods = [] } = useQuery<PaymentMethod[]>({
+    queryKey: ['payment-methods'],
+    queryFn: async () => (await api.get<{ data: PaymentMethod[] }>('/payment-methods')).data.data,
+  })
+
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<PmFormData>({ resolver: zodResolver(pmSchema) })
+  const feeType = watch('feeType')
+
+  const openNew = () => { setEditing(null); reset({ feeType: 'none', feeBearer: 'merchant', feePercentage: 0, feeFixed: 0 }); setDrawerOpen(true) }
+  const openEdit = (pm: PaymentMethod) => {
+    setEditing(pm)
+    reset({ name: pm.name, type: pm.type as PmFormData['type'], feeType: pm.feeType as PmFormData['feeType'], feePercentage: Number(pm.feePercentage), feeFixed: Number(pm.feeFixed), feeBearer: pm.feeBearer as PmFormData['feeBearer'] })
+    setDrawerOpen(true)
+  }
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async (data: PmFormData) => {
+      if (editing) await api.patch(`/payment-methods/${editing.id}`, data)
+      else await api.post('/payment-methods', data)
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'تم التحديث' : 'تم الإضافة')
+      qc.invalidateQueries({ queryKey: ['payment-methods'] })
+      setDrawerOpen(false)
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  const { mutate: toggleActive } = useMutation({
+    mutationFn: async (pm: PaymentMethod) => api.patch(`/payment-methods/${pm.id}`, { isActive: !pm.isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['payment-methods'] }),
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100">طرق الدفع</h3>
+        <Button onClick={openNew}><Plus className="w-4 h-4" />إضافة طريقة</Button>
+      </div>
+
+      <Table
+        columns={[
+          { key: 'name', header: 'الاسم', render: (pm) => <span className="font-medium text-gray-100">{pm.name}</span> },
+          { key: 'type', header: 'النوع', render: (pm) => <Badge variant="gray">{typeLabels[pm.type] ?? pm.type}</Badge> },
+          { key: 'feeType', header: 'نوع الرسوم', render: (pm) => <span className="text-gray-400 text-sm">{feeTypeLabels[pm.feeType] ?? pm.feeType}</span> },
+          { key: 'fee', header: 'الرسوم', render: (pm) => (
+            <span className="font-mono text-sm text-gray-300">
+              {pm.feeType === 'none' ? '—' : pm.feeType === 'percentage' ? `${Number(pm.feePercentage)}%` : pm.feeType === 'fixed' ? `${Number(pm.feeFixed)} ج` : `${Number(pm.feePercentage)}% + ${Number(pm.feeFixed)} ج`}
+            </span>
+          )},
+          { key: 'isActive', header: 'الحالة', render: (pm) => <Badge variant={pm.isActive ? 'success' : 'gray'} dot>{pm.isActive ? 'نشط' : 'معطّل'}</Badge> },
+          { key: 'actions', header: '', render: (pm) => (
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => openEdit(pm)}><Edit2 className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => toggleActive(pm)}>
+                {pm.isActive ? <ToggleRight className="w-4 h-4 text-success-500" /> : <ToggleLeft className="w-4 h-4 text-gray-500" />}
+              </Button>
+            </div>
+          )},
+        ]}
+        data={methods} keyExtractor={(pm) => pm.id} emptyMessage="لا توجد طرق دفع"
+      />
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل طريقة الدفع' : 'طريقة دفع جديدة'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button>
+            <Button loading={isPending} onClick={handleSubmit((d) => save(d))}>حفظ</Button>
+          </>
+        }
+      >
+        <form className="flex flex-col gap-5">
+          <Input label="الاسم" error={errors.name?.message} {...register('name')} />
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">النوع</label>
+            <select {...register('type')} disabled={!!editing} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 disabled:opacity-50">
+              <option value="cash">نقدي</option>
+              <option value="card">بطاقة بنكية</option>
+              <option value="ewallet">محفظة إلكترونية</option>
+              <option value="bnpl">تقسيط (BNPL)</option>
+              <option value="bank_transfer">تحويل بنكي</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">نوع الرسوم</label>
+            <select {...register('feeType')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+              <option value="none">بدون رسوم</option>
+              <option value="percentage">نسبة مئوية</option>
+              <option value="fixed">مبلغ ثابت</option>
+              <option value="both">نسبة + مبلغ ثابت</option>
+            </select>
+          </div>
+          {(feeType === 'percentage' || feeType === 'both') && (
+            <Input label="نسبة الرسوم (%)" type="number" step="0.01" {...register('feePercentage')} />
+          )}
+          {(feeType === 'fixed' || feeType === 'both') && (
+            <Input label="مبلغ الرسوم الثابت (ج)" type="number" step="0.01" {...register('feeFixed')} />
+          )}
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">من يتحمل الرسوم</label>
+            <select {...register('feeBearer')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+              <option value="merchant">المتجر</option>
+              <option value="customer">العميل</option>
+              <option value="negotiable">قابل للتفاوض</option>
+            </select>
+          </div>
+        </form>
+      </Drawer>
+    </div>
+  )
+}
+
+// ─── Users Settings ───────────────────────────────────────────────────────────
+interface TenantUser { id: string; fullName: string; email: string; role: { name: string; slug: string }; isActive: boolean; lastLogin?: string }
+
+function UsersSettings() {
+  const { data: users = [], isLoading } = useQuery<TenantUser[]>({
+    queryKey: ['tenant-users'],
+    queryFn: async () => {
+      const res = await api.get<{ data: TenantUser[] }>('/auth/users')
+      return res.data.data
+    },
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <h3 className="text-lg font-semibold text-gray-100">المستخدمون والأدوار</h3>
+      {isLoading ? (
+        <div className="text-gray-500 text-sm">جارٍ التحميل...</div>
+      ) : (
+        <Table
+          columns={[
+            { key: 'fullName', header: 'الاسم', render: (u) => <span className="font-medium text-gray-100">{u.fullName}</span> },
+            { key: 'email', header: 'البريد الإلكتروني', className: 'text-gray-400 text-sm' },
+            { key: 'role', header: 'الدور', render: (u) => <Badge variant="gray">{u.role?.name ?? u.role?.slug ?? '—'}</Badge> },
+            { key: 'isActive', header: 'الحالة', render: (u) => <Badge variant={u.isActive ? 'success' : 'gray'} dot>{u.isActive ? 'نشط' : 'معطّل'}</Badge> },
+            { key: 'lastLogin', header: 'آخر دخول', render: (u) => u.lastLogin
+              ? <span className="text-gray-500 text-xs">{new Date(u.lastLogin).toLocaleDateString('ar-EG')}</span>
+              : <span className="text-gray-600">—</span>
+            },
+          ]}
+          data={users} keyExtractor={(u) => u.id} emptyMessage="لا يوجد مستخدمون"
+        />
+      )}
     </div>
   )
 }

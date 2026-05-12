@@ -11,6 +11,7 @@ import {
   Truck,
   Receipt,
   LogOut,
+  ClipboardList,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
@@ -24,6 +25,7 @@ const navItems = [
   { to: '/invoices', icon: FileText, label: 'الفواتير' },
   { to: '/installments', icon: CreditCard, label: 'الأقساط' },
   { to: '/suppliers', icon: Truck, label: 'الموردون' },
+  { to: '/purchase-orders', icon: ClipboardList, label: 'أوامر الشراء' },
   { to: '/expenses', icon: Receipt, label: 'المصروفات' },
   { to: '/reports', icon: BarChart3, label: 'التقارير' },
   { to: '/settings', icon: Settings, label: 'الإعدادات' },

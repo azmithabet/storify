@@ -20,6 +20,7 @@ const Installments = lazy(() => import('@/pages/installments/Installments'))
 const Suppliers = lazy(() => import('@/pages/suppliers/Suppliers'))
 const Expenses = lazy(() => import('@/pages/expenses/Expenses'))
 const Reports = lazy(() => import('@/pages/reports/Reports'))
+const PurchaseOrders = lazy(() => import('@/pages/purchase-orders/PurchaseOrders'))
 const Settings = lazy(() => import('@/pages/settings/Settings'))
 
 const PageLoader = () => (
@@ -53,6 +54,7 @@ export default function App() {
         <Route path="/suppliers/*" element={<AuthGuard><Suppliers /></AuthGuard>} />
         <Route path="/expenses/*" element={<AuthGuard><Expenses /></AuthGuard>} />
         <Route path="/reports/*" element={<AuthGuard><Reports /></AuthGuard>} />
+        <Route path="/purchase-orders/*" element={<AuthGuard><PurchaseOrders /></AuthGuard>} />
         <Route path="/settings/*" element={<AuthGuard><Settings /></AuthGuard>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />

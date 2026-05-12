@@ -21,6 +21,7 @@ import { expenseRoutes } from './modules/expenses/expense.routes'
 import { reportRoutes } from './modules/reports/report.routes'
 import { etaRoutes } from './modules/eta/eta.routes'
 import { billingRoutes } from './modules/billing/billing.routes'
+import { authenticate } from './shared/middleware/auth.middleware'
 import { startEtaWorker } from './jobs/eta-submission.job'
 import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
 
@@ -82,6 +83,16 @@ app.register(async function tenantScoped(sub) {
   sub.register(reportRoutes, { prefix: '/api/reports' })
   sub.register(etaRoutes, { prefix: '/api' })
   sub.register(billingRoutes, { prefix: '/api' })
+
+  // Simple branches listing (used by frontend forms)
+  sub.get('/api/branches', { preHandler: [authenticate] }, async (request, reply) => {
+    const branches = await request.tenantDb.branch.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, isMain: true },
+      orderBy: { isMain: 'desc' },
+    })
+    return reply.send({ success: true, data: branches })
+  })
 })
 
 const start = async () => {

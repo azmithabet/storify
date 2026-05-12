@@ -8,6 +8,7 @@ interface ModalProps {
   onClose: () => void
   title?: string
   children: ReactNode
+  footer?: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
@@ -19,7 +20,7 @@ const sizeClasses = {
   xl: 'max-w-2xl',
 }
 
-export function Modal({ open, onClose, title, children, size = 'md', className }: ModalProps) {
+export function Modal({ open, onClose, title, children, footer, size = 'md', className }: ModalProps) {
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -55,6 +56,9 @@ export function Modal({ open, onClose, title, children, size = 'md', className }
           </div>
         )}
         <div className="p-6">{children}</div>
+        {footer && (
+          <div className="px-6 py-4 border-t border-gray-700 flex gap-3 justify-end">{footer}</div>
+        )}
       </div>
     </div>
   )

@@ -18,7 +18,7 @@ export default function Invoices() {
   const [search, setSearch] = useState('')
   const { data = [], isLoading } = useQuery<Invoice[]>({
     queryKey: ['invoices', search],
-    queryFn: async () => (await api.get<Invoice[]>('/invoices', { params: { search, limit: 50 } })).data,
+    queryFn: async () => (await api.get<{data:Invoice[]}>('/invoices', { params: { search, limit: 50 } })).data.data,
   })
   return (
     <AppShell title="الفواتير">

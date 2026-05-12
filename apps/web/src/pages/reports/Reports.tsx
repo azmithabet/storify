@@ -4,14 +4,28 @@ import { AppShell } from '@/components/layout/AppShell'
 import { StatCard, Button, SkeletonTable, Table, Money } from '@/components/ui'
 import { api } from '@/api/client'
 
-interface SalesReport { date: string; totalSales: number; invoiceCount: number; totalFees: number }
+interface SalesSummary {
+  totalRevenue: number
+  subtotal: number
+  taxTotal: number
+  discountTotal: number
+  feeTotal: number
+  invoiceCount: number
+}
+
+interface ByPeriod { period: string; revenue: number; count: number }
+
+interface SalesReport {
+  summary: SalesSummary
+  byPeriod: ByPeriod[]
+}
 
 export default function Reports() {
   const [tab, setTab] = useState<'sales'|'stock'|'installments'|'pnl'>('sales')
 
-  const { data: sales = [], isLoading } = useQuery<SalesReport[]>({
+  const { data: salesData, isLoading } = useQuery<SalesReport>({
     queryKey: ['reports-sales'],
-    queryFn: async () => (await api.get<SalesReport[]>('/reports/sales')).data,
+    queryFn: async () => (await api.get<{data: SalesReport}>('/reports/sales')).data.data,
     enabled: tab === 'sales',
   })
 
@@ -22,8 +36,8 @@ export default function Reports() {
     { id: 'pnl', label: 'الأرباح والخسائر' },
   ] as const
 
-  const totalSales = sales.reduce((s, r) => s + r.totalSales, 0)
-  const totalFees = sales.reduce((s, r) => s + r.totalFees, 0)
+  const summary = salesData?.summary
+  const byPeriod = salesData?.byPeriod ?? []
 
   return (
     <AppShell title="التقارير">
@@ -37,19 +51,18 @@ export default function Reports() {
         {tab === 'sales' && (
           <>
             <div className="grid grid-cols-3 gap-4">
-              <StatCard label="إجمالي المبيعات" value={`${totalSales.toLocaleString('ar-EG')} ج`} accentColor="bg-brand-500" />
-              <StatCard label="إجمالي الرسوم" value={`${totalFees.toLocaleString('ar-EG')} ج`} accentColor="bg-warning-500" />
-              <StatCard label="عدد الفواتير" value={sales.reduce((s, r) => s + r.invoiceCount, 0)} accentColor="bg-success-500" />
+              <StatCard label="إجمالي المبيعات" value={`${(summary?.totalRevenue ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-brand-500" />
+              <StatCard label="إجمالي الرسوم" value={`${(summary?.feeTotal ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-warning-500" />
+              <StatCard label="عدد الفواتير" value={summary?.invoiceCount ?? 0} accentColor="bg-success-500" />
             </div>
-            {isLoading ? <SkeletonTable rows={8} cols={4} /> : (
+            {isLoading ? <SkeletonTable rows={8} cols={3} /> : (
               <Table
                 columns={[
-                  { key: 'date', header: 'التاريخ', render: (r) => <span className="text-gray-500 font-mono">{r.date}</span> },
-                  { key: 'invoiceCount', header: 'الفواتير', className: 'font-mono text-center' },
-                  { key: 'totalSales', header: 'المبيعات', render: (r) => <Money value={r.totalSales} /> },
-                  { key: 'totalFees', header: 'الرسوم', render: (r) => <Money value={r.totalFees} /> },
+                  { key: 'period', header: 'الفترة', render: (r) => <span className="text-gray-500 font-mono">{r.period}</span> },
+                  { key: 'count', header: 'الفواتير', className: 'font-mono text-center' },
+                  { key: 'revenue', header: 'الإيرادات', render: (r) => <Money value={r.revenue} /> },
                 ]}
-                data={sales} keyExtractor={(r) => r.date} emptyMessage="لا توجد بيانات"
+                data={byPeriod} keyExtractor={(r) => r.period} emptyMessage="لا توجد بيانات"
               />
             )}
           </>

@@ -51,10 +51,12 @@ interface CompletedInvoice {
 }
 
 function calculateFee(total: number, pm: PaymentMethod): number {
+  const pct = Number(pm.feeValue)
+  const fixed = Number(pm.feeFixed ?? 0)
   if (pm.feeType === 'none') return 0
-  if (pm.feeType === 'percentage') return total * (pm.feeValue / 100)
-  if (pm.feeType === 'fixed') return pm.feeFixed ?? pm.feeValue
-  if (pm.feeType === 'both') return total * (pm.feeValue / 100) + (pm.feeFixed ?? 0)
+  if (pm.feeType === 'percentage') return total * (pct / 100)
+  if (pm.feeType === 'fixed') return fixed || pct
+  if (pm.feeType === 'both') return total * (pct / 100) + fixed
   return 0
 }
 
@@ -72,21 +74,21 @@ export default function POS() {
 
   const { data: paymentMethods = [] } = useQuery<PaymentMethod[]>({
     queryKey: ['payment-methods'],
-    queryFn: async () => (await api.get<PaymentMethod[]>('/payment-methods')).data,
+    queryFn: async () => (await api.get<{ data: PaymentMethod[] }>('/payment-methods')).data.data,
   })
 
   const { data: customers = [] } = useQuery<Customer[]>({
     queryKey: ['customers-search', customerSearch],
     queryFn: async () =>
-      (await api.get<Customer[]>('/customers', { params: { search: customerSearch, limit: 10 } })).data,
+      (await api.get<{ data: Customer[] }>('/customers', { params: { search: customerSearch, limit: 10 } })).data.data,
     enabled: customerSearch.length > 1,
   })
 
   const doSearch = useCallback(async (q: string) => {
     if (!q.trim()) { setSearchResults([]); return }
     try {
-      const res = await api.get<Variant[]>('/products/search', { params: { q, limit: 8 } })
-      setSearchResults(res.data)
+      const res = await api.get<{ data: Variant[] }>('/products/search', { params: { q, limit: 8 } })
+      setSearchResults(res.data.data)
     } catch {
       setSearchResults([])
     }
@@ -151,7 +153,7 @@ export default function POS() {
     mutationFn: async () => {
       if (!selectedPM) throw new Error('اختر طريقة الدفع')
       if (cart.length === 0) throw new Error('السلة فارغة')
-      const res = await api.post<CompletedInvoice>('/invoices', {
+      const res = await api.post<{ data: CompletedInvoice }>('/invoices', {
         paymentMethodId: selectedPM.id,
         customerId: customer?.id,
         feeBearer,
@@ -161,7 +163,7 @@ export default function POS() {
           unitPrice: i.unitPrice,
         })),
       })
-      return res.data
+      return res.data.data
     },
     onSuccess: (invoice) => {
       setCompletedInvoice(invoice)

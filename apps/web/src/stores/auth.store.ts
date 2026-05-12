@@ -3,10 +3,10 @@ import { persist } from 'zustand/middleware'
 
 export interface AuthUser {
   id: string
-  name: string
+  fullName: string
   email: string
-  role: string
-  permissions: Record<string, string[]>
+  roleSlug: string
+  permissions?: Record<string, string[]>
 }
 
 interface AuthState {
@@ -36,7 +36,7 @@ export const useAuthStore = create<AuthState>()(
       hasPermission: (resource, action) => {
         const { user } = get()
         if (!user) return false
-        if (user.role === 'super_admin') return true
+        if (user.roleSlug === 'super_admin') return true
         return user.permissions?.[resource]?.includes(action) ?? false
       },
     }),

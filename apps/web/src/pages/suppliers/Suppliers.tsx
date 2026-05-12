@@ -8,7 +8,7 @@ interface Supplier { id: string; name: string; phone?: string; balance: number; 
 export default function Suppliers() {
   const { data = [], isLoading } = useQuery<Supplier[]>({
     queryKey: ['suppliers'],
-    queryFn: async () => (await api.get<Supplier[]>('/suppliers')).data,
+    queryFn: async () => (await api.get<{data:Supplier[]}>('/suppliers')).data.data,
   })
   return (
     <AppShell title="الموردون">

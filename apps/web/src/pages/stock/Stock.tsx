@@ -10,7 +10,7 @@ export default function Stock() {
   const [_tab, _setTab] = useState<'overview' | 'movements'>('overview')
   const { data = [], isLoading } = useQuery<StockEntry[]>({
     queryKey: ['stock'],
-    queryFn: async () => (await api.get<StockEntry[]>('/stock')).data,
+    queryFn: async () => (await api.get<{data:StockEntry[]}>('/stock')).data.data,
   })
   return (
     <AppShell title="المخزون">

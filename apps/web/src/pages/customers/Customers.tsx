@@ -11,7 +11,7 @@ export default function Customers() {
   const [search, setSearch] = useState('')
   const { data = [], isLoading } = useQuery<Customer[]>({
     queryKey: ['customers', search],
-    queryFn: async () => (await api.get<Customer[]>('/customers', { params: { search, limit: 50 } })).data,
+    queryFn: async () => (await api.get<{data:Customer[]}>('/customers', { params: { search, limit: 50 } })).data.data,
   })
   return (
     <AppShell title="العملاء">

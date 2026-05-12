@@ -30,12 +30,12 @@ export default function Login() {
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: async (data: FormData) => {
-      const res = await api.post<{ accessToken: string; user: AuthUser }>(
+      const res = await api.post<{ success: boolean; data: { accessToken: string; user: AuthUser } }>(
         '/auth/login',
         { email: data.email, password: data.password },
         { headers: { 'X-Tenant-Subdomain': data.subdomain } },
       )
-      return { ...res.data, subdomain: data.subdomain }
+      return { ...res.data.data, subdomain: data.subdomain }
     },
     onSuccess: ({ accessToken, user, subdomain }) => {
       setAuth(user, accessToken, subdomain)

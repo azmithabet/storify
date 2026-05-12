@@ -9,7 +9,8 @@ export async function tenantMiddleware(
   request: FastifyRequest,
   reply: FastifyReply,
 ): Promise<void> {
-  const hostname = request.hostname
+  // strip port if present (e.g. "localhost:3000" → "localhost")
+  const hostname = request.hostname.split(':')[0]
   let subdomain = hostname.split('.')[0]
 
   // In dev the frontend runs on localhost — fall back to the X-Tenant-Subdomain header

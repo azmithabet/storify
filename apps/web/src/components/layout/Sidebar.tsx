@@ -71,7 +71,7 @@ export function Sidebar() {
       {/* User + Logout */}
       <div className="border-t border-gray-800 p-4 flex items-center gap-3">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-200 truncate">{user?.name}</p>
+          <p className="text-sm font-medium text-gray-200 truncate">{user?.fullName}</p>
           <p className="text-xs text-gray-500 truncate">{user?.email}</p>
         </div>
         <button

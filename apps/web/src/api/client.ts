@@ -37,8 +37,13 @@ api.interceptors.response.use(
     original._retry = true
     isRefreshing = true
     try {
-      const { data } = await axios.post<{ accessToken: string }>('/api/auth/refresh', {}, { withCredentials: true })
-      const newToken = data.accessToken
+      const subdomain = useAuthStore.getState().tenantSubdomain
+      const { data } = await axios.post<{ success: boolean; data: { accessToken: string } }>(
+        '/api/auth/refresh',
+        {},
+        { withCredentials: true, headers: subdomain ? { 'X-Tenant-Subdomain': subdomain } : {} },
+      )
+      const newToken = data.data.accessToken
       useAuthStore.getState().setAccessToken(newToken)
       refreshQueue.forEach((cb) => cb(newToken))
       refreshQueue = []

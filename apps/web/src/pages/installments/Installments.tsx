@@ -16,7 +16,7 @@ const statusMap: Record<string, { label: string; variant: 'warning'|'success'|'d
 export default function Installments() {
   const { data = [], isLoading } = useQuery<InstallmentContract[]>({
     queryKey: ['installments'],
-    queryFn: async () => (await api.get<InstallmentContract[]>('/installments')).data,
+    queryFn: async () => (await api.get<{data:InstallmentContract[]}>('/installments')).data.data,
   })
   return (
     <AppShell title="الأقساط">

@@ -32,7 +32,7 @@ export default function Products() {
 
   const { data: products = [], isLoading } = useQuery<Product[]>({
     queryKey: ['products', search],
-    queryFn: async () => (await api.get<Product[]>('/products', { params: { search, limit: 50 } })).data,
+    queryFn: async () => (await api.get<{data:Product[]}>('/products', { params: { search, limit: 50 } })).data.data,
   })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) })

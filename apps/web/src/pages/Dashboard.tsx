@@ -16,8 +16,8 @@ export default function Dashboard() {
   const { data, isLoading, error } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => {
-      const res = await api.get<DashboardData>('/reports/dashboard')
-      return res.data
+      const res = await api.get<{ data: DashboardData }>('/reports/dashboard')
+      return res.data.data
     },
     refetchInterval: 2 * 60 * 1000,
   })

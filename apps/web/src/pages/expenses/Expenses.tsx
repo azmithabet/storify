@@ -8,7 +8,7 @@ interface Expense { id: string; description: string; amount: number; categoryNam
 export default function Expenses() {
   const { data = [], isLoading } = useQuery<Expense[]>({
     queryKey: ['expenses'],
-    queryFn: async () => (await api.get<Expense[]>('/expenses')).data,
+    queryFn: async () => (await api.get<{data:Expense[]}>('/expenses')).data.data,
   })
   return (
     <AppShell title="المصروفات">

@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag, WifiOff } from 'lucide-react'
+import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag, WifiOff, BookCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button, Input, Badge, Money, Modal } from '@/components/ui'
@@ -129,6 +129,8 @@ export default function POS() {
   const [couponInput, setCouponInput] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
+  const [showEOD, setShowEOD] = useState(false)
+  const [actualCash, setActualCash] = useState('')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [offlineQueue, setOfflineQueue] = useState<unknown[]>(() => {
     try { return JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]') } catch { return [] }
@@ -172,6 +174,35 @@ export default function POS() {
     queryFn: async () =>
       (await api.get<{ data: Customer[] }>('/customers', { params: { search: customerSearch, limit: 10 } })).data.data,
     enabled: customerSearch.length > 1,
+  })
+
+  const todayDate = new Date().toISOString().slice(0, 10)
+
+  interface DashboardToday { revenue: number; invoiceCount: number; feeExpenses: number }
+  interface SalesByPM { paymentMethodName: string; totalRevenue: number; invoiceCount: number }
+  interface ApiSalesByPM { paymentMethod: { id: string; name?: string }; totalRevenue: number; count: number }
+
+  const { data: eodDashboard } = useQuery<DashboardToday>({
+    queryKey: ['eod-dashboard'],
+    queryFn: async () => (await api.get<{ data: { today: DashboardToday } }>('/reports/dashboard')).data.data.today,
+    enabled: showEOD,
+    refetchOnMount: true,
+  })
+
+  const { data: eodByPM } = useQuery<SalesByPM[]>({
+    queryKey: ['eod-by-pm', todayDate],
+    queryFn: async () => {
+      const res = await api.get<{ data: { byPaymentMethod: ApiSalesByPM[] } }>('/reports/sales', {
+        params: { from: todayDate, to: todayDate, groupBy: 'day' },
+      })
+      return (res.data.data.byPaymentMethod ?? []).map((r) => ({
+        paymentMethodName: r.paymentMethod.name ?? r.paymentMethod.id,
+        totalRevenue: r.totalRevenue,
+        invoiceCount: r.count,
+      }))
+    },
+    enabled: showEOD,
+    refetchOnMount: true,
   })
 
   const doSearch = useCallback(async (q: string) => {
@@ -620,6 +651,14 @@ export default function POS() {
           >
             إتمام البيع
           </Button>
+
+          <button
+            onClick={() => { setShowEOD(true); setActualCash('') }}
+            className="w-full flex items-center justify-center gap-2 text-xs text-gray-500 hover:text-gray-300 py-2 border border-gray-700 rounded-md hover:border-gray-600 transition-colors"
+          >
+            <BookCheck className="w-3.5 h-3.5" />
+            إغلاق اليوم
+          </button>
         </div>
       </div>
 
@@ -647,6 +686,106 @@ export default function POS() {
                 {c.phone && <span className="text-gray-500 mr-2 num">{c.phone}</span>}
               </button>
             ))}
+          </div>
+        </div>
+      </Modal>
+
+      {/* End-of-day modal */}
+      <Modal open={showEOD} onClose={() => setShowEOD(false)} title="إغلاق اليوم — ملخص النقدية">
+        <div className="flex flex-col gap-5">
+          <div className="grid grid-cols-3 gap-3">
+            <div className="bg-gray-900 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-500 mb-1">إجمالي المبيعات</p>
+              <p className="text-lg font-mono font-bold text-gray-100">{(eodDashboard?.revenue ?? 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج</p>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-500 mb-1">عدد الفواتير</p>
+              <p className="text-lg font-mono font-bold text-gray-100">{eodDashboard?.invoiceCount ?? 0}</p>
+            </div>
+            <div className="bg-gray-900 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-500 mb-1">رسوم الدفع</p>
+              <p className="text-lg font-mono font-bold text-warning-400">{(eodDashboard?.feeExpenses ?? 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ج</p>
+            </div>
+          </div>
+
+          {eodByPM && eodByPM.length > 0 && (
+            <div className="bg-gray-900 rounded-lg p-3">
+              <p className="text-xs text-gray-500 uppercase tracking-wide mb-2">تفصيل طرق الدفع</p>
+              <div className="flex flex-col gap-1">
+                {eodByPM.map((pm) => (
+                  <div key={pm.paymentMethodName} className="flex items-center justify-between text-sm py-1 border-b border-gray-800 last:border-0">
+                    <span className="text-gray-300">{pm.paymentMethodName}</span>
+                    <div className="text-left">
+                      <span className="font-mono text-gray-100">{pm.totalRevenue.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ج</span>
+                      <span className="text-gray-500 text-xs mr-2">× {pm.invoiceCount}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          <div className="bg-gray-900 rounded-lg p-4">
+            <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">جرد الدرج النقدي الفعلي (ج)</label>
+            <input
+              type="number"
+              value={actualCash}
+              onChange={(e) => setActualCash(e.target.value)}
+              placeholder="0.00"
+              className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-lg font-mono text-gray-100 placeholder-gray-600 focus:outline-none focus:border-brand-500 text-left"
+              dir="ltr"
+            />
+            {actualCash !== '' && eodDashboard && (() => {
+              const cashPM = eodByPM?.find((pm) => pm.paymentMethodName.toLowerCase().includes('نقد') || pm.paymentMethodName.toLowerCase().includes('cash'))
+              const expectedCash = cashPM?.totalRevenue ?? eodDashboard.revenue
+              const actual = parseFloat(actualCash) || 0
+              const diff = actual - expectedCash
+              return (
+                <div className={cn('mt-3 flex items-center justify-between text-sm font-semibold rounded-md px-3 py-2', diff === 0 ? 'bg-success-500/10 text-success-400' : diff > 0 ? 'bg-warning-500/10 text-warning-400' : 'bg-danger-500/10 text-danger-400')}>
+                  <span>{diff === 0 ? 'مطابق تماماً' : diff > 0 ? 'فائض' : 'عجز'}</span>
+                  <span className="font-mono">{diff >= 0 ? '+' : ''}{diff.toFixed(2)} ج</span>
+                </div>
+              )
+            })()}
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="secondary"
+              className="flex-1"
+              onClick={() => {
+                const win = window.open('', '_blank', 'width=500,height=600')
+                if (!win) return
+                const pmRows = (eodByPM ?? []).map((pm) =>
+                  `<tr><td>${pm.paymentMethodName}</td><td>${pm.invoiceCount}</td><td>${pm.totalRevenue.toFixed(2)} ج</td></tr>`
+                ).join('')
+                win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إغلاق اليوم</title><style>
+                  *{box-sizing:border-box;margin:0;padding:0}body{font-family:monospace;font-size:13px;padding:16px}
+                  h2{text-align:center;margin-bottom:12px}table{width:100%;border-collapse:collapse;margin:8px 0}
+                  th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f5f5f5}
+                  .total{font-weight:bold;font-size:15px}.section{margin-bottom:16px}
+                </style></head><body>
+                  <h2>ملخص إغلاق يوم ${new Date().toLocaleDateString('ar-EG')}</h2>
+                  <div class="section"><table><thead><tr><th>البيان</th><th>القيمة</th></tr></thead><tbody>
+                    <tr><td>إجمالي المبيعات</td><td class="total">${(eodDashboard?.revenue ?? 0).toFixed(2)} ج</td></tr>
+                    <tr><td>عدد الفواتير</td><td>${eodDashboard?.invoiceCount ?? 0}</td></tr>
+                    <tr><td>رسوم الدفع (على التاجر)</td><td>${(eodDashboard?.feeExpenses ?? 0).toFixed(2)} ج</td></tr>
+                    ${actualCash ? `<tr><td>الجرد الفعلي للدرج</td><td>${parseFloat(actualCash).toFixed(2)} ج</td></tr>` : ''}
+                  </tbody></table></div>
+                  ${pmRows ? `<div class="section"><p><strong>تفصيل طرق الدفع:</strong></p><table><thead><tr><th>الطريقة</th><th>العدد</th><th>الإجمالي</th></tr></thead><tbody>${pmRows}</tbody></table></div>` : ''}
+                  <div style="margin-top:40px;border-top:1px dashed #999;padding-top:12px;display:flex;justify-content:space-between">
+                    <span>توقيع الكاشير: ________________</span>
+                    <span>توقيع المدير: ________________</span>
+                  </div>
+                </body></html>`)
+                win.document.close()
+                setTimeout(() => { win.print(); win.close() }, 250)
+              }}
+            >
+              <Printer className="w-4 h-4" />
+              طباعة الملخص
+            </Button>
+            <Button className="flex-1" onClick={() => setShowEOD(false)}>تم</Button>
           </div>
         </div>
       </Modal>

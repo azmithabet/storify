@@ -125,8 +125,8 @@ export async function reportRoutes(app: FastifyInstance) {
       where: {
         invoice: { status: 'completed', ...(branchId ? { branchId } : {}), ...dateFilter },
       },
-      _sum: { quantity: true, totalPrice: true },
-      orderBy: { _sum: { totalPrice: 'desc' } },
+      _sum: { quantity: true, subtotal: true },
+      orderBy: { _sum: { subtotal: 'desc' } },
       take: limit,
     })
 
@@ -142,8 +142,8 @@ export async function reportRoutes(app: FastifyInstance) {
       return {
         variantSku: v?.sku ?? r.variantId.slice(0, 8),
         productName: v?.product.name ?? '—',
-        totalQty: Number(r._sum.quantity ?? 0),
-        totalRevenue: Number(r._sum.totalPrice ?? 0),
+        totalQty: Number(r._sum?.quantity ?? 0),
+        totalRevenue: Number(r._sum?.subtotal ?? 0),
       }
     })
 

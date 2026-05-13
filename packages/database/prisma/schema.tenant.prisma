@@ -392,6 +392,7 @@ model Invoice {
   feeAmount       Decimal  @default(0) @db.Decimal(15, 4) @map("fee_amount")
   feeBearer       String   @default("merchant") @db.VarChar(20) @map("fee_bearer")
   feeAddedToTotal Boolean  @default(false) @map("fee_added_to_total")
+  invoiceNumber   String?  @unique @db.VarChar(50) @map("invoice_number")
   totalAmount     Decimal  @db.Decimal(15, 4) @map("total_amount")
   paidAmount      Decimal  @default(0) @db.Decimal(15, 4) @map("paid_amount")
   status          String   @default("completed") @db.VarChar(50)

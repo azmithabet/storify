@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X } from 'lucide-react'
+import { Check, X, Search } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, Money, SkeletonTable, Button, Modal, Drawer } from '@/components/ui'
+import { Table, Badge, Money, SkeletonTable, Button, Modal, Drawer, Input, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -29,23 +29,35 @@ interface InstallmentContract {
 }
 
 const statusMap: Record<string, { label: string; variant: 'warning' | 'success' | 'danger' | 'gray' | 'info' }> = {
-  pending_approval: { label: 'انتظار موافقة', variant: 'warning' },
+  pending_approval: { label: 'انتظار موافقة', variant: 'warning' } as const,
   active: { label: 'نشط', variant: 'success' },
   overdue: { label: 'متأخر', variant: 'danger' },
   completed: { label: 'مكتمل', variant: 'info' },
   cancelled: { label: 'ملغي', variant: 'gray' },
 }
 
+const LIMIT = 20
+
 export default function Installments() {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
+  const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
+  const [statusFilter, setStatusFilter] = useState('')
   const [confirmAction, setConfirmAction] = useState<{ contract: InstallmentContract; type: 'approve' | 'reject' } | null>(null)
   const [detailContract, setDetailContract] = useState<InstallmentContract | null>(null)
 
-  const { data = [], isLoading } = useQuery<InstallmentContract[]>({
-    queryKey: ['installments'],
-    queryFn: async () => (await api.get<{ data: InstallmentContract[] }>('/installments', { params: { limit: 50 } })).data.data,
+  const { data: listData, isLoading } = useQuery<{ data: InstallmentContract[]; meta: { total: number; page: number; limit: number; pages: number } }>({
+    queryKey: ['installments', search, page, statusFilter],
+    queryFn: async () => {
+      const params: Record<string, string | number> = { limit: LIMIT, page }
+      if (search) params.search = search
+      if (statusFilter) params.status = statusFilter
+      return (await api.get<{ data: InstallmentContract[]; meta: { total: number; page: number; limit: number; pages: number } }>('/installments', { params })).data
+    },
   })
+  const data = listData?.data ?? []
+  const meta = listData?.meta
 
   const { mutate: reviewContract, isPending: isReviewing } = useMutation({
     mutationFn: async ({ contract, type }: { contract: InstallmentContract; type: 'approve' | 'reject' }) =>
@@ -85,7 +97,22 @@ export default function Installments() {
   return (
     <AppShell title="الأقساط">
       <div className="flex flex-col gap-6">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex-1 max-w-xs">
+            <Input placeholder="بحث بالعميل أو رقم العقد..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} startIcon={<Search className="w-4 h-4" />} />
+          </div>
+          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+            className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">كل الحالات</option>
+            <option value="pending_approval">انتظار موافقة</option>
+            <option value="active">نشط</option>
+            <option value="overdue">متأخر</option>
+            <option value="completed">مكتمل</option>
+            <option value="cancelled">ملغي</option>
+          </select>
+        </div>
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
+          <>
           <Table
             columns={[
               { key: 'contractNumber', header: 'رقم العقد', render: (c) => (
@@ -115,6 +142,8 @@ export default function Installments() {
             ]}
             data={data} keyExtractor={(c) => c.id} emptyMessage="لا توجد عقود أقساط"
           />
+          {meta && <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />}
+          </>
         )}
       </div>
 

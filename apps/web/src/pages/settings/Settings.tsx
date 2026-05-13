@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Shield } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 
@@ -14,7 +14,12 @@ const tabs = [
   { id: 'store', label: 'بيانات المتجر' },
   { id: 'branches', label: 'الفروع' },
   { id: 'payment', label: 'طرق الدفع' },
+  { id: 'categories', label: 'فئات المنتجات' },
+  { id: 'tax', label: 'معدلات الضريبة' },
+  { id: 'expense-categories', label: 'فئات المصروفات' },
   { id: 'users', label: 'المستخدمون' },
+  { id: 'audit', label: 'سجل التدقيق' },
+  { id: 'password', label: 'كلمة المرور' },
 ]
 
 export default function Settings() {
@@ -35,7 +40,12 @@ export default function Settings() {
           {tab === 'store' && <StoreSettings />}
           {tab === 'branches' && <BranchesSettings />}
           {tab === 'payment' && <PaymentMethodsSettings />}
+          {tab === 'categories' && <ProductCategoriesSettings />}
+          {tab === 'tax' && <TaxRatesSettings />}
+          {tab === 'expense-categories' && <ExpenseCategoriesSettings />}
           {tab === 'users' && <UsersSettings />}
+          {tab === 'audit' && <AuditLogSettings />}
+          {tab === 'password' && <ChangePasswordSettings />}
         </div>
       </div>
     </AppShell>
@@ -399,6 +409,388 @@ function UsersSettings() {
               <option value="">كل الفروع</option>
               {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </select>
+          </div>
+        </form>
+      </Drawer>
+    </div>
+  )
+}
+
+// ─── Product Categories Settings ──────────────────────────────────────────────
+interface ProductCategory { id: string; name: string; parentId?: string; isActive: boolean }
+
+const catSchema = z.object({ name: z.string().min(1, 'الاسم مطلوب') })
+type CatFormData = z.infer<typeof catSchema>
+
+function ProductCategoriesSettings() {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState<ProductCategory | null>(null)
+
+  const { data: categories = [] } = useQuery<ProductCategory[]>({
+    queryKey: ['product-categories-settings'],
+    queryFn: async () => (await api.get<{ data: ProductCategory[] }>('/products/categories')).data.data,
+  })
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<CatFormData>({ resolver: zodResolver(catSchema) })
+
+  const openNew = () => { setEditing(null); reset({}); setDrawerOpen(true) }
+  const openEdit = (c: ProductCategory) => { setEditing(c); reset({ name: c.name }); setDrawerOpen(true) }
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async (data: CatFormData) => {
+      if (editing) await api.patch(`/products/categories/${editing.id}`, data)
+      else await api.post('/products/categories', data)
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'تم التحديث' : 'تم الإضافة')
+      qc.invalidateQueries({ queryKey: ['product-categories-settings'] })
+      qc.invalidateQueries({ queryKey: ['product-categories'] })
+      setDrawerOpen(false)
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  const { mutate: toggle } = useMutation({
+    mutationFn: async (c: ProductCategory) => api.patch(`/products/categories/${c.id}`, { isActive: !c.isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['product-categories-settings'] }),
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100">فئات المنتجات</h3>
+        <Button onClick={openNew}><Plus className="w-4 h-4" />فئة جديدة</Button>
+      </div>
+      <Table
+        columns={[
+          { key: 'name', header: 'الفئة', render: (c) => <span className="font-medium text-gray-100">{c.name}</span> },
+          { key: 'isActive', header: 'الحالة', render: (c) => <Badge variant={c.isActive ? 'success' : 'gray'} dot>{c.isActive ? 'نشطة' : 'معطّلة'}</Badge> },
+          { key: 'actions', header: '', render: (c) => (
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => openEdit(c)}><Edit2 className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => toggle(c)}>
+                {c.isActive ? <ToggleRight className="w-4 h-4 text-success-500" /> : <ToggleLeft className="w-4 h-4 text-gray-500" />}
+              </Button>
+            </div>
+          )},
+        ]}
+        data={categories} keyExtractor={(c) => c.id} emptyMessage="لا توجد فئات"
+      />
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل الفئة' : 'فئة جديدة'}
+        footer={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button><Button loading={isPending} onClick={handleSubmit((d) => save(d))}>حفظ</Button></>}
+      >
+        <form className="flex flex-col gap-4">
+          <Input label="اسم الفئة" error={errors.name?.message} {...register('name')} />
+        </form>
+      </Drawer>
+    </div>
+  )
+}
+
+// ─── Tax Rates Settings ───────────────────────────────────────────────────────
+interface TaxRate { id: string; name: string; rate: string | number; isDefault: boolean; isActive: boolean }
+
+const taxSchema = z.object({
+  name: z.string().min(1, 'الاسم مطلوب'),
+  rate: z.coerce.number().min(0, 'لا يمكن أن يكون سالباً').max(100, 'أقصى قيمة 100'),
+  isDefault: z.boolean().default(false),
+})
+type TaxFormData = z.infer<typeof taxSchema>
+
+function TaxRatesSettings() {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState<TaxRate | null>(null)
+
+  const { data: taxRates = [] } = useQuery<TaxRate[]>({
+    queryKey: ['tax-rates-settings'],
+    queryFn: async () => (await api.get<{ data: TaxRate[] }>('/products/tax-rates')).data.data,
+  })
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<TaxFormData>({ resolver: zodResolver(taxSchema) })
+
+  const openNew = () => { setEditing(null); reset({ rate: 0, isDefault: false }); setDrawerOpen(true) }
+  const openEdit = (t: TaxRate) => { setEditing(t); reset({ name: t.name, rate: Number(t.rate), isDefault: t.isDefault }); setDrawerOpen(true) }
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async (data: TaxFormData) => {
+      if (editing) await api.patch(`/products/tax-rates/${editing.id}`, data)
+      else await api.post('/products/tax-rates', data)
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'تم التحديث' : 'تم الإضافة')
+      qc.invalidateQueries({ queryKey: ['tax-rates-settings'] })
+      qc.invalidateQueries({ queryKey: ['tax-rates'] })
+      setDrawerOpen(false)
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  const { mutate: toggle } = useMutation({
+    mutationFn: async (t: TaxRate) => api.patch(`/products/tax-rates/${t.id}`, { isActive: !t.isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['tax-rates-settings'] }),
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100">معدلات الضريبة</h3>
+        <Button onClick={openNew}><Plus className="w-4 h-4" />معدل جديد</Button>
+      </div>
+      <Table
+        columns={[
+          { key: 'name', header: 'الاسم', render: (t) => (
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-gray-100">{t.name}</span>
+              {t.isDefault && <Badge variant="info">افتراضي</Badge>}
+            </div>
+          )},
+          { key: 'rate', header: 'النسبة', render: (t) => <span className="font-mono text-gray-300">{Number(t.rate)}%</span> },
+          { key: 'isActive', header: 'الحالة', render: (t) => <Badge variant={t.isActive ? 'success' : 'gray'} dot>{t.isActive ? 'نشط' : 'معطّل'}</Badge> },
+          { key: 'actions', header: '', render: (t) => (
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => openEdit(t)}><Edit2 className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => toggle(t)}>
+                {t.isActive ? <ToggleRight className="w-4 h-4 text-success-500" /> : <ToggleLeft className="w-4 h-4 text-gray-500" />}
+              </Button>
+            </div>
+          )},
+        ]}
+        data={taxRates} keyExtractor={(t) => t.id} emptyMessage="لا توجد معدلات ضريبة"
+      />
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل معدل الضريبة' : 'معدل ضريبة جديد'}
+        footer={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button><Button loading={isPending} onClick={handleSubmit((d) => save(d))}>حفظ</Button></>}
+      >
+        <form className="flex flex-col gap-4">
+          <Input label="الاسم (مثال: ضريبة القيمة المضافة)" error={errors.name?.message} {...register('name')} />
+          <Input label="النسبة %" type="number" step="0.01" error={errors.rate?.message} {...register('rate')} />
+          <label className="flex items-center gap-3 text-sm text-gray-300 cursor-pointer">
+            <input type="checkbox" {...register('isDefault')} className="w-4 h-4 accent-brand-500" />
+            تعيين كمعدل افتراضي
+          </label>
+        </form>
+      </Drawer>
+    </div>
+  )
+}
+
+// ─── Audit Log Settings ───────────────────────────────────────────────────────
+
+interface AuditLogEntry {
+  id: string
+  entity: string
+  entityId?: string
+  action: string
+  before?: unknown
+  after?: unknown
+  ip?: string
+  createdAt: string
+  actor?: { id: string; fullName: string }
+}
+interface AuditMeta { total: number; page: number; limit: number; pages: number }
+
+const entityLabels: Record<string, string> = {
+  invoice: 'فاتورة', product: 'منتج', user: 'مستخدم', customer: 'عميل',
+  supplier: 'مورد', expense: 'مصروف', stock: 'مخزون', installment: 'قسط',
+  purchase_order: 'طلب شراء', branch: 'فرع',
+}
+
+const actionLabels: Record<string, { label: string; color: string }> = {
+  create: { label: 'إنشاء', color: 'text-success-400' },
+  update: { label: 'تعديل', color: 'text-brand-400' },
+  delete: { label: 'حذف', color: 'text-danger-400' },
+  approve: { label: 'موافقة', color: 'text-success-400' },
+  reject: { label: 'رفض', color: 'text-warning-400' },
+  login: { label: 'دخول', color: 'text-gray-400' },
+}
+
+function AuditLogSettings() {
+  const [page, setPage] = useState(1)
+  const [entity, setEntity] = useState('')
+  const [action, setAction] = useState('')
+
+  const { data, isLoading } = useQuery<{ data: AuditLogEntry[]; meta: AuditMeta }>({
+    queryKey: ['audit-logs', page, entity, action],
+    queryFn: async () => {
+      const res = await api.get<{ data: AuditLogEntry[]; meta: AuditMeta }>('/auth/audit-logs', {
+        params: { page, limit: 20, ...(entity ? { entity } : {}), ...(action ? { action } : {}) },
+      })
+      return res.data
+    },
+  })
+
+  const logs = data?.data ?? []
+  const meta = data?.meta
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-brand-400" />سجل التدقيق
+        </h3>
+      </div>
+
+      <div className="flex gap-3">
+        <select value={entity} onChange={(e) => { setEntity(e.target.value); setPage(1) }} className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <option value="">كل الكيانات</option>
+          {Object.entries(entityLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select value={action} onChange={(e) => { setAction(e.target.value); setPage(1) }} className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <option value="">كل الإجراءات</option>
+          {Object.entries(actionLabels).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-2">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-12 bg-gray-700 rounded animate-pulse" />)}</div>
+      ) : logs.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-8">لا توجد سجلات</p>
+      ) : (
+        <div className="flex flex-col divide-y divide-gray-700">
+          {logs.map((log) => {
+            const act = actionLabels[log.action] ?? { label: log.action, color: 'text-gray-400' }
+            return (
+              <div key={log.id} className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn('text-sm font-medium', act.color)}>{act.label}</span>
+                    <span className="text-xs text-gray-400">{entityLabels[log.entity] ?? log.entity}</span>
+                    {log.actor && <span className="text-xs text-gray-500">بواسطة {log.actor.fullName}</span>}
+                    {log.ip && <span className="text-xs text-gray-600 font-mono">{log.ip}</span>}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">{new Date(log.createdAt).toLocaleString('ar-EG')}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {meta && meta.pages > 1 && (
+        <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />
+      )}
+    </div>
+  )
+}
+
+// ─── Change Password Settings ─────────────────────────────────────────────────
+
+const pwSchema = z.object({
+  currentPassword: z.string().min(1, 'كلمة المرور الحالية مطلوبة'),
+  newPassword: z.string().min(8, 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل'),
+  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
+}).refine((d) => d.newPassword === d.confirmPassword, {
+  message: 'كلمتا المرور غير متطابقتان',
+  path: ['confirmPassword'],
+})
+type PwFormData = z.infer<typeof pwSchema>
+
+function ChangePasswordSettings() {
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<PwFormData>({ resolver: zodResolver(pwSchema) })
+
+  const { mutate: changePassword, isPending } = useMutation({
+    mutationFn: async (data: PwFormData) => {
+      await api.patch('/auth/me/password', { currentPassword: data.currentPassword, newPassword: data.newPassword })
+    },
+    onSuccess: () => {
+      toast.success('تم تغيير كلمة المرور بنجاح')
+      reset()
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+      toast.error(msg ?? 'حدث خطأ')
+    },
+  })
+
+  return (
+    <div className="flex flex-col gap-6 max-w-md">
+      <h3 className="text-lg font-semibold text-gray-100">تغيير كلمة المرور</h3>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit((d) => changePassword(d))}>
+        <Input label="كلمة المرور الحالية" type="password" error={errors.currentPassword?.message} {...register('currentPassword')} />
+        <Input label="كلمة المرور الجديدة" type="password" error={errors.newPassword?.message} {...register('newPassword')} />
+        <Input label="تأكيد كلمة المرور الجديدة" type="password" error={errors.confirmPassword?.message} {...register('confirmPassword')} />
+        <Button loading={isPending} type="submit" className="w-fit">تغيير كلمة المرور</Button>
+      </form>
+    </div>
+  )
+}
+
+// ─── Expense Categories Settings ──────────────────────────────────────────────
+interface ExpenseCategory { id: string; name: string; description?: string; isActive: boolean }
+
+const expCatSchema = z.object({
+  name: z.string().min(1, 'الاسم مطلوب'),
+  description: z.string().optional(),
+})
+type ExpCatFormData = z.infer<typeof expCatSchema>
+
+function ExpenseCategoriesSettings() {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState<ExpenseCategory | null>(null)
+
+  const { data: categories = [] } = useQuery<ExpenseCategory[]>({
+    queryKey: ['expense-categories-settings'],
+    queryFn: async () => (await api.get<{ data: ExpenseCategory[] }>('/expenses/categories')).data.data,
+  })
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<ExpCatFormData>({ resolver: zodResolver(expCatSchema) })
+
+  const openNew = () => { setEditing(null); reset({}); setDrawerOpen(true) }
+  const openEdit = (c: ExpenseCategory) => { setEditing(c); reset({ name: c.name, description: c.description ?? '' }); setDrawerOpen(true) }
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async (data: ExpCatFormData) => {
+      if (editing) await api.patch(`/expenses/categories/${editing.id}`, data)
+      else await api.post('/expenses/categories', data)
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'تم التحديث' : 'تم الإضافة')
+      qc.invalidateQueries({ queryKey: ['expense-categories-settings'] })
+      qc.invalidateQueries({ queryKey: ['expense-categories'] })
+      setDrawerOpen(false)
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  const { mutate: toggle } = useMutation({
+    mutationFn: async (c: ExpenseCategory) => api.patch(`/expenses/categories/${c.id}`, { isActive: !c.isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['expense-categories-settings'] }),
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100">فئات المصروفات</h3>
+        <Button onClick={openNew}><Plus className="w-4 h-4" />فئة جديدة</Button>
+      </div>
+      <Table
+        columns={[
+          { key: 'name', header: 'الفئة', render: (c) => <span className="font-medium text-gray-100">{c.name}</span> },
+          { key: 'description', header: 'الوصف', render: (c) => <span className="text-gray-500 text-sm">{c.description ?? '—'}</span> },
+          { key: 'isActive', header: 'الحالة', render: (c) => <Badge variant={c.isActive ? 'success' : 'gray'} dot>{c.isActive ? 'نشطة' : 'معطّلة'}</Badge> },
+          { key: 'actions', header: '', render: (c) => (
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => openEdit(c)}><Edit2 className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => toggle(c)}>
+                {c.isActive ? <ToggleRight className="w-4 h-4 text-success-500" /> : <ToggleLeft className="w-4 h-4 text-gray-500" />}
+              </Button>
+            </div>
+          )},
+        ]}
+        data={categories} keyExtractor={(c) => c.id} emptyMessage="لا توجد فئات"
+      />
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل الفئة' : 'فئة مصروف جديدة'}
+        footer={<><Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button><Button loading={isPending} onClick={handleSubmit((d) => save(d))}>حفظ</Button></>}
+      >
+        <form className="flex flex-col gap-4">
+          <Input label="اسم الفئة" error={errors.name?.message} {...register('name')} />
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">الوصف (اختياري)</label>
+            <textarea {...register('description')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
           </div>
         </form>
       </Drawer>

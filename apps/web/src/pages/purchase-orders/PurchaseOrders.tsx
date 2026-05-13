@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard } from 'lucide-react'
+import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard, Printer } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -175,6 +175,46 @@ function VariantSearchField({
       {error && <p className="text-danger-500 text-xs mt-1">{error}</p>}
     </div>
   )
+}
+
+function printPO(po: PurchaseOrder) {
+  const win = window.open('', '_blank', 'width=800,height=700')
+  if (!win) return
+  const statusLabels: Record<string, string> = { draft: 'مسودة', pending_approval: 'انتظار موافقة', approved: 'موافق', received: 'مستلم', cancelled: 'ملغي' }
+  const rows = (po.items ?? []).map((item) =>
+    `<tr><td>${item.variant.product.name}</td><td>${item.variant.sku}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:left">${Number(item.unitCost).toFixed(2)} ج</td><td style="text-align:left">${Number(item.totalCost).toFixed(2)} ج</td></tr>`
+  ).join('')
+  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>أمر شراء ${po.poNumber}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;padding:24px;color:#000}
+    h1{font-size:20px;margin-bottom:4px}h2{font-size:13px;color:#555;margin-bottom:16px}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
+    .grid div{font-size:12px}.grid div span{color:#777;display:block;font-size:11px}
+    table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
+    th{background:#f5f5f5;font-weight:600}.total td{font-weight:bold;border-top:2px solid #999}
+    .footer{margin-top:40px;display:flex;justify-content:space-between}
+    @media print{@page{margin:15mm;size:A4}}
+  </style></head><body>
+    <h1>Storify — أمر شراء</h1>
+    <h2>رقم الأمر: <strong>${po.poNumber}</strong> | الحالة: ${statusLabels[po.status] ?? po.status}</h2>
+    <div class="grid">
+      <div><span>المورد</span>${po.supplier?.name ?? '—'}</div>
+      <div><span>الفرع</span>${po.branch?.name ?? '—'}</div>
+      <div><span>أنشأه</span>${po.createdBy?.fullName ?? '—'}</div>
+      <div><span>تاريخ الإنشاء</span>${new Date(po.createdAt).toLocaleDateString('ar-EG')}</div>
+      ${po.approvedBy ? `<div><span>وافق عليه</span>${po.approvedBy.fullName}</div>` : ''}
+    </div>
+    <table>
+      <thead><tr><th>المنتج</th><th>SKU</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr class="total"><td colspan="4">الإجمالي الكلي</td><td style="text-align:left">${Number(po.totalCost).toFixed(2)} ج</td></tr></tfoot>
+    </table>
+    <div class="footer">
+      <div style="text-align:center;width:40%"><div style="border-top:1px solid #000;margin-top:40px;padding-top:8px">توقيع المستلم</div></div>
+      <div style="text-align:center;width:40%"><div style="border-top:1px solid #000;margin-top:40px;padding-top:8px">توقيع المورد</div></div>
+    </div>
+  </body></html>`)
+  win.document.close()
+  setTimeout(() => { win.print(); win.close() }, 300)
 }
 
 export default function PurchaseOrders() {
@@ -426,6 +466,9 @@ export default function PurchaseOrders() {
                 <Money value={detailPO.totalCost} />
               </div>
             </div>
+            <Button variant="secondary" onClick={() => printPO(detailPO)}>
+              <Printer className="w-4 h-4" />طباعة الأمر
+            </Button>
             {detailPO.status === 'pending_approval' && (
               <Button onClick={() => { setDetailPO(null); setApproveTarget(detailPO) }}>
                 <Check className="w-4 h-4" />الموافقة على الأمر

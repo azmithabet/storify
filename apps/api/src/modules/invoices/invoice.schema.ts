@@ -6,6 +6,7 @@ export const createInvoiceSchema = z.object({
   currencyId: z.string().uuid(),
   customerId: z.string().uuid().optional(),
   couponCode: z.string().optional(),
+  creditAmount: z.coerce.number().min(0).optional(),
   feeBearer: z.enum(['customer', 'merchant']).optional(),
   notes: z.string().optional(),
   externalFinancing: z

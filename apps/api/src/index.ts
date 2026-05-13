@@ -86,6 +86,29 @@ app.register(async function tenantScoped(sub) {
   sub.register(etaRoutes, { prefix: '/api' })
   sub.register(billingRoutes, { prefix: '/api' })
 
+  // ─── Tenant Settings ──────────────────────────────────────────────────────
+  sub.get('/api/settings', { preHandler: [authenticate] }, async (request, reply) => {
+    const s = await request.tenantDb.tenantSetting.findFirst()
+    return reply.send({ success: true, data: s })
+  })
+
+  sub.patch('/api/settings', { preHandler: [authenticate] }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({
+      vatEnabled: z.boolean().optional(),
+      vatRate: z.coerce.number().min(0).max(100).optional(),
+      timezone: z.string().optional(),
+      language: z.string().optional(),
+      currencyDefault: z.string().optional(),
+    })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const existing = await request.tenantDb.tenantSetting.findFirst()
+    if (!existing) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الإعدادات غير موجودة' } })
+    const updated = await request.tenantDb.tenantSetting.update({ where: { id: existing.id }, data: parsed.data })
+    return reply.send({ success: true, data: updated })
+  })
+
   // ─── Branches CRUD ────────────────────────────────────────────────────────
   sub.get('/api/branches', { preHandler: [authenticate] }, async (request, reply) => {
     const branches = await request.tenantDb.branch.findMany({

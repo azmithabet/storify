@@ -18,10 +18,10 @@ export async function expenseRoutes(app: FastifyInstance) {
   // ─── POST /api/expenses/categories ───────────────────────────────────────────
   app.post('/categories', { preHandler: requirePermission('expenses', 'create') }, async (request, reply) => {
     const { z } = await import('zod')
-    const schema = z.object({ name: z.string().min(1), description: z.string().optional() })
+    const schema = z.object({ name: z.string().min(1) })
     const parsed = schema.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
-    const category = await request.tenantDb.expenseCategory.create({ data: { name: parsed.data.name, description: parsed.data.description } })
+    const category = await request.tenantDb.expenseCategory.create({ data: { name: parsed.data.name } })
     return reply.status(201).send({ success: true, data: category })
   })
 

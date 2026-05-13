@@ -33,7 +33,27 @@ export async function listInvoices(
     to?: string
   },
 ) {
+  // Resolve invoice IDs matching invoice_number search (raw column, not in Prisma schema)
+  let searchIds: string[] | undefined
+  if (opts.search) {
+    const term = `%${opts.search}%`
+    const rows = await db.$queryRawUnsafe<{ id: string }[]>(
+      `SELECT id FROM invoices WHERE invoice_number ILIKE $1 LIMIT 200`,
+      term,
+    )
+    const customerRows = await db.$queryRawUnsafe<{ id: string }[]>(
+      `SELECT i.id FROM invoices i JOIN customers c ON c.id = i.customer_id WHERE c.full_name ILIKE $1 LIMIT 200`,
+      term,
+    )
+    const idSet = new Set([...rows.map((r) => r.id), ...customerRows.map((r) => r.id)])
+    searchIds = [...idSet]
+    if (searchIds.length === 0) {
+      return { items: [], meta: { total: 0, page: opts.page, limit: opts.limit, pages: 0 } }
+    }
+  }
+
   const where = {
+    ...(searchIds ? { id: { in: searchIds } } : {}),
     ...(opts.customerId ? { customerId: opts.customerId } : {}),
     ...(opts.branchId ? { branchId: opts.branchId } : {}),
     ...(opts.status ? { status: opts.status } : {}),
@@ -330,6 +350,13 @@ export async function createInvoice(
       })
     }
 
+    // Generate invoice number: INV-YYYYMMDD-{last6 of UUID}
+    const now = new Date()
+    const datePart = now.toISOString().slice(0, 10).replace(/-/g, '')
+    const suffix = invoice.id.replace(/-/g, '').slice(-6).toUpperCase()
+    const invoiceNumber = `INV-${datePart}-${suffix}`
+    await tx.invoice.update({ where: { id: invoice.id }, data: { invoiceNumber } })
+
     // Mandatory audit log inside transaction
     await tx.auditLog.create({
       data: {
@@ -338,6 +365,7 @@ export async function createInvoice(
         entityId: invoice.id,
         action: 'create',
         after: {
+          invoiceNumber,
           totalAmount: totalAmount.toString(),
           itemCount: computedItems.length,
           feeAmount: feeAmount.toString(),
@@ -346,7 +374,7 @@ export async function createInvoice(
       },
     })
 
-    return invoice
+    return { ...invoice, invoiceNumber }
   })
 }
 

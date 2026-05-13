@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, Search } from 'lucide-react'
+import { Check, X, Search, Plus, Trash2 } from 'lucide-react'
+import { useForm, useFieldArray } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Table, Badge, Money, SkeletonTable, Button, Modal, Drawer, Input, Pagination } from '@/components/ui'
@@ -29,11 +32,252 @@ interface InstallmentContract {
 }
 
 const statusMap: Record<string, { label: string; variant: 'warning' | 'success' | 'danger' | 'gray' | 'info' }> = {
-  pending_approval: { label: 'انتظار موافقة', variant: 'warning' } as const,
+  pending_approval: { label: 'انتظار موافقة', variant: 'warning' },
   active: { label: 'نشط', variant: 'success' },
   overdue: { label: 'متأخر', variant: 'danger' },
   completed: { label: 'مكتمل', variant: 'info' },
   cancelled: { label: 'ملغي', variant: 'gray' },
+}
+
+// ─── Interfaces for create form ───────────────────────────────────────────────
+
+interface Customer { id: string; fullName: string; phone?: string }
+interface Branch { id: string; name: string }
+interface PaymentMethod { id: string; name: string }
+interface Currency { id: string; code: string; name: string; isBase: boolean }
+
+const contractSchema = z.object({
+  customerId: z.string().uuid('اختر العميل'),
+  branchId: z.string().uuid('اختر الفرع'),
+  paymentMethodId: z.string().uuid('اختر طريقة الدفع'),
+  currencyId: z.string().uuid('اختر العملة'),
+  downPayment: z.coerce.number().min(0, 'يجب أن يكون صفراً أو أكثر'),
+  installmentsCount: z.coerce.number().int().min(1).max(120),
+  interestRate: z.coerce.number().min(0).max(100).default(0),
+  firstDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'اختر تاريخاً صحيحاً'),
+  guarantorName: z.string().optional(),
+  guarantorPhone: z.string().optional(),
+  notes: z.string().optional(),
+  items: z.array(z.object({
+    variantId: z.string().uuid(),
+    variantLabel: z.string().optional(),
+    quantity: z.coerce.number().int().positive('الكمية موجبة'),
+    unitPrice: z.coerce.number().positive('السعر يجب أن يكون أكبر من صفر'),
+  })).min(1, 'أضف صنفاً واحداً على الأقل'),
+})
+type ContractForm = z.infer<typeof contractSchema>
+
+function VariantSearchField({ index, register, setValue }: {
+  index: number
+  register: ReturnType<typeof useForm<ContractForm>>['register']
+  setValue: ReturnType<typeof useForm<ContractForm>>['setValue']
+}) {
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<{ id: string; sku: string; sellPrice: number; product: { name: string } }[]>([])
+  const [selected, setSelected] = useState('')
+
+  const search = async (query: string) => {
+    setQ(query)
+    if (query.length < 2) { setResults([]); return }
+    const res = await api.get<{ data: { id: string; sku: string; sellPrice: number; product: { name: string } }[] }>('/products/search', { params: { q: query, limit: 6 } })
+    setResults(res.data.data)
+  }
+
+  const pick = (v: { id: string; sku: string; sellPrice: number; product: { name: string } }) => {
+    setValue(`items.${index}.variantId`, v.id, { shouldValidate: true })
+    setValue(`items.${index}.unitPrice`, Number(v.sellPrice))
+    const label = `${v.product.name} (${v.sku})`
+    setValue(`items.${index}.variantLabel`, label)
+    setSelected(label)
+    setResults([])
+    setQ('')
+  }
+
+  return (
+    <div className="relative flex-1">
+      <input
+        value={selected || q}
+        placeholder="بحث عن منتج..."
+        onChange={(e) => { setSelected(''); search(e.target.value) }}
+        className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+      />
+      <input type="hidden" {...register(`items.${index}.variantId`)} />
+      <input type="hidden" {...register(`items.${index}.variantLabel`)} />
+      {results.length > 0 && (
+        <div className="absolute z-50 top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-md shadow-lg overflow-hidden">
+          {results.map((v) => (
+            <button key={v.id} type="button" onClick={() => pick(v)}
+              className="w-full text-right px-3 py-2 hover:bg-gray-700 flex justify-between text-sm border-b border-gray-700/50 last:border-0">
+              <span className="text-gray-100">{v.product.name}</span>
+              <span className="text-gray-500 font-mono text-xs">{v.sku}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CreateContractDrawer({ onClose }: { onClose: () => void }) {
+  const qc = useQueryClient()
+
+  const { data: customers = [] } = useQuery<Customer[]>({
+    queryKey: ['customers-all'],
+    queryFn: async () => (await api.get<{ data: Customer[] }>('/customers', { params: { limit: 200 } })).data.data,
+  })
+  const { data: branches = [] } = useQuery<Branch[]>({
+    queryKey: ['branches'],
+    queryFn: async () => (await api.get<{ data: Branch[] }>('/branches')).data.data,
+  })
+  const { data: paymentMethods = [] } = useQuery<PaymentMethod[]>({
+    queryKey: ['payment-methods'],
+    queryFn: async () => (await api.get<{ data: PaymentMethod[] }>('/payment-methods')).data.data,
+  })
+  const { data: currencies = [] } = useQuery<Currency[]>({
+    queryKey: ['currencies'],
+    queryFn: async () => (await api.get<{ data: Currency[] }>('/installments/currencies')).data.data,
+  })
+
+  const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<ContractForm>({
+    resolver: zodResolver(contractSchema),
+    defaultValues: { installmentsCount: 12, interestRate: 0, downPayment: 0, items: [{ variantId: '', variantLabel: '', quantity: 1, unitPrice: 0 }] },
+  })
+  const { fields, append, remove } = useFieldArray({ control, name: 'items' })
+
+  const items = watch('items')
+  const downPayment = Number(watch('downPayment') ?? 0)
+  const installmentsCount = Number(watch('installmentsCount') ?? 1)
+  const interestRate = Number(watch('interestRate') ?? 0)
+  const subtotal = items.reduce((s, i) => s + (Number(i.unitPrice) * Number(i.quantity) || 0), 0)
+  const financed = Math.max(0, subtotal - downPayment)
+  const totalWithInterest = financed * (1 + interestRate / 100)
+  const installmentAmount = installmentsCount > 0 ? totalWithInterest / installmentsCount : 0
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (data: ContractForm) => {
+      await api.post('/installments', {
+        customerId: data.customerId,
+        branchId: data.branchId,
+        paymentMethodId: data.paymentMethodId,
+        currencyId: data.currencyId,
+        downPayment: data.downPayment,
+        installmentsCount: data.installmentsCount,
+        interestRate: data.interestRate,
+        firstDueDate: data.firstDueDate,
+        guarantorName: data.guarantorName || undefined,
+        guarantorPhone: data.guarantorPhone || undefined,
+        notes: data.notes || undefined,
+        items: data.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
+      })
+    },
+    onSuccess: () => {
+      toast.success('تم إنشاء عقد القسط')
+      qc.invalidateQueries({ queryKey: ['installments'] })
+      onClose()
+    },
+    onError: (e: unknown) => {
+      const msg = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+      toast.error(msg === 'insufficient_stock' ? 'المخزون غير كافٍ' : 'فشل إنشاء العقد')
+    },
+  })
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="col-span-2">
+          <label className="text-sm text-gray-400 block mb-1">العميل</label>
+          <select {...register('customerId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">اختر العميل...</option>
+            {customers.map((c) => <option key={c.id} value={c.id}>{c.fullName}{c.phone ? ` — ${c.phone}` : ''}</option>)}
+          </select>
+          {errors.customerId && <p className="text-danger-500 text-xs mt-1">{errors.customerId.message}</p>}
+        </div>
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">الفرع</label>
+          <select {...register('branchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">اختر...</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </select>
+          {errors.branchId && <p className="text-danger-500 text-xs mt-1">{errors.branchId.message}</p>}
+        </div>
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">طريقة الدفع</label>
+          <select {...register('paymentMethodId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">اختر...</option>
+            {paymentMethods.map((pm) => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+          </select>
+          {errors.paymentMethodId && <p className="text-danger-500 text-xs mt-1">{errors.paymentMethodId.message}</p>}
+        </div>
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">العملة</label>
+          <select {...register('currencyId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">اختر...</option>
+            {currencies.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
+          </select>
+          {errors.currencyId && <p className="text-danger-500 text-xs mt-1">{errors.currencyId.message}</p>}
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-sm font-semibold text-gray-300">الأصناف</p>
+          <Button type="button" variant="ghost" size="sm" onClick={() => append({ variantId: '', variantLabel: '', quantity: 1, unitPrice: 0 })}>
+            <Plus className="w-3 h-3" />إضافة صنف
+          </Button>
+        </div>
+        {errors.items?.root && <p className="text-danger-500 text-xs mb-2">{errors.items.root.message}</p>}
+        <div className="flex flex-col gap-2">
+          {fields.map((field, idx) => (
+            <div key={field.id} className="bg-gray-750 border border-gray-700 rounded-md p-3 flex flex-col gap-2">
+              <div className="flex gap-2 items-center">
+                <VariantSearchField index={idx} register={register} setValue={setValue} />
+                <Button type="button" variant="ghost" size="sm" className="text-danger-500" onClick={() => remove(idx)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Input label="الكمية" type="number" min={1} {...register(`items.${idx}.quantity`)} />
+                <Input label="سعر الوحدة (ج)" type="number" step="0.01" {...register(`items.${idx}.unitPrice`)} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-3 gap-3">
+        <Input label="المقدم (ج)" type="number" step="0.01" {...register('downPayment')} />
+        <Input label="عدد الأقساط" type="number" min={1} max={120} {...register('installmentsCount')} />
+        <Input label="الفائدة %" type="number" step="0.1" min={0} max={100} {...register('interestRate')} />
+      </div>
+
+      <div className="bg-gray-750 border border-gray-700 rounded-md p-3 text-sm flex flex-col gap-1">
+        <div className="flex justify-between text-gray-400"><span>إجمالي الأصناف</span><Money value={subtotal} /></div>
+        <div className="flex justify-between text-gray-400"><span>المقدم</span><span className="text-danger-400">- <Money value={downPayment} /></span></div>
+        {interestRate > 0 && <div className="flex justify-between text-gray-400"><span>الفائدة ({interestRate}%)</span><Money value={financed * interestRate / 100} /></div>}
+        <div className="flex justify-between text-gray-100 font-semibold border-t border-gray-600 pt-1 mt-1">
+          <span>القسط الشهري (× {installmentsCount})</span>
+          <Money value={installmentAmount} />
+        </div>
+      </div>
+
+      <Input label="تاريخ أول قسط" type="date" error={errors.firstDueDate?.message} {...register('firstDueDate')} />
+
+      <div className="grid grid-cols-2 gap-3">
+        <Input label="اسم الضامن (اختياري)" {...register('guarantorName')} />
+        <Input label="هاتف الضامن (اختياري)" {...register('guarantorPhone')} />
+      </div>
+
+      <div>
+        <label className="text-sm text-gray-400 block mb-1">ملاحظات (اختياري)</label>
+        <textarea {...register('notes')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
+      </div>
+
+      <div className="flex gap-3 pt-2">
+        <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>إلغاء</Button>
+        <Button loading={isPending} className="flex-1" onClick={handleSubmit((d) => mutate(d))}>إنشاء العقد</Button>
+      </div>
+    </div>
+  )
 }
 
 const LIMIT = 20
@@ -44,6 +288,7 @@ export default function Installments() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [statusFilter, setStatusFilter] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ contract: InstallmentContract; type: 'approve' | 'reject' } | null>(null)
   const [detailContract, setDetailContract] = useState<InstallmentContract | null>(null)
 
@@ -110,6 +355,10 @@ export default function Installments() {
             <option value="completed">مكتمل</option>
             <option value="cancelled">ملغي</option>
           </select>
+          <div className="flex-1" />
+          <Button onClick={() => setCreateOpen(true)}>
+            <Plus className="w-4 h-4" />عقد جديد
+          </Button>
         </div>
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
           <>
@@ -184,6 +433,11 @@ export default function Installments() {
             </div>
           </div>
         )}
+      </Drawer>
+
+      {/* Create contract drawer */}
+      <Drawer open={createOpen} onClose={() => setCreateOpen(false)} title="عقد قسط جديد" width="w-[580px]">
+        {createOpen && <CreateContractDrawer onClose={() => setCreateOpen(false)} />}
       </Drawer>
 
       {/* Approve/Reject confirmation */}

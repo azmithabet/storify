@@ -18,6 +18,15 @@ import {
 export async function installmentRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate)
 
+  // ─── GET /api/installments/currencies ────────────────────────────────────────
+  app.get('/currencies', { preHandler: requirePermission('installments', 'read') }, async (request, reply) => {
+    const currencies = await request.tenantDb.currency.findMany({
+      select: { id: true, code: true, name: true, isBase: true },
+      orderBy: { isBase: 'desc' },
+    })
+    return reply.send({ success: true, data: currencies })
+  })
+
   // ─── GET /api/installments ───────────────────────────────────────────────────
   app.get('/', { preHandler: requirePermission('installments', 'read') }, async (request, reply) => {
     const parsed = listInstallmentsSchema.safeParse(request.query)

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, Check, Trash2 } from 'lucide-react'
+import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -34,6 +34,68 @@ interface PurchaseOrder {
   items?: POItem[]
   createdBy?: { fullName: string }
   approvedBy?: { fullName: string }
+}
+
+// ─── Receive Modal ────────────────────────────────────────────────────────────
+
+function ReceiveModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder | null; onClose: () => void; onConfirm: (d: { receivedDate?: string; notes?: string }) => void; isPending: boolean }) {
+  const { register, handleSubmit } = useForm<{ receivedDate?: string; notes?: string }>()
+  if (!po) return null
+  return (
+    <Modal open={!!po} onClose={onClose} title={`استلام أمر الشراء: ${po.poNumber}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>إلغاء</Button>
+          <Button loading={isPending} onClick={handleSubmit(onConfirm)}>
+            <PackageCheck className="w-4 h-4" />تأكيد الاستلام
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <p className="text-sm text-gray-400">سيتم تحديث المخزون تلقائياً بكميات جميع الأصناف في هذا الأمر.</p>
+        <Input label="تاريخ الاستلام" type="date" {...register('receivedDate')} />
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">ملاحظات (اختياري)</label>
+          <textarea {...register('notes')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// ─── Payment Modal ────────────────────────────────────────────────────────────
+
+function PaymentModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder | null; onClose: () => void; onConfirm: (d: { amount: number; paymentMethod?: string }) => void; isPending: boolean }) {
+  const { register, handleSubmit, formState: { errors } } = useForm<{ amount: number; paymentMethod?: string }>({
+    resolver: zodResolver(z.object({ amount: z.coerce.number().positive('المبلغ يجب أن يكون أكبر من صفر'), paymentMethod: z.string().optional() })),
+  })
+  if (!po) return null
+  return (
+    <Modal open={!!po} onClose={onClose} title={`تسجيل دفعة: ${po.poNumber}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>إلغاء</Button>
+          <Button loading={isPending} onClick={handleSubmit(onConfirm)}>
+            <CreditCard className="w-4 h-4" />تسجيل الدفعة
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Input label="المبلغ المدفوع (ج)" type="number" step="0.01" error={errors.amount?.message} {...register('amount')} />
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">طريقة الدفع (اختياري)</label>
+          <select {...register('paymentMethod')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">اختر</option>
+            <option value="cash">نقدي</option>
+            <option value="bank_transfer">تحويل بنكي</option>
+            <option value="check">شيك</option>
+          </select>
+        </div>
+      </div>
+    </Modal>
+  )
 }
 
 const statusMap: Record<string, { label: string; variant: 'gray' | 'warning' | 'success' | 'info' | 'danger' }> = {
@@ -121,6 +183,8 @@ export default function PurchaseOrders() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [detailPO, setDetailPO] = useState<PurchaseOrder | null>(null)
   const [approveTarget, setApproveTarget] = useState<PurchaseOrder | null>(null)
+  const [receiveTarget, setReceiveTarget] = useState<PurchaseOrder | null>(null)
+  const [paymentTarget, setPaymentTarget] = useState<PurchaseOrder | null>(null)
 
   const { data: poData, isLoading } = useQuery<{ data: PurchaseOrder[]; meta: { total: number; page: number; limit: number; pages: number } }>({
     queryKey: ['purchase-orders', page],
@@ -172,6 +236,32 @@ export default function PurchaseOrders() {
       setApproveTarget(null)
     },
     onError: () => toast.error('حدث خطأ'),
+  })
+
+  const { mutate: receive, isPending: isReceiving } = useMutation({
+    mutationFn: async ({ id, receivedDate, notes }: { id: string; receivedDate?: string; notes?: string }) =>
+      api.post(`/purchase-orders/${id}/receive`, { receivedDate: receivedDate || undefined, notes: notes || undefined }),
+    onSuccess: () => {
+      toast.success('تم استلام أمر الشراء وتحديث المخزون')
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      qc.invalidateQueries({ queryKey: ['stock'] })
+      setReceiveTarget(null)
+    },
+    onError: (e: unknown) => {
+      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+      toast.error(code === 'invalid_status' ? 'أمر الشراء يجب أن يكون معتمداً أولاً' : 'حدث خطأ في الاستلام')
+    },
+  })
+
+  const { mutate: recordPayment, isPending: isPaymentPending } = useMutation({
+    mutationFn: async ({ id, amount, paymentMethod }: { id: string; amount: number; paymentMethod?: string }) =>
+      api.post(`/purchase-orders/${id}/payments`, { amount, paymentMethod: paymentMethod || undefined }),
+    onSuccess: () => {
+      toast.success('تم تسجيل الدفعة للمورد')
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+      setPaymentTarget(null)
+    },
+    onError: () => toast.error('حدث خطأ في تسجيل الدفعة'),
   })
 
   const openDetail = async (po: PurchaseOrder) => {
@@ -341,6 +431,16 @@ export default function PurchaseOrders() {
                 <Check className="w-4 h-4" />الموافقة على الأمر
               </Button>
             )}
+            {detailPO.status === 'approved' && (
+              <Button onClick={() => { setDetailPO(null); setReceiveTarget(detailPO) }}>
+                <PackageCheck className="w-4 h-4" />استلام البضاعة
+              </Button>
+            )}
+            {detailPO.status === 'received' && (
+              <Button variant="secondary" onClick={() => { setDetailPO(null); setPaymentTarget(detailPO) }}>
+                <CreditCard className="w-4 h-4" />تسجيل دفعة للمورد
+              </Button>
+            )}
           </div>
         )}
       </Drawer>
@@ -355,6 +455,9 @@ export default function PurchaseOrders() {
       >
         <p className="text-gray-300">هل تريد الموافقة على <strong className="text-gray-100">{approveTarget?.poNumber}</strong>؟</p>
       </Modal>
+
+      <ReceiveModal po={receiveTarget} onClose={() => setReceiveTarget(null)} onConfirm={(d) => receiveTarget && receive({ id: receiveTarget.id, ...d })} isPending={isReceiving} />
+      <PaymentModal po={paymentTarget} onClose={() => setPaymentTarget(null)} onConfirm={(d) => paymentTarget && recordPayment({ id: paymentTarget.id, ...d })} isPending={isPaymentPending} />
     </AppShell>
   )
 }

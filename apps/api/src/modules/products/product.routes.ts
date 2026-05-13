@@ -309,4 +309,34 @@ export async function productRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  // ─── GET /api/products/categories ────────────────────────────────────────────
+  app.get('/categories', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
+    const categories = await request.tenantDb.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, parentId: true },
+      orderBy: { name: 'asc' },
+    })
+    return reply.send({ success: true, data: categories })
+  })
+
+  // ─── POST /api/products/categories ───────────────────────────────────────────
+  app.post('/categories', { preHandler: requirePermission('products', 'create') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1), parentId: z.string().uuid().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const category = await request.tenantDb.category.create({ data: { name: parsed.data.name, parentId: parsed.data.parentId ?? null } })
+    return reply.status(201).send({ success: true, data: category })
+  })
+
+  // ─── GET /api/products/tax-rates ─────────────────────────────────────────────
+  app.get('/tax-rates', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
+    const taxRates = await request.tenantDb.taxRate.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, rate: true, isDefault: true },
+      orderBy: { rate: 'asc' },
+    })
+    return reply.send({ success: true, data: taxRates })
+  })
 }

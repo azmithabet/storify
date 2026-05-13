@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Edit2, Wallet } from 'lucide-react'
+import { Search, Plus, Edit2, Wallet, FileText } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination, Modal } from '@/components/ui'
+import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination, Modal, Badge } from '@/components/ui'
 import { api } from '@/api/client'
 
 interface Customer {
@@ -97,6 +97,100 @@ function CreditModal({ customer, onClose }: { customer: Customer; onClose: () =>
   )
 }
 
+// ─── Customer Detail Drawer ───────────────────────────────────────────────────
+
+interface CustomerInvoice {
+  id: string
+  invoiceNumber: string
+  totalAmount: number
+  status: string
+  createdAt: string
+  paymentMethod?: { name: string }
+}
+
+interface InvoiceMeta { total: number; page: number; limit: number; pages: number }
+
+const invStatusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'gray' }> = {
+  completed: { label: 'مكتملة', variant: 'success' },
+  pending: { label: 'معلقة', variant: 'warning' },
+  cancelled: { label: 'ملغاة', variant: 'danger' },
+  returned: { label: 'مرتجعة', variant: 'gray' },
+}
+
+function CustomerDetailDrawer({ customer }: { customer: Customer }) {
+  const [invPage, setInvPage] = useState(1)
+
+  const { data: invData, isLoading } = useQuery<{ data: CustomerInvoice[]; meta: InvoiceMeta }>({
+    queryKey: ['customer-invoices', customer.id, invPage],
+    queryFn: async () =>
+      (await api.get<{ data: CustomerInvoice[]; meta: InvoiceMeta }>('/invoices', {
+        params: { customerId: customer.id, limit: 8, page: invPage },
+      })).data,
+  })
+
+  const invoices = invData?.data ?? []
+  const meta = invData?.meta
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bg-gray-750 border border-gray-700 rounded-md p-3">
+          <p className="text-xs text-gray-500 mb-1">رصيد العميل</p>
+          {customer.creditBalance > 0
+            ? <Money value={customer.creditBalance} size="lg" />
+            : <span className="text-gray-500 text-sm">لا يوجد رصيد</span>}
+        </div>
+        <div className="bg-gray-750 border border-gray-700 rounded-md p-3">
+          <p className="text-xs text-gray-500 mb-1">إجمالي الفواتير</p>
+          <p className="text-2xl font-mono font-bold text-gray-100">{customer._count?.invoices ?? 0}</p>
+        </div>
+      </div>
+
+      {customer.phone && (
+        <div className="text-sm">
+          <span className="text-gray-500">الهاتف: </span>
+          <span className="font-mono text-gray-300">{customer.phone}</span>
+        </div>
+      )}
+
+      <div>
+        <h4 className="text-sm font-semibold text-gray-300 mb-3">سجل الفواتير</h4>
+        {isLoading ? (
+          <div className="flex flex-col gap-2">
+            {Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-10 bg-gray-700 rounded animate-pulse" />)}
+          </div>
+        ) : invoices.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-6">لا توجد فواتير</p>
+        ) : (
+          <div className="flex flex-col divide-y divide-gray-700">
+            {invoices.map((inv) => {
+              const s = invStatusMap[inv.status]
+              return (
+                <div key={inv.id} className="py-3 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-mono text-gray-100">{inv.invoiceNumber}</p>
+                    <p className="text-xs text-gray-500">
+                      {new Date(inv.createdAt).toLocaleDateString('ar-EG')}
+                      {inv.paymentMethod && ` · ${inv.paymentMethod.name}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {s && <Badge variant={s.variant}>{s.label}</Badge>}
+                    <Money value={inv.totalAmount} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+        {meta && meta.pages > 1 && (
+          <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setInvPage} />
+        )}
+      </div>
+    </div>
+  )
+}
+
 export default function Customers() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
@@ -104,6 +198,7 @@ export default function Customers() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
   const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null)
+  const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
 
   const { data, isLoading } = useQuery<{ data: Customer[]; meta: Meta }>({
     queryKey: ['customers', search, page],
@@ -150,14 +245,19 @@ export default function Customers() {
           <>
             <Table
               columns={[
-                { key: 'fullName', header: 'الاسم', render: (c) => <span className="font-medium text-gray-100">{c.fullName}</span> },
+                { key: 'fullName', header: 'الاسم', render: (c) => (
+                  <button className="font-medium text-brand-400 hover:underline text-right" onClick={() => setDetailCustomer(c)}>{c.fullName}</button>
+                )},
                 { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
                 { key: 'email', header: 'البريد الإلكتروني', className: 'text-gray-500 text-sm' },
                 { key: 'invoices', header: 'الفواتير', render: (c) => <span className="text-center font-mono">{c._count?.invoices ?? 0}</span> },
                 { key: 'creditBalance', header: 'الرصيد', render: (c) => c.creditBalance > 0 ? <Money value={c.creditBalance} /> : <span className="text-gray-500">—</span> },
                 { key: 'actions', header: '', render: (c) => (
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setCreditCustomer(c) }}>
+                    <Button variant="ghost" size="sm" title="السجل" onClick={(e) => { e.stopPropagation(); setDetailCustomer(c) }}>
+                      <FileText className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" title="تعديل الرصيد" onClick={(e) => { e.stopPropagation(); setCreditCustomer(c) }}>
                       <Wallet className="w-3 h-3" />
                     </Button>
                     <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(c) }}>
@@ -176,6 +276,10 @@ export default function Customers() {
       <Modal open={!!creditCustomer} onClose={() => setCreditCustomer(null)} title={`تعديل رصيد: ${creditCustomer?.fullName ?? ''}`}>
         {creditCustomer && <CreditModal customer={creditCustomer} onClose={() => setCreditCustomer(null)} />}
       </Modal>
+
+      <Drawer open={!!detailCustomer} onClose={() => setDetailCustomer(null)} title={detailCustomer?.fullName ?? ''} width="w-[480px]">
+        {detailCustomer && <CustomerDetailDrawer customer={detailCustomer} />}
+      </Drawer>
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل بيانات العميل' : 'عميل جديد'}
         footer={

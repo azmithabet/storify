@@ -48,6 +48,51 @@ interface CompletedInvoice {
   id: string
   invoiceNumber: string
   totalAmount: number
+  subtotal: number
+  feeAmount: number
+  customerName?: string
+  paymentMethodName: string
+  createdAt: string
+  items: { productName: string; sku: string; quantity: number; unitPrice: number; lineTotal: number }[]
+}
+
+function printReceipt(inv: CompletedInvoice) {
+  const win = window.open('', '_blank', 'width=400,height=640')
+  if (!win) return
+  const rows = inv.items.map((i) =>
+    `<tr><td>${i.productName}<br/><small style="color:#666">${i.sku} × ${i.quantity}</small></td><td style="text-align:left;white-space:nowrap">${i.lineTotal.toFixed(2)} ج</td></tr>`
+  ).join('')
+  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إيصال ${inv.invoiceNumber}</title><style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:monospace;font-size:12px;width:80mm;margin:0 auto;padding:8px;color:#000}
+    .center{text-align:center}
+    h2{font-size:15px;margin:6px 0}
+    table{width:100%;border-collapse:collapse}
+    td{padding:3px 2px;vertical-align:top}
+    .dashed{border-bottom:1px dashed #000;margin:6px 0}
+    .total td{font-weight:bold;font-size:14px;border-top:1px dashed #000;padding-top:6px}
+    @media print{@page{margin:4mm;size:80mm auto}}
+  </style></head><body>
+    <div class="center"><h2>Storify</h2><p style="font-size:11px">نقطة البيع</p></div>
+    <div class="dashed"></div>
+    <p>رقم الفاتورة: <b>${inv.invoiceNumber}</b></p>
+    <p>التاريخ: ${new Date(inv.createdAt).toLocaleString('ar-EG')}</p>
+    ${inv.customerName ? `<p>العميل: ${inv.customerName}</p>` : ''}
+    <p>الدفع: ${inv.paymentMethodName}</p>
+    <div class="dashed"></div>
+    <table><tbody>${rows}</tbody></table>
+    <div class="dashed"></div>
+    <table><tbody>
+      <tr><td>المجموع الفرعي</td><td style="text-align:left">${inv.subtotal.toFixed(2)} ج</td></tr>
+      ${inv.feeAmount > 0 ? `<tr><td>رسوم الدفع</td><td style="text-align:left">${inv.feeAmount.toFixed(2)} ج</td></tr>` : ''}
+      <tr class="total"><td>الإجمالي</td><td style="text-align:left">${inv.totalAmount.toFixed(2)} ج</td></tr>
+    </tbody></table>
+    <div class="dashed"></div>
+    <div class="center" style="margin-top:8px"><p>شكراً لتعاملكم معنا</p></div>
+  </body></html>`)
+  win.document.close()
+  win.focus()
+  setTimeout(() => { win.print(); win.close() }, 250)
 }
 
 function calculateFee(total: number, pm: PaymentMethod): number {
@@ -168,7 +213,7 @@ export default function POS() {
     mutationFn: async () => {
       if (!selectedPM) throw new Error('اختر طريقة الدفع')
       if (cart.length === 0) throw new Error('السلة فارغة')
-      const res = await api.post<{ data: CompletedInvoice }>('/invoices', {
+      const res = await api.post<{ data: { id: string; invoiceNumber: string; totalAmount: number; feeAmount: number } }>('/invoices', {
         paymentMethodId: selectedPM.id,
         customerId: customer?.id,
         feeBearer,
@@ -180,12 +225,30 @@ export default function POS() {
       })
       return res.data.data
     },
-    onSuccess: (invoice) => {
-      setCompletedInvoice(invoice)
+    onSuccess: (apiInvoice) => {
+      const completedFee = feeBearer === 'customer' ? fee : 0
+      const invoiceRecord: CompletedInvoice = {
+        id: apiInvoice.id,
+        invoiceNumber: apiInvoice.invoiceNumber,
+        totalAmount: apiInvoice.totalAmount,
+        subtotal,
+        feeAmount: completedFee,
+        customerName: customer?.fullName,
+        paymentMethodName: selectedPM!.name,
+        createdAt: new Date().toISOString(),
+        items: cart.map((i) => ({
+          productName: i.productName,
+          sku: i.sku,
+          quantity: i.quantity,
+          unitPrice: i.unitPrice,
+          lineTotal: i.unitPrice * i.quantity,
+        })),
+      }
+      setCompletedInvoice(invoiceRecord)
       setCart([])
       setCustomer(null)
       setSelectedPM(null)
-      toast.success(`تم إنشاء الفاتورة ${invoice.invoiceNumber}`)
+      toast.success(`تم إنشاء الفاتورة ${apiInvoice.invoiceNumber}`)
     },
     onError: (e: unknown) => {
       const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
@@ -458,18 +521,50 @@ export default function POS() {
       {/* Completion modal */}
       <Modal open={!!completedInvoice} onClose={() => setCompletedInvoice(null)} title="تم إنشاء الفاتورة">
         {completedInvoice && (
-          <div className="flex flex-col items-center gap-6 py-4">
-            <div className="w-16 h-16 rounded-full bg-success-500/20 flex items-center justify-center">
-              <Check className="w-8 h-8 text-success-500" />
+          <div className="flex flex-col gap-5">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-success-500/20 flex items-center justify-center shrink-0">
+                <Check className="w-6 h-6 text-success-500" />
+              </div>
+              <div>
+                <p className="font-semibold text-gray-100">{completedInvoice.invoiceNumber}</p>
+                <Money value={completedInvoice.totalAmount} size="lg" />
+                {completedInvoice.customerName && (
+                  <p className="text-xs text-gray-500 mt-0.5">{completedInvoice.customerName}</p>
+                )}
+              </div>
             </div>
-            <div className="text-center">
-              <p className="text-lg font-semibold text-gray-100">{completedInvoice.invoiceNumber}</p>
-              <Money value={completedInvoice.totalAmount} size="xl" className="mt-2" />
+
+            <div className="bg-gray-900 rounded-md p-3 flex flex-col gap-1 max-h-40 overflow-y-auto">
+              {completedInvoice.items.map((item, i) => (
+                <div key={i} className="flex justify-between text-sm py-1 border-b border-gray-800 last:border-0">
+                  <div>
+                    <span className="text-gray-200">{item.productName}</span>
+                    <span className="text-gray-500 mr-1 text-xs">× {item.quantity}</span>
+                  </div>
+                  <span className="font-mono text-gray-300">{item.lineTotal.toFixed(2)} ج</span>
+                </div>
+              ))}
             </div>
-            <div className="flex gap-3 w-full">
-              <Button variant="secondary" className="flex-1" onClick={() => window.print()}>
+
+            <div className="flex flex-col gap-1 text-sm">
+              <div className="flex justify-between text-gray-400">
+                <span>المجموع الفرعي</span><span>{completedInvoice.subtotal.toFixed(2)} ج</span>
+              </div>
+              {completedInvoice.feeAmount > 0 && (
+                <div className="flex justify-between text-warning-400">
+                  <span>رسوم الدفع (على العميل)</span><span>{completedInvoice.feeAmount.toFixed(2)} ج</span>
+                </div>
+              )}
+              <div className="flex justify-between font-semibold text-gray-100 border-t border-gray-700 pt-2 mt-1">
+                <span>الإجمالي</span><Money value={completedInvoice.totalAmount} />
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <Button variant="secondary" className="flex-1" onClick={() => printReceipt(completedInvoice)}>
                 <Printer className="w-4 h-4" />
-                طباعة
+                طباعة الإيصال
               </Button>
               <Button className="flex-1" onClick={() => setCompletedInvoice(null)}>
                 بيع جديد

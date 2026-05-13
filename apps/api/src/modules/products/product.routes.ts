@@ -333,10 +333,35 @@ export async function productRoutes(app: FastifyInstance) {
   // ─── GET /api/products/tax-rates ─────────────────────────────────────────────
   app.get('/tax-rates', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
     const taxRates = await request.tenantDb.taxRate.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, rate: true, isDefault: true },
+      select: { id: true, name: true, rate: true, isDefault: true, isActive: true },
       orderBy: { rate: 'asc' },
     })
     return reply.send({ success: true, data: taxRates })
+  })
+
+  // ─── POST /api/products/tax-rates ────────────────────────────────────────────
+  app.post('/tax-rates', { preHandler: requirePermission('products', 'create') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1), rate: z.coerce.number().min(0).max(100), isDefault: z.boolean().default(false) })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    if (parsed.data.isDefault) {
+      await request.tenantDb.taxRate.updateMany({ data: { isDefault: false } })
+    }
+    const taxRate = await request.tenantDb.taxRate.create({ data: { name: parsed.data.name, rate: parsed.data.rate, isDefault: parsed.data.isDefault } })
+    return reply.status(201).send({ success: true, data: taxRate })
+  })
+
+  // ─── PATCH /api/products/tax-rates/:id ───────────────────────────────────────
+  app.patch<{ Params: { id: string } }>('/tax-rates/:id', { preHandler: requirePermission('products', 'update') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1).optional(), rate: z.coerce.number().min(0).max(100).optional(), isDefault: z.boolean().optional(), isActive: z.boolean().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    if (parsed.data.isDefault) {
+      await request.tenantDb.taxRate.updateMany({ data: { isDefault: false } })
+    }
+    const taxRate = await request.tenantDb.taxRate.update({ where: { id: request.params.id }, data: parsed.data })
+    return reply.send({ success: true, data: taxRate })
   })
 }

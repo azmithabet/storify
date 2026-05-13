@@ -7,13 +7,32 @@ import { createExpenseSchema, updateExpenseSchema, listExpensesSchema } from './
 export async function expenseRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate)
 
-  // ─── GET /api/expense-categories ─────────────────────────────────────────────
+  // ─── GET /api/expenses/categories ────────────────────────────────────────────
   app.get('/categories', { preHandler: requirePermission('expenses', 'read') }, async (request, reply) => {
     const categories = await request.tenantDb.expenseCategory.findMany({
-      where: { isActive: true },
       orderBy: { name: 'asc' },
     })
     return reply.send({ success: true, data: categories })
+  })
+
+  // ─── POST /api/expenses/categories ───────────────────────────────────────────
+  app.post('/categories', { preHandler: requirePermission('expenses', 'create') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1), description: z.string().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const category = await request.tenantDb.expenseCategory.create({ data: { name: parsed.data.name, description: parsed.data.description } })
+    return reply.status(201).send({ success: true, data: category })
+  })
+
+  // ─── PATCH /api/expenses/categories/:id ──────────────────────────────────────
+  app.patch<{ Params: { id: string } }>('/categories/:id', { preHandler: requirePermission('expenses', 'update') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1).optional(), isActive: z.boolean().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const category = await request.tenantDb.expenseCategory.update({ where: { id: request.params.id }, data: parsed.data })
+    return reply.send({ success: true, data: category })
   })
 
   // ─── GET /api/expenses ────────────────────────────────────────────────────────

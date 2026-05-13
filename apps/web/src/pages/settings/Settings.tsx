@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Shield } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 
@@ -18,6 +18,8 @@ const tabs = [
   { id: 'tax', label: 'معدلات الضريبة' },
   { id: 'expense-categories', label: 'فئات المصروفات' },
   { id: 'users', label: 'المستخدمون' },
+  { id: 'audit', label: 'سجل التدقيق' },
+  { id: 'password', label: 'كلمة المرور' },
 ]
 
 export default function Settings() {
@@ -42,6 +44,8 @@ export default function Settings() {
           {tab === 'tax' && <TaxRatesSettings />}
           {tab === 'expense-categories' && <ExpenseCategoriesSettings />}
           {tab === 'users' && <UsersSettings />}
+          {tab === 'audit' && <AuditLogSettings />}
+          {tab === 'password' && <ChangePasswordSettings />}
         </div>
       </div>
     </AppShell>
@@ -569,6 +573,146 @@ function TaxRatesSettings() {
           </label>
         </form>
       </Drawer>
+    </div>
+  )
+}
+
+// ─── Audit Log Settings ───────────────────────────────────────────────────────
+
+interface AuditLogEntry {
+  id: string
+  entity: string
+  entityId?: string
+  action: string
+  before?: unknown
+  after?: unknown
+  ip?: string
+  createdAt: string
+  actor?: { id: string; fullName: string }
+}
+interface AuditMeta { total: number; page: number; limit: number; pages: number }
+
+const entityLabels: Record<string, string> = {
+  invoice: 'فاتورة', product: 'منتج', user: 'مستخدم', customer: 'عميل',
+  supplier: 'مورد', expense: 'مصروف', stock: 'مخزون', installment: 'قسط',
+  purchase_order: 'طلب شراء', branch: 'فرع',
+}
+
+const actionLabels: Record<string, { label: string; color: string }> = {
+  create: { label: 'إنشاء', color: 'text-success-400' },
+  update: { label: 'تعديل', color: 'text-brand-400' },
+  delete: { label: 'حذف', color: 'text-danger-400' },
+  approve: { label: 'موافقة', color: 'text-success-400' },
+  reject: { label: 'رفض', color: 'text-warning-400' },
+  login: { label: 'دخول', color: 'text-gray-400' },
+}
+
+function AuditLogSettings() {
+  const [page, setPage] = useState(1)
+  const [entity, setEntity] = useState('')
+  const [action, setAction] = useState('')
+
+  const { data, isLoading } = useQuery<{ data: AuditLogEntry[]; meta: AuditMeta }>({
+    queryKey: ['audit-logs', page, entity, action],
+    queryFn: async () => {
+      const res = await api.get<{ data: AuditLogEntry[]; meta: AuditMeta }>('/auth/audit-logs', {
+        params: { page, limit: 20, ...(entity ? { entity } : {}), ...(action ? { action } : {}) },
+      })
+      return res.data
+    },
+  })
+
+  const logs = data?.data ?? []
+  const meta = data?.meta
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
+          <Shield className="w-5 h-5 text-brand-400" />سجل التدقيق
+        </h3>
+      </div>
+
+      <div className="flex gap-3">
+        <select value={entity} onChange={(e) => { setEntity(e.target.value); setPage(1) }} className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <option value="">كل الكيانات</option>
+          {Object.entries(entityLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+        </select>
+        <select value={action} onChange={(e) => { setAction(e.target.value); setPage(1) }} className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <option value="">كل الإجراءات</option>
+          {Object.entries(actionLabels).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-2">{Array.from({ length: 8 }).map((_, i) => <div key={i} className="h-12 bg-gray-700 rounded animate-pulse" />)}</div>
+      ) : logs.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-8">لا توجد سجلات</p>
+      ) : (
+        <div className="flex flex-col divide-y divide-gray-700">
+          {logs.map((log) => {
+            const act = actionLabels[log.action] ?? { label: log.action, color: 'text-gray-400' }
+            return (
+              <div key={log.id} className="py-3 flex items-start justify-between gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={cn('text-sm font-medium', act.color)}>{act.label}</span>
+                    <span className="text-xs text-gray-400">{entityLabels[log.entity] ?? log.entity}</span>
+                    {log.actor && <span className="text-xs text-gray-500">بواسطة {log.actor.fullName}</span>}
+                    {log.ip && <span className="text-xs text-gray-600 font-mono">{log.ip}</span>}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">{new Date(log.createdAt).toLocaleString('ar-EG')}</p>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+      {meta && meta.pages > 1 && (
+        <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />
+      )}
+    </div>
+  )
+}
+
+// ─── Change Password Settings ─────────────────────────────────────────────────
+
+const pwSchema = z.object({
+  currentPassword: z.string().min(1, 'كلمة المرور الحالية مطلوبة'),
+  newPassword: z.string().min(8, 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل'),
+  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
+}).refine((d) => d.newPassword === d.confirmPassword, {
+  message: 'كلمتا المرور غير متطابقتان',
+  path: ['confirmPassword'],
+})
+type PwFormData = z.infer<typeof pwSchema>
+
+function ChangePasswordSettings() {
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<PwFormData>({ resolver: zodResolver(pwSchema) })
+
+  const { mutate: changePassword, isPending } = useMutation({
+    mutationFn: async (data: PwFormData) => {
+      await api.patch('/auth/me/password', { currentPassword: data.currentPassword, newPassword: data.newPassword })
+    },
+    onSuccess: () => {
+      toast.success('تم تغيير كلمة المرور بنجاح')
+      reset()
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+      toast.error(msg ?? 'حدث خطأ')
+    },
+  })
+
+  return (
+    <div className="flex flex-col gap-6 max-w-md">
+      <h3 className="text-lg font-semibold text-gray-100">تغيير كلمة المرور</h3>
+      <form className="flex flex-col gap-5" onSubmit={handleSubmit((d) => changePassword(d))}>
+        <Input label="كلمة المرور الحالية" type="password" error={errors.currentPassword?.message} {...register('currentPassword')} />
+        <Input label="كلمة المرور الجديدة" type="password" error={errors.newPassword?.message} {...register('newPassword')} />
+        <Input label="تأكيد كلمة المرور الجديدة" type="password" error={errors.confirmPassword?.message} {...register('confirmPassword')} />
+        <Button loading={isPending} type="submit" className="w-fit">تغيير كلمة المرور</Button>
+      </form>
     </div>
   )
 }

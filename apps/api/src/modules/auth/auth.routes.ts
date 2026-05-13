@@ -253,4 +253,82 @@ export async function authRoutes(app: FastifyInstance) {
     })
     return reply.send({ success: true, data: roles })
   })
+
+  // ─── PATCH /api/auth/me/password — change own password ───────────────────
+  const changePasswordSchema = z.object({
+    currentPassword: z.string().min(1),
+    newPassword: z.string().min(8),
+  })
+
+  app.patch('/me/password', { preHandler: [authenticate] }, async (request, reply) => {
+    const user = request.user as import('../../shared/middleware/auth.middleware').JWTPayload
+    const parsed = changePasswordSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    }
+
+    const { verifyPassword, hashPassword } = await import('../../shared/utils/password')
+    const dbUser = await request.tenantDb.user.findUnique({ where: { id: user.userId } })
+    if (!dbUser) {
+      return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'المستخدم غير موجود' } })
+    }
+
+    const valid = await verifyPassword(parsed.data.currentPassword, dbUser.passwordHash)
+    if (!valid) {
+      return reply.status(401).send({ success: false, error: { code: 'wrong_password', message: 'كلمة المرور الحالية غير صحيحة' } })
+    }
+
+    const passwordHash = await hashPassword(parsed.data.newPassword)
+    await request.tenantDb.user.update({ where: { id: user.userId }, data: { passwordHash } })
+
+    return reply.send({ success: true })
+  })
+
+  // ─── GET /api/auth/audit-logs — paginated audit log viewer ───────────────
+  const auditQuerySchema = z.object({
+    page: z.coerce.number().int().min(1).default(1),
+    limit: z.coerce.number().int().min(1).max(100).default(20),
+    entity: z.string().optional(),
+    action: z.string().optional(),
+    actorId: z.string().uuid().optional(),
+    from: z.string().optional(),
+    to: z.string().optional(),
+  })
+
+  app.get('/audit-logs', { preHandler: [authenticate, requirePermission('users', 'read')] }, async (request, reply) => {
+    const parsed = auditQuerySchema.safeParse(request.query)
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    }
+    const { page, limit, entity, action, actorId, from, to } = parsed.data
+
+    const where = {
+      ...(entity ? { entity } : {}),
+      ...(action ? { action } : {}),
+      ...(actorId ? { actorId } : {}),
+      ...(from || to ? {
+        createdAt: {
+          ...(from ? { gte: new Date(from) } : {}),
+          ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+        },
+      } : {}),
+    }
+
+    const [logs, total] = await Promise.all([
+      request.tenantDb.auditLog.findMany({
+        where,
+        include: { actor: { select: { id: true, fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      request.tenantDb.auditLog.count({ where }),
+    ])
+
+    return reply.send({
+      success: true,
+      data: logs,
+      meta: { total, page, limit, pages: Math.ceil(total / limit) },
+    })
+  })
 }

@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, ReceiptText, CreditCard } from 'lucide-react'
+import { Plus, Edit2, Trash2, ReceiptText, CreditCard, Search } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -191,14 +191,21 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
 export default function Suppliers() {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
+  const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
   const [detailSupplier, setDetailSupplier] = useState<Supplier | null>(null)
 
+  useEffect(() => {
+    const t = setTimeout(() => { setDebouncedSearch(search); setPage(1) }, 300)
+    return () => clearTimeout(t)
+  }, [search])
+
   const { data, isLoading } = useQuery<{ data: Supplier[]; meta: Meta }>({
-    queryKey: ['suppliers', page],
-    queryFn: async () => (await api.get<{ data: Supplier[]; meta: Meta }>('/suppliers', { params: { limit: LIMIT, page } })).data,
+    queryKey: ['suppliers', page, debouncedSearch],
+    queryFn: async () => (await api.get<{ data: Supplier[]; meta: Meta }>('/suppliers', { params: { limit: LIMIT, page, ...(debouncedSearch ? { search: debouncedSearch } : {}) } })).data,
   })
 
   const suppliers = data?.data ?? []
@@ -240,7 +247,16 @@ export default function Suppliers() {
   return (
     <AppShell title="الموردون">
       <div className="flex flex-col gap-6">
-        <div className="flex justify-end">
+        <div className="flex items-center justify-between gap-3">
+          <div className="relative flex-1 max-w-xs">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="بحث باسم المورد أو الهاتف..."
+              className="w-full bg-gray-800 border border-gray-700 rounded-md pr-9 pl-3 py-2 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-500"
+            />
+          </div>
           <Button onClick={openNew}><Plus className="w-4 h-4" />مورد جديد</Button>
         </div>
 

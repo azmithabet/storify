@@ -42,6 +42,7 @@ interface Customer {
   id: string
   fullName: string
   phone?: string
+  creditBalance?: number
 }
 
 interface AppliedCoupon {
@@ -131,6 +132,8 @@ export default function POS() {
   const [couponLoading, setCouponLoading] = useState(false)
   const [showEOD, setShowEOD] = useState(false)
   const [actualCash, setActualCash] = useState('')
+  const [useCredit, setUseCredit] = useState(false)
+  const [creditAmount, setCreditAmount] = useState('')
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [offlineQueue, setOfflineQueue] = useState<unknown[]>(() => {
     try { return JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]') } catch { return [] }
@@ -175,6 +178,10 @@ export default function POS() {
       (await api.get<{ data: Customer[] }>('/customers', { params: { search: customerSearch, limit: 10 } })).data.data,
     enabled: customerSearch.length > 1,
   })
+
+  const appliedCredit = useCredit && customer?.creditBalance && Number(creditAmount) > 0
+    ? Math.min(Number(creditAmount), customer.creditBalance, total)
+    : 0
 
   const todayDate = new Date().toISOString().slice(0, 10)
 
@@ -321,6 +328,7 @@ export default function POS() {
         customerId: customer?.id,
         feeBearer,
         couponCode: appliedCoupon?.code,
+        creditAmount: appliedCredit > 0 ? appliedCredit : undefined,
         items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
       }
       if (!navigator.onLine) {
@@ -359,6 +367,8 @@ export default function POS() {
       setSelectedPM(null)
       setAppliedCoupon(null)
       setCouponInput('')
+      setUseCredit(false)
+      setCreditAmount('')
       toast.success(`تم إنشاء الفاتورة ${apiInvoice.invoiceNumber}`)
     },
     onError: (e: unknown) => {
@@ -496,14 +506,42 @@ export default function POS() {
         <div className="w-80 flex flex-col gap-4">
           <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-4">
             {customer ? (
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-100">{customer.fullName}</p>
-                  {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-gray-100">{customer.fullName}</p>
+                    {customer.phone && <p className="text-xs text-gray-500">{customer.phone}</p>}
+                  </div>
+                  <button onClick={() => { setCustomer(null); setUseCredit(false); setCreditAmount('') }} className="text-gray-500 hover:text-danger-500">
+                    <X className="w-4 h-4" />
+                  </button>
                 </div>
-                <button onClick={() => setCustomer(null)} className="text-gray-500 hover:text-danger-500">
-                  <X className="w-4 h-4" />
-                </button>
+                {(customer.creditBalance ?? 0) > 0 && (
+                  <div className="flex items-center gap-2 bg-success-500/10 border border-success-500/30 rounded-md px-3 py-2">
+                    <div className="flex-1">
+                      <p className="text-xs text-success-400">رصيد متاح: {Number(customer.creditBalance).toFixed(2)} ج</p>
+                      {useCredit && (
+                        <input
+                          type="number"
+                          value={creditAmount}
+                          onChange={(e) => setCreditAmount(e.target.value)}
+                          placeholder="المبلغ المستخدم..."
+                          max={Math.min(Number(customer.creditBalance), total)}
+                          min={0}
+                          step={0.01}
+                          className="mt-1 w-full bg-gray-800 border border-success-500/50 rounded px-2 py-1 text-xs text-gray-100 font-mono focus:outline-none"
+                          dir="ltr"
+                        />
+                      )}
+                    </div>
+                    <button
+                      onClick={() => { setUseCredit(!useCredit); setCreditAmount('') }}
+                      className={cn('text-xs px-2 py-1 rounded border transition-all', useCredit ? 'border-success-500 text-success-400 bg-success-500/10' : 'border-gray-600 text-gray-400')}
+                    >
+                      {useCredit ? 'إلغاء' : 'استخدام'}
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <button
@@ -636,9 +674,15 @@ export default function POS() {
                 </span>
               </div>
             )}
+            {appliedCredit > 0 && (
+              <div className="flex justify-between text-sm text-success-400">
+                <span>رصيد العميل المستخدم</span>
+                <span className="font-mono">-{appliedCredit.toFixed(2)} ج</span>
+              </div>
+            )}
             <div className="border-t border-gray-700 pt-3 flex justify-between font-semibold">
               <span className="text-gray-200">الإجمالي</span>
-              <Money value={total} size="lg" />
+              <Money value={Math.max(0, total - appliedCredit)} size="lg" />
             </div>
           </div>
 

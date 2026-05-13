@@ -239,6 +239,16 @@ export async function createInvoice(
     if (couponDiscount.greaterThan(subtotal)) couponDiscount = subtotal
   }
 
+  // Validate and cap credit amount
+  let creditUsed = ZERO
+  if (input.creditAmount && input.creditAmount > 0 && input.customerId) {
+    const customer = await db.customer.findUnique({ where: { id: input.customerId }, select: { creditBalance: true } })
+    if (customer) {
+      const availableCredit = toDecimal(customer.creditBalance)
+      creditUsed = roundMoney(toDecimal(Math.min(input.creditAmount, availableCredit.toNumber())))
+    }
+  }
+
   const preFeeTotal = subtotal.minus(couponDiscount).plus(taxTotal)
   const { feeAmount, feeAddedToTotal } = calculateFee(
     preFeeTotal,
@@ -246,14 +256,25 @@ export async function createInvoice(
     input.feeBearer,
   )
 
-  const totalAmount = roundMoney(
+  const totalBeforeCredit = roundMoney(
     feeAddedToTotal ? preFeeTotal.plus(feeAmount) : preFeeTotal,
   )
+  // Credit reduces the amount actually charged via payment method (capped at total)
+  if (creditUsed.greaterThan(totalBeforeCredit)) creditUsed = totalBeforeCredit
+  const totalAmount = roundMoney(totalBeforeCredit.minus(creditUsed))
 
   const effectiveFeeBearer = input.feeBearer ?? paymentMethod.feeBearer
 
   // 6. Atomic transaction
   return db.$transaction(async (tx) => {
+    // Deduct credit from customer balance first
+    if (creditUsed.greaterThan(0) && input.customerId) {
+      await tx.customer.update({
+        where: { id: input.customerId },
+        data: { creditBalance: { decrement: creditUsed } },
+      })
+    }
+
     const invoice = await tx.invoice.create({
       data: {
         branchId: input.branchId,
@@ -264,7 +285,7 @@ export async function createInvoice(
         couponId,
         exchangeRate: toDecimal(currency.rateToBase),
         subtotal,
-        discountAmount: couponDiscount,
+        discountAmount: couponDiscount.plus(creditUsed),
         taxTotal,
         feePercentage: toDecimal(paymentMethod.feePercentage),
         feeFixed: toDecimal(paymentMethod.feeFixed),

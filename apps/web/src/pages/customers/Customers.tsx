@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Edit2, Wallet, FileText } from 'lucide-react'
+import { Search, Plus, Edit2, Wallet, FileText, Download } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -277,7 +277,28 @@ export default function Customers() {
         {creditCustomer && <CreditModal customer={creditCustomer} onClose={() => setCreditCustomer(null)} />}
       </Modal>
 
-      <Drawer open={!!detailCustomer} onClose={() => setDetailCustomer(null)} title={detailCustomer?.fullName ?? ''} width="w-[480px]">
+      <Drawer
+        open={!!detailCustomer}
+        onClose={() => setDetailCustomer(null)}
+        title={detailCustomer?.fullName ?? ''}
+        width="w-[480px]"
+        footer={
+          <Button variant="ghost" onClick={async () => {
+            if (!detailCustomer) return
+            try {
+              const res = await api.get(`/customers/${detailCustomer.id}/statement`, { responseType: 'blob' })
+              const url = URL.createObjectURL(new Blob([res.data as BlobPart]))
+              const a = document.createElement('a')
+              a.href = url
+              a.download = `كشف_حساب_${detailCustomer.fullName}.xlsx`
+              a.click()
+              URL.revokeObjectURL(url)
+            } catch { toast.error('فشل تصدير كشف الحساب') }
+          }}>
+            <Download className="w-4 h-4" />تصدير كشف الحساب
+          </Button>
+        }
+      >
         {detailCustomer && <CustomerDetailDrawer customer={detailCustomer} />}
       </Drawer>
 

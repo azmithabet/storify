@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, Search, Plus, Trash2 } from 'lucide-react'
+import { Check, X, Search, Plus, Trash2, Printer } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -282,6 +282,68 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
 
 const LIMIT = 20
 
+function printContract(c: InstallmentContract) {
+  const fmt = (n: number) => n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const paymentRows = (c.payments ?? []).map((p, i) => `
+    <tr>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${i + 1}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb">${new Date(p.dueDate).toLocaleDateString('ar-EG')}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(p.amount))} ج</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${p.status === 'paid' ? '✓ مدفوع' : p.status === 'overdue' ? '⚠ متأخر' : '—'}</td>
+    </tr>`).join('')
+
+  const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
+    <title>عقد قسط ${c.contractNumber}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:32px}
+      h1{font-size:20px;font-weight:700}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0;padding:14px;background:#f9fafb;border-radius:8px}
+      .meta-item label{font-size:11px;color:#6b7280;display:block;margin-bottom:2px}
+      .meta-item p{font-weight:600}
+      table{width:100%;border-collapse:collapse;margin-top:16px}
+      th{background:#f3f4f6;padding:8px 10px;font-size:12px;color:#374151;text-align:right}
+      .sig{display:grid;grid-template-columns:1fr 1fr;gap:40px;margin-top:60px}
+      .sig-box{border-top:1px solid #374151;padding-top:8px;font-size:12px;color:#6b7280}
+      .footer{margin-top:30px;text-align:center;font-size:11px;color:#9ca3af}
+      @media print{body{padding:16px}}
+    </style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div><h1>عقد بيع بالتقسيط</h1><p style="color:#6b7280;font-size:12px">Storify POS</p></div>
+      <div style="text-align:left">
+        <p style="font-size:16px;font-weight:700;font-family:monospace">${c.contractNumber}</p>
+        <p style="font-size:12px;color:#6b7280">${new Date().toLocaleDateString('ar-EG')}</p>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="meta-item"><label>العميل</label><p>${c.customer?.fullName ?? '—'}</p></div>
+      <div class="meta-item"><label>الهاتف</label><p>${c.customer?.phone ?? '—'}</p></div>
+      <div class="meta-item"><label>إجمالي العقد</label><p>${fmt(Number(c.totalAmount))} ج</p></div>
+      <div class="meta-item"><label>المقدم</label><p>${fmt(Number(c.downPayment))} ج</p></div>
+      <div class="meta-item"><label>المبلغ الممول</label><p>${fmt(Number(c.remainingAmount))} ج</p></div>
+      <div class="meta-item"><label>عدد الأقساط</label><p>${c.installmentsCount} قسط</p></div>
+    </div>
+    <h2 style="font-size:14px;font-weight:600;margin-bottom:8px">جدول السداد</h2>
+    <table>
+      <thead><tr>
+        <th style="text-align:center">#</th><th>تاريخ الاستحقاق</th><th style="text-align:left">المبلغ</th><th style="text-align:center">الحالة</th>
+      </tr></thead>
+      <tbody>${paymentRows}</tbody>
+    </table>
+    <div class="sig">
+      <div class="sig-box">توقيع العميل: ${c.customer?.fullName ?? ''}</div>
+      <div class="sig-box">توقيع البائع</div>
+    </div>
+    <div class="footer"><p>تم الإنشاء بواسطة Storify — هذا العقد ملزم قانونياً</p></div>
+  </body></html>`
+
+  const win = window.open('', '_blank', 'width=800,height=1100')
+  if (!win) return
+  win.document.write(html)
+  win.document.close()
+  setTimeout(() => { win.print(); setTimeout(() => win.close(), 500) }, 300)
+}
+
 export default function Installments() {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
@@ -397,7 +459,17 @@ export default function Installments() {
       </div>
 
       {/* Detail Drawer */}
-      <Drawer open={!!detailContract} onClose={() => setDetailContract(null)} title={`عقد ${detailContract?.contractNumber ?? ''}`} width="w-[480px]">
+      <Drawer
+        open={!!detailContract}
+        onClose={() => setDetailContract(null)}
+        title={`عقد ${detailContract?.contractNumber ?? ''}`}
+        width="w-[480px]"
+        footer={
+          <Button variant="ghost" onClick={() => detailContract && printContract(detailContract)}>
+            <Printer className="w-4 h-4" />طباعة العقد
+          </Button>
+        }
+      >
         {detailContract && (
           <div className="flex flex-col gap-6">
             <div className="grid grid-cols-2 gap-4 text-sm">

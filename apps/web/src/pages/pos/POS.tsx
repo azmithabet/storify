@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag } from 'lucide-react'
+import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag, WifiOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button, Input, Badge, Money, Modal } from '@/components/ui'
@@ -129,8 +129,38 @@ export default function POS() {
   const [couponInput, setCouponInput] = useState('')
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
   const [couponLoading, setCouponLoading] = useState(false)
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  const [offlineQueue, setOfflineQueue] = useState<unknown[]>(() => {
+    try { return JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]') } catch { return [] }
+  })
   const searchRef = useRef<HTMLInputElement>(null)
   const barcodeRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const goOnline = async () => {
+      setIsOnline(true)
+      const queue: unknown[] = JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]')
+      if (queue.length === 0) return
+      toast.loading(`جاري إرسال ${queue.length} فاتورة معلقة...`, { id: 'sync' })
+      let sent = 0
+      const remaining: unknown[] = []
+      for (const payload of queue) {
+        try {
+          await api.post('/invoices', payload)
+          sent++
+        } catch { remaining.push(payload) }
+      }
+      localStorage.setItem('pos_offline_queue', JSON.stringify(remaining))
+      setOfflineQueue(remaining)
+      toast.dismiss('sync')
+      if (sent > 0) toast.success(`تم إرسال ${sent} فاتورة كانت معلقة`)
+      if (remaining.length > 0) toast.error(`فشل إرسال ${remaining.length} فاتورة`)
+    }
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => { window.removeEventListener('online', goOnline); window.removeEventListener('offline', goOffline) }
+  }, [])
 
   const { data: paymentMethods = [] } = useQuery<PaymentMethod[]>({
     queryKey: ['payment-methods'],
@@ -255,17 +285,21 @@ export default function POS() {
     mutationFn: async () => {
       if (!selectedPM) throw new Error('اختر طريقة الدفع')
       if (cart.length === 0) throw new Error('السلة فارغة')
-      const res = await api.post<{ data: { id: string; invoiceNumber: string; totalAmount: number; feeAmount: number } }>('/invoices', {
+      const payload = {
         paymentMethodId: selectedPM.id,
         customerId: customer?.id,
         feeBearer,
         couponCode: appliedCoupon?.code,
-        items: cart.map((i) => ({
-          variantId: i.variantId,
-          quantity: i.quantity,
-          unitPrice: i.unitPrice,
-        })),
-      })
+        items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
+      }
+      if (!navigator.onLine) {
+        const queue = JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]')
+        queue.push(payload)
+        localStorage.setItem('pos_offline_queue', JSON.stringify(queue))
+        setOfflineQueue(queue)
+        return { id: 'offline', invoiceNumber: `OFFLINE-${Date.now()}`, totalAmount: 0, feeAmount: 0 }
+      }
+      const res = await api.post<{ data: { id: string; invoiceNumber: string; totalAmount: number; feeAmount: number } }>('/invoices', payload)
       return res.data.data
     },
     onSuccess: (apiInvoice) => {
@@ -304,6 +338,18 @@ export default function POS() {
 
   return (
     <AppShell title="نقطة البيع">
+      {/* Offline banner */}
+      {(!isOnline || offlineQueue.length > 0) && (
+        <div className={cn(
+          'flex items-center gap-2 px-4 py-2 rounded-md mb-4 text-sm',
+          !isOnline ? 'bg-danger-500/10 border border-danger-500/30 text-danger-400' : 'bg-warning-500/10 border border-warning-500/30 text-warning-400',
+        )}>
+          <WifiOff className="w-4 h-4 shrink-0" />
+          {!isOnline
+            ? `أنت غير متصل بالإنترنت — الفواتير ستُحفظ محلياً (${offlineQueue.length} في الانتظار)`
+            : `${offlineQueue.length} فاتورة معلقة — سيتم إرسالها تلقائياً`}
+        </div>
+      )}
       <div className="flex gap-6 h-[calc(100vh-8rem)]">
         {/* LEFT: Search + Cart */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">

@@ -1,10 +1,78 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Eye, RotateCcw } from 'lucide-react'
+import { Search, Eye, RotateCcw, Printer } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination, Modal } from '@/components/ui'
 import { api } from '@/api/client'
+
+function printInvoice(inv: Invoice) {
+  const fmt = (n: number) => n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const rows = (inv.items ?? []).map((item) => `
+    <tr>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${item.productName}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${item.quantity}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(item.unitPrice))}</td>
+      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(item.totalPrice))}</td>
+    </tr>`).join('')
+
+  const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
+    <title>فاتورة ${inv.invoiceNumber}</title>
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:32px}
+      h1{font-size:22px;font-weight:700;margin-bottom:4px}
+      .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0;padding:16px;background:#f9fafb;border-radius:8px}
+      .meta-item label{font-size:11px;color:#6b7280;display:block;margin-bottom:2px}
+      .meta-item p{font-weight:600}
+      table{width:100%;border-collapse:collapse;margin-top:16px}
+      th{background:#f3f4f6;padding:10px 12px;text-align:right;font-size:12px;color:#374151}
+      th:not(:first-child){text-align:center}
+      th:last-child,th:nth-child(3){text-align:left}
+      .totals{margin-top:20px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:260px}
+      .totals-row{display:flex;justify-content:space-between;width:260px;font-size:13px;color:#374151}
+      .totals-row.total{font-size:16px;font-weight:700;border-top:2px solid #111;padding-top:8px;margin-top:4px}
+      .footer{margin-top:40px;text-align:center;font-size:11px;color:#9ca3af}
+      @media print{body{padding:16px}}
+    </style></head><body>
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <h1>فاتورة ضريبية</h1>
+        <p style="color:#6b7280;font-size:12px">Storify POS</p>
+      </div>
+      <div style="text-align:left">
+        <p style="font-size:18px;font-weight:700;font-family:monospace">${inv.invoiceNumber}</p>
+        <p style="font-size:12px;color:#6b7280">${new Date(inv.createdAt).toLocaleString('ar-EG')}</p>
+      </div>
+    </div>
+    <div class="meta">
+      <div class="meta-item"><label>العميل</label><p>${inv.customer?.fullName ?? 'نقدي'}</p></div>
+      <div class="meta-item"><label>طريقة الدفع</label><p>${inv.paymentMethod?.name ?? '—'}</p></div>
+      <div class="meta-item"><label>الكاشير</label><p>${inv.cashier?.fullName ?? '—'}</p></div>
+      <div class="meta-item"><label>الحالة</label><p>${inv.status === 'completed' ? 'مكتملة' : inv.status}</p></div>
+    </div>
+    <table>
+      <thead><tr>
+        <th>الصنف</th><th style="text-align:center">الكمية</th><th style="text-align:left">سعر الوحدة</th><th style="text-align:left">الإجمالي</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <div class="totals">
+      <div class="totals-row"><span>المجموع الفرعي</span><span>${fmt(Number(inv.subtotal))}</span></div>
+      ${Number(inv.discountAmount) > 0 ? `<div class="totals-row" style="color:#dc2626"><span>الخصم</span><span>- ${fmt(Number(inv.discountAmount))}</span></div>` : ''}
+      ${Number(inv.taxTotal) > 0 ? `<div class="totals-row"><span>الضريبة</span><span>${fmt(Number(inv.taxTotal))}</span></div>` : ''}
+      ${Number(inv.feeAmount) > 0 ? `<div class="totals-row"><span>رسوم الدفع</span><span>${fmt(Number(inv.feeAmount))}</span></div>` : ''}
+      <div class="totals-row total"><span>الإجمالي</span><span>${fmt(Number(inv.totalAmount))} ج</span></div>
+    </div>
+    <div class="footer"><p>شكراً لتعاملكم معنا — تم الإنشاء بواسطة Storify</p></div>
+  </body></html>`
+
+  const win = window.open('', '_blank', 'width=800,height=1000')
+  if (!win) return
+  win.document.write(html)
+  win.document.close()
+  setTimeout(() => { win.print(); setTimeout(() => win.close(), 500) }, 300)
+}
 
 interface InvoiceItem {
   id: string
@@ -192,12 +260,16 @@ export default function Invoices() {
         title={`فاتورة ${detailInvoice?.invoiceNumber ?? ''}`}
         width="w-[520px]"
         footer={
-          detailInvoice?.status === 'completed' ? (
-            <Button variant="secondary" onClick={() => { setReturnInvoice(detailInvoice); setDetailInvoice(null) }}>
-              <RotateCcw className="w-4 h-4" />
-              إرجاع
+          <div className="flex gap-2 w-full">
+            <Button variant="ghost" onClick={() => detailInvoice && printInvoice(detailInvoice)}>
+              <Printer className="w-4 h-4" />طباعة
             </Button>
-          ) : undefined
+            {detailInvoice?.status === 'completed' && (
+              <Button variant="secondary" onClick={() => { setReturnInvoice(detailInvoice); setDetailInvoice(null) }}>
+                <RotateCcw className="w-4 h-4" />إرجاع
+              </Button>
+            )}
+          </div>
         }
       >
         {detailInvoice && (

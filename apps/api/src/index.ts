@@ -19,6 +19,7 @@ import { supplierRoutes } from './modules/suppliers/supplier.routes'
 import { purchaseOrderRoutes } from './modules/purchase-orders/po.routes'
 import { expenseRoutes } from './modules/expenses/expense.routes'
 import { reportRoutes } from './modules/reports/report.routes'
+import { couponRoutes } from './modules/coupons/coupon.routes'
 import { etaRoutes } from './modules/eta/eta.routes'
 import { billingRoutes } from './modules/billing/billing.routes'
 import { authenticate } from './shared/middleware/auth.middleware'
@@ -81,6 +82,7 @@ app.register(async function tenantScoped(sub) {
   sub.register(purchaseOrderRoutes, { prefix: '/api/purchase-orders' })
   sub.register(expenseRoutes, { prefix: '/api/expenses' })
   sub.register(reportRoutes, { prefix: '/api/reports' })
+  sub.register(couponRoutes, { prefix: '/api/coupons' })
   sub.register(etaRoutes, { prefix: '/api' })
   sub.register(billingRoutes, { prefix: '/api' })
 

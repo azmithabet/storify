@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine } from 'lucide-react'
+import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button, Input, Badge, Money, Modal } from '@/components/ui'
@@ -44,12 +44,21 @@ interface Customer {
   phone?: string
 }
 
+interface AppliedCoupon {
+  code: string
+  discountType: 'percentage' | 'fixed'
+  discountValue: number
+  minAmount?: number | null
+}
+
 interface CompletedInvoice {
   id: string
   invoiceNumber: string
   totalAmount: number
   subtotal: number
   feeAmount: number
+  couponCode?: string
+  couponDiscount?: number
   customerName?: string
   paymentMethodName: string
   createdAt: string
@@ -84,6 +93,7 @@ function printReceipt(inv: CompletedInvoice) {
     <div class="dashed"></div>
     <table><tbody>
       <tr><td>المجموع الفرعي</td><td style="text-align:left">${inv.subtotal.toFixed(2)} ج</td></tr>
+      ${inv.couponDiscount && inv.couponDiscount > 0 ? `<tr><td>خصم (${inv.couponCode ?? ''})</td><td style="text-align:left;color:green">-${inv.couponDiscount.toFixed(2)} ج</td></tr>` : ''}
       ${inv.feeAmount > 0 ? `<tr><td>رسوم الدفع</td><td style="text-align:left">${inv.feeAmount.toFixed(2)} ج</td></tr>` : ''}
       <tr class="total"><td>الإجمالي</td><td style="text-align:left">${inv.totalAmount.toFixed(2)} ج</td></tr>
     </tbody></table>
@@ -116,6 +126,9 @@ export default function POS() {
   const [customerSearch, setCustomerSearch] = useState('')
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [completedInvoice, setCompletedInvoice] = useState<CompletedInvoice | null>(null)
+  const [couponInput, setCouponInput] = useState('')
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null)
+  const [couponLoading, setCouponLoading] = useState(false)
   const searchRef = useRef<HTMLInputElement>(null)
   const barcodeRef = useRef<HTMLInputElement>(null)
 
@@ -206,8 +219,37 @@ export default function POS() {
   const removeItem = (variantId: string) => setCart((prev) => prev.filter((i) => i.variantId !== variantId))
 
   const subtotal = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
-  const fee = selectedPM ? calculateFee(subtotal, selectedPM) : 0
-  const total = feeBearer === 'customer' ? subtotal + fee : subtotal
+
+  const couponDiscount = appliedCoupon
+    ? appliedCoupon.discountType === 'percentage'
+      ? Math.min(subtotal * (appliedCoupon.discountValue / 100), subtotal)
+      : Math.min(appliedCoupon.discountValue, subtotal)
+    : 0
+  const discountedSubtotal = subtotal - couponDiscount
+
+  const fee = selectedPM ? calculateFee(discountedSubtotal, selectedPM) : 0
+  const total = feeBearer === 'customer' ? discountedSubtotal + fee : discountedSubtotal
+
+  const validateCoupon = async () => {
+    if (!couponInput.trim()) return
+    setCouponLoading(true)
+    try {
+      const res = await api.get<{ data: AppliedCoupon }>('/coupons/validate', { params: { code: couponInput.trim().toUpperCase() } })
+      const c = res.data.data
+      if (c.minAmount && discountedSubtotal < Number(c.minAmount)) {
+        toast.error(`الحد الأدنى للطلب ${Number(c.minAmount).toFixed(0)} ج`)
+      } else {
+        setAppliedCoupon({ ...c, discountValue: Number(c.discountValue) })
+        toast.success('تم تطبيق الكوبون')
+        setCouponInput('')
+      }
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+      toast.error(msg ?? 'كوبون غير صالح')
+    } finally {
+      setCouponLoading(false)
+    }
+  }
 
   const { mutate: submitSale, isPending } = useMutation({
     mutationFn: async () => {
@@ -217,6 +259,7 @@ export default function POS() {
         paymentMethodId: selectedPM.id,
         customerId: customer?.id,
         feeBearer,
+        couponCode: appliedCoupon?.code,
         items: cart.map((i) => ({
           variantId: i.variantId,
           quantity: i.quantity,
@@ -226,13 +269,14 @@ export default function POS() {
       return res.data.data
     },
     onSuccess: (apiInvoice) => {
-      const completedFee = feeBearer === 'customer' ? fee : 0
       const invoiceRecord: CompletedInvoice = {
         id: apiInvoice.id,
         invoiceNumber: apiInvoice.invoiceNumber,
         totalAmount: apiInvoice.totalAmount,
         subtotal,
-        feeAmount: completedFee,
+        feeAmount: feeBearer === 'customer' ? fee : 0,
+        couponCode: appliedCoupon?.code,
+        couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
         customerName: customer?.fullName,
         paymentMethodName: selectedPM!.name,
         createdAt: new Date().toISOString(),
@@ -248,6 +292,8 @@ export default function POS() {
       setCart([])
       setCustomer(null)
       setSelectedPM(null)
+      setAppliedCoupon(null)
+      setCouponInput('')
       toast.success(`تم إنشاء الفاتورة ${apiInvoice.invoiceNumber}`)
     },
     onError: (e: unknown) => {
@@ -449,11 +495,52 @@ export default function POS() {
             )}
           </div>
 
+          {/* Coupon input */}
+          <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-3">
+            {appliedCoupon ? (
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Tag className="w-4 h-4 text-success-400" />
+                  <span className="text-sm font-mono text-success-400">{appliedCoupon.code}</span>
+                  <span className="text-xs text-success-500">
+                    -{appliedCoupon.discountType === 'percentage' ? `${appliedCoupon.discountValue}%` : `${appliedCoupon.discountValue} ج`}
+                  </span>
+                </div>
+                <button onClick={() => setAppliedCoupon(null)} className="text-gray-500 hover:text-danger-500">
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2">
+                <input
+                  value={couponInput}
+                  onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                  onKeyDown={(e) => e.key === 'Enter' && validateCoupon()}
+                  placeholder="كود الخصم..."
+                  className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-3 py-1.5 text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono"
+                />
+                <button
+                  onClick={validateCoupon}
+                  disabled={!couponInput.trim() || couponLoading}
+                  className="px-3 py-1.5 rounded-md bg-brand-600 hover:bg-brand-500 text-white text-sm disabled:opacity-40 transition-colors"
+                >
+                  {couponLoading ? '...' : 'تطبيق'}
+                </button>
+              </div>
+            )}
+          </div>
+
           <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-4 flex flex-col gap-3">
             <div className="flex justify-between text-sm">
               <span className="text-gray-400">المجموع الفرعي</span>
               <Money value={subtotal} />
             </div>
+            {couponDiscount > 0 && (
+              <div className="flex justify-between text-sm text-success-400">
+                <span>خصم الكوبون ({appliedCoupon?.code})</span>
+                <span className="font-mono">-{couponDiscount.toFixed(2)} ج</span>
+              </div>
+            )}
             {fee > 0 && (
               <div className="flex justify-between text-sm">
                 <span className="text-gray-400">
@@ -551,6 +638,12 @@ export default function POS() {
               <div className="flex justify-between text-gray-400">
                 <span>المجموع الفرعي</span><span>{completedInvoice.subtotal.toFixed(2)} ج</span>
               </div>
+              {completedInvoice.couponDiscount && completedInvoice.couponDiscount > 0 && (
+                <div className="flex justify-between text-success-400">
+                  <span>خصم ({completedInvoice.couponCode})</span>
+                  <span>-{completedInvoice.couponDiscount.toFixed(2)} ج</span>
+                </div>
+              )}
               {completedInvoice.feeAmount > 0 && (
                 <div className="flex justify-between text-warning-400">
                   <span>رسوم الدفع (على العميل)</span><span>{completedInvoice.feeAmount.toFixed(2)} ج</span>

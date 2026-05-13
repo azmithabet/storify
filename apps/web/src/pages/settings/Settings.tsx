@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight, Shield } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -18,6 +18,7 @@ const tabs = [
   { id: 'tax', label: 'معدلات الضريبة' },
   { id: 'expense-categories', label: 'فئات المصروفات' },
   { id: 'users', label: 'المستخدمون' },
+  { id: 'coupons', label: 'الكوبونات' },
   { id: 'audit', label: 'سجل التدقيق' },
   { id: 'password', label: 'كلمة المرور' },
 ]
@@ -44,6 +45,7 @@ export default function Settings() {
           {tab === 'tax' && <TaxRatesSettings />}
           {tab === 'expense-categories' && <ExpenseCategoriesSettings />}
           {tab === 'users' && <UsersSettings />}
+          {tab === 'coupons' && <CouponsSettings />}
           {tab === 'audit' && <AuditLogSettings />}
           {tab === 'password' && <ChangePasswordSettings />}
         </div>
@@ -792,6 +794,177 @@ function ExpenseCategoriesSettings() {
             <label className="text-sm text-gray-400 block mb-1">الوصف (اختياري)</label>
             <textarea {...register('description')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
           </div>
+        </form>
+      </Drawer>
+    </div>
+  )
+}
+
+// ─── Coupons Settings ─────────────────────────────────────────────────────────
+
+interface Coupon {
+  id: string
+  code: string
+  discountType: 'percentage' | 'fixed'
+  discountValue: string | number
+  minAmount?: string | number | null
+  maxUses?: number | null
+  usedCount: number
+  expiresAt?: string | null
+  isActive: boolean
+}
+
+const couponSchema = z.object({
+  code: z.string().min(1, 'الكود مطلوب').toUpperCase(),
+  discountType: z.enum(['percentage', 'fixed']),
+  discountValue: z.coerce.number().positive('يجب أن تكون القيمة أكبر من صفر'),
+  minAmount: z.coerce.number().min(0).optional().or(z.literal('')),
+  maxUses: z.coerce.number().int().positive().optional().or(z.literal('')),
+  expiresAt: z.string().optional(),
+  isActive: z.boolean().default(true),
+})
+type CouponFormData = z.infer<typeof couponSchema>
+
+function CouponsSettings() {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState<Coupon | null>(null)
+
+  const { data: coupons = [], isLoading } = useQuery<Coupon[]>({
+    queryKey: ['coupons'],
+    queryFn: async () => (await api.get<{ data: Coupon[] }>('/coupons')).data.data,
+  })
+
+  const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<CouponFormData>({ resolver: zodResolver(couponSchema) })
+  const discountType = watch('discountType')
+
+  const openNew = () => { setEditing(null); reset({ discountType: 'percentage', isActive: true }); setDrawerOpen(true) }
+  const openEdit = (c: Coupon) => {
+    setEditing(c)
+    reset({
+      code: c.code,
+      discountType: c.discountType,
+      discountValue: Number(c.discountValue),
+      minAmount: c.minAmount ? Number(c.minAmount) : '',
+      maxUses: c.maxUses ?? '',
+      expiresAt: c.expiresAt ? new Date(c.expiresAt).toISOString().slice(0, 16) : '',
+      isActive: c.isActive,
+    })
+    setDrawerOpen(true)
+  }
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async (data: CouponFormData) => {
+      const body = {
+        ...data,
+        code: data.code.toUpperCase(),
+        minAmount: data.minAmount === '' ? undefined : data.minAmount,
+        maxUses: data.maxUses === '' ? undefined : data.maxUses,
+        expiresAt: data.expiresAt ? new Date(data.expiresAt).toISOString() : undefined,
+      }
+      if (editing) await api.patch(`/coupons/${editing.id}`, body)
+      else await api.post('/coupons', body)
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'تم التحديث' : 'تم إضافة الكوبون')
+      qc.invalidateQueries({ queryKey: ['coupons'] })
+      setDrawerOpen(false)
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+      toast.error(msg ?? 'حدث خطأ')
+    },
+  })
+
+  const { mutate: toggle } = useMutation({
+    mutationFn: async (c: Coupon) => api.patch(`/coupons/${c.id}`, { isActive: !c.isActive }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['coupons'] }),
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  const { mutate: deleteCoupon } = useMutation({
+    mutationFn: async (id: string) => api.delete(`/coupons/${id}`),
+    onSuccess: () => { toast.success('تم حذف الكوبون'); qc.invalidateQueries({ queryKey: ['coupons'] }) },
+    onError: () => toast.error('لا يمكن حذف كوبون مستخدم'),
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
+          <Tag className="w-5 h-5 text-brand-400" />كوبونات الخصم
+        </h3>
+        <Button onClick={openNew}><Plus className="w-4 h-4" />كوبون جديد</Button>
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 bg-gray-700 rounded animate-pulse" />)}</div>
+      ) : (
+        <Table
+          columns={[
+            { key: 'code', header: 'الكود', render: (c) => <span className="font-mono font-bold text-brand-400">{c.code}</span> },
+            { key: 'discount', header: 'الخصم', render: (c) => (
+              <span className="font-mono text-gray-300">
+                {c.discountType === 'percentage' ? `${Number(c.discountValue)}%` : `${Number(c.discountValue)} ج`}
+              </span>
+            )},
+            { key: 'uses', header: 'الاستخدامات', render: (c) => (
+              <span className="text-sm text-gray-400 font-mono">
+                {c.usedCount}{c.maxUses != null ? ` / ${c.maxUses}` : ''}
+              </span>
+            )},
+            { key: 'expiresAt', header: 'الانتهاء', render: (c) => c.expiresAt
+              ? <span className={cn('text-xs font-mono', new Date(c.expiresAt) < new Date() ? 'text-danger-400' : 'text-gray-400')}>{new Date(c.expiresAt).toLocaleDateString('ar-EG')}</span>
+              : <span className="text-gray-600">—</span>
+            },
+            { key: 'isActive', header: 'الحالة', render: (c) => <Badge variant={c.isActive ? 'success' : 'gray'} dot>{c.isActive ? 'نشط' : 'معطّل'}</Badge> },
+            { key: 'actions', header: '', render: (c) => (
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" onClick={() => openEdit(c)}><Edit2 className="w-3 h-3" /></Button>
+                <Button variant="ghost" size="sm" onClick={() => toggle(c)}>
+                  {c.isActive ? <ToggleRight className="w-4 h-4 text-success-500" /> : <ToggleLeft className="w-4 h-4 text-gray-500" />}
+                </Button>
+                <Button variant="ghost" size="sm" className="text-danger-500" onClick={() => deleteCoupon(c.id)}><Edit2 className="w-3 h-3" /></Button>
+              </div>
+            )},
+          ]}
+          data={coupons} keyExtractor={(c) => c.id} emptyMessage="لا توجد كوبونات"
+        />
+      )}
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل الكوبون' : 'كوبون جديد'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button>
+            <Button loading={isPending} onClick={handleSubmit((d) => save(d))}>حفظ</Button>
+          </>
+        }
+      >
+        <form className="flex flex-col gap-5">
+          <Input label="كود الخصم" placeholder="مثال: SUMMER20" error={errors.code?.message} {...register('code')} disabled={!!editing} />
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">نوع الخصم</label>
+            <select {...register('discountType')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+              <option value="percentage">نسبة مئوية (%)</option>
+              <option value="fixed">مبلغ ثابت (ج)</option>
+            </select>
+          </div>
+          <Input
+            label={discountType === 'percentage' ? 'قيمة الخصم (%)' : 'قيمة الخصم (ج)'}
+            type="number" step="0.01"
+            error={errors.discountValue?.message}
+            {...register('discountValue')}
+          />
+          <Input label="الحد الأدنى للطلب (ج) — اختياري" type="number" step="0.01" {...register('minAmount')} />
+          <Input label="الحد الأقصى للاستخدام — اختياري" type="number" {...register('maxUses')} />
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">تاريخ الانتهاء — اختياري</label>
+            <input type="datetime-local" {...register('expiresAt')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
+          </div>
+          <label className="flex items-center gap-3 text-sm text-gray-300 cursor-pointer">
+            <input type="checkbox" {...register('isActive')} className="w-4 h-4 accent-brand-500" />
+            كوبون نشط
+          </label>
         </form>
       </Drawer>
     </div>

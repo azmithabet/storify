@@ -1,0 +1,119 @@
+@import './fonts.css';
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* Brand */
+  --brand-50: #EEF2FF;
+  --brand-200: #C7D2FE;
+  --brand-400: #818CF8;
+  --brand-500: #6366F1;
+  --brand-600: #4F46E5;
+  --brand-800: #3730A3;
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-body: 'IBM Plex Sans Arabic', sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Spacing */
+  --sp-1: 0.25rem;
+  --sp-2: 0.5rem;
+  --sp-4: 1rem;
+  --sp-6: 1.5rem;
+  --sp-8: 2rem;
+  --sp-12: 3rem;
+
+  /* Radius */
+  --r-sm: 0.25rem;
+  --r-md: 0.5rem;
+  --r-lg: 0.75rem;
+  --r-xl: 1rem;
+  --r-2xl: 1.5rem;
+  --r-full: 9999px;
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-brand: 0 4px 14px 0 rgb(99 102 241 / 0.3);
+
+  /* Transitions */
+  --ease-fast: 150ms ease;
+  --ease-normal: 200ms ease;
+  --ease-slow: 300ms ease;
+
+  /* Z-Index */
+  --z-dropdown: 100;
+  --z-modal: 400;
+  --z-toast: 500;
+}
+
+@layer base {
+  html {
+    direction: rtl;
+    font-family: var(--font-body);
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    @apply bg-app text-gray-100;
+    min-height: 100vh;
+  }
+
+  * {
+    @apply border-gray-800;
+  }
+
+  /* Scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    @apply bg-gray-900;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gray-700 rounded-r-full;
+  }
+
+  /* Focus ring */
+  :focus-visible {
+    outline: 2px solid #6366F1;
+    outline-offset: 2px;
+  }
+
+  /* Reduced motion */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+@layer components {
+  /* Shimmer skeleton */
+  .skeleton {
+    @apply bg-gray-800 rounded;
+    background: linear-gradient(
+      90deg,
+      #1E293B 25%,
+      #334155 50%,
+      #1E293B 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1500ms infinite;
+  }
+}
+
+@layer utilities {
+  /* RTL safe number display */
+  .num {
+    direction: ltr;
+    display: inline-block;
+    font-family: var(--font-mono);
+  }
+}

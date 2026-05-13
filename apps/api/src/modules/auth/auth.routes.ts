@@ -10,6 +10,7 @@ import {
   resetPassword,
   checkForgotPasswordRateLimit,
 } from './auth.service'
+import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
 
 const REFRESH_COOKIE = 'refreshToken'
@@ -191,5 +192,65 @@ export async function authRoutes(app: FastifyInstance) {
       app.log.error(err)
       return reply.status(500).send({ success: false, error: { code: 'internal_error', message: 'خطأ داخلي' } })
     }
+  })
+
+  // ─── GET /api/auth/users — list all tenant users ─────────────────────────
+  app.get('/users', { preHandler: [authenticate, requirePermission('users', 'read')] }, async (request, reply) => {
+    const users = await request.tenantDb.user.findMany({
+      include: { role: { select: { id: true, name: true, slug: true } } },
+      orderBy: { createdAt: 'asc' },
+    })
+    return reply.send({
+      success: true,
+      data: users.map((u) => ({
+        id: u.id,
+        fullName: u.fullName,
+        email: u.email,
+        role: u.role,
+        isActive: u.isActive,
+        lastLogin: u.lastLogin,
+        branchId: u.branchId,
+      })),
+    })
+  })
+
+  // ─── POST /api/auth/users — create a new tenant user ─────────────────────
+  const createUserSchema = z.object({
+    fullName: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(8),
+    roleId: z.string().uuid(),
+    branchId: z.string().uuid().optional(),
+  })
+
+  app.post('/users', { preHandler: [authenticate, requirePermission('users', 'create')] }, async (request, reply) => {
+    const parsed = createUserSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    }
+    const { fullName, email, password, roleId, branchId } = parsed.data
+    const existing = await request.tenantDb.user.findUnique({ where: { email } })
+    if (existing) {
+      return reply.status(409).send({ success: false, error: { code: 'conflict', message: 'البريد الإلكتروني مستخدم بالفعل' } })
+    }
+    const { hashPassword } = await import('../../shared/utils/password')
+    const passwordHash = await hashPassword(password)
+    const user = await request.tenantDb.user.create({
+      data: { fullName, email, passwordHash, roleId, branchId: branchId ?? null },
+      include: { role: { select: { id: true, name: true, slug: true } } },
+    })
+    return reply.status(201).send({
+      success: true,
+      data: { id: user.id, fullName: user.fullName, email: user.email, role: user.role, isActive: user.isActive },
+    })
+  })
+
+  // ─── GET /api/auth/roles — list available roles ───────────────────────────
+  app.get('/roles', { preHandler: [authenticate] }, async (request, reply) => {
+    const roles = await request.tenantDb.role.findMany({
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: 'asc' },
+    })
+    return reply.send({ success: true, data: roles })
   })
 }

@@ -13,7 +13,7 @@ const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 // 7 days in seconds
 export interface LoginResult {
   payload: JWTPayload
   refreshToken: string
-  user: { id: string; email: string; fullName: string; roleSlug: string }
+  user: { id: string; email: string; fullName: string; roleSlug: string; branchId: string }
 }
 
 export async function loginUser(
@@ -65,7 +65,7 @@ export async function loginUser(
   return {
     payload,
     refreshToken,
-    user: { id: user.id, email: user.email, fullName: user.fullName, roleSlug: user.role.slug },
+    user: { id: user.id, email: user.email, fullName: user.fullName, roleSlug: user.role.slug, branchId: user.branchId ?? '' },
   }
 }
 

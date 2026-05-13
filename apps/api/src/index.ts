@@ -5,6 +5,7 @@ import { masterDb } from './config/database'
 import { redis } from './config/redis'
 import jwtPlugin from './shared/plugins/jwt.plugin'
 import cookiePlugin from './shared/plugins/cookie.plugin'
+import sentryPlugin from './shared/plugins/sentry.plugin'
 import { tenantMiddleware } from './shared/middleware/tenant.middleware'
 import { tenantRoutes } from './modules/tenants/tenant.routes'
 import { authRoutes } from './modules/auth/auth.routes'
@@ -18,6 +19,11 @@ import { supplierRoutes } from './modules/suppliers/supplier.routes'
 import { purchaseOrderRoutes } from './modules/purchase-orders/po.routes'
 import { expenseRoutes } from './modules/expenses/expense.routes'
 import { reportRoutes } from './modules/reports/report.routes'
+import { etaRoutes } from './modules/eta/eta.routes'
+import { billingRoutes } from './modules/billing/billing.routes'
+import { authenticate } from './shared/middleware/auth.middleware'
+import { startEtaWorker } from './jobs/eta-submission.job'
+import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
 
 const app = Fastify({
   logger: {
@@ -30,6 +36,7 @@ const app = Fastify({
 })
 
 // ─── Global plugins ───────────────────────────────────────────────────────────
+app.register(sentryPlugin)
 app.register(jwtPlugin)
 app.register(cookiePlugin)
 app.register(rateLimit, {
@@ -42,7 +49,15 @@ app.get('/health', async () => {
   return { status: 'ok', env: config.NODE_ENV, timestamp: new Date().toISOString() }
 })
 
+// also expose under /api/plans so the Vite proxy (/api → :3000) works
 app.get('/plans', async (_req, reply) => {
+  const plans = await masterDb.plan.findMany({
+    where: { isActive: true },
+    orderBy: { sortOrder: 'asc' },
+  })
+  return reply.send({ data: plans })
+})
+app.get('/api/plans', async (_req, reply) => {
   const plans = await masterDb.plan.findMany({
     where: { isActive: true },
     orderBy: { sortOrder: 'asc' },
@@ -66,12 +81,51 @@ app.register(async function tenantScoped(sub) {
   sub.register(purchaseOrderRoutes, { prefix: '/api/purchase-orders' })
   sub.register(expenseRoutes, { prefix: '/api/expenses' })
   sub.register(reportRoutes, { prefix: '/api/reports' })
+  sub.register(etaRoutes, { prefix: '/api' })
+  sub.register(billingRoutes, { prefix: '/api' })
+
+  // ─── Branches CRUD ────────────────────────────────────────────────────────
+  sub.get('/api/branches', { preHandler: [authenticate] }, async (request, reply) => {
+    const branches = await request.tenantDb.branch.findMany({
+      select: { id: true, name: true, isMain: true, isActive: true, address: true, phone: true },
+      orderBy: { isMain: 'desc' },
+    })
+    return reply.send({ success: true, data: branches })
+  })
+
+  sub.post('/api/branches', { preHandler: [authenticate] }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1), address: z.string().optional(), phone: z.string().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const branch = await request.tenantDb.branch.create({
+      data: { name: parsed.data.name, address: parsed.data.address, phone: parsed.data.phone },
+    })
+    return reply.status(201).send({ success: true, data: branch })
+  })
+
+  sub.patch<{ Params: { id: string } }>('/api/branches/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1).optional(), address: z.string().optional(), phone: z.string().optional(), isActive: z.boolean().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const branch = await request.tenantDb.branch.update({
+      where: { id: request.params.id },
+      data: parsed.data,
+    })
+    return reply.send({ success: true, data: branch })
+  })
 })
 
 const start = async () => {
   try {
     await app.listen({ port: config.API_PORT, host: config.API_HOST })
     console.log(`Server running on port ${config.API_PORT}`)
+
+    // Start background workers
+    startEtaWorker()
+    startDunningWorker()
+    await scheduleDunning()
   } catch (err) {
     app.log.error(err)
     process.exit(1)

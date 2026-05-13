@@ -22,6 +22,7 @@ const Expenses = lazy(() => import('@/pages/expenses/Expenses'))
 const Reports = lazy(() => import('@/pages/reports/Reports'))
 const PurchaseOrders = lazy(() => import('@/pages/purchase-orders/PurchaseOrders'))
 const Settings = lazy(() => import('@/pages/settings/Settings'))
+const Returns = lazy(() => import('@/pages/returns/Returns'))
 
 const PageLoader = () => (
   <div className="p-8 flex flex-col gap-4">
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/reports/*" element={<AuthGuard><Reports /></AuthGuard>} />
         <Route path="/purchase-orders/*" element={<AuthGuard><PurchaseOrders /></AuthGuard>} />
         <Route path="/settings/*" element={<AuthGuard><Settings /></AuthGuard>} />
+        <Route path="/returns/*" element={<AuthGuard><Returns /></AuthGuard>} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

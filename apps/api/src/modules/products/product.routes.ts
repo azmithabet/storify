@@ -309,4 +309,105 @@ export async function productRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  // ─── GET /api/products/categories ────────────────────────────────────────────
+  app.get('/categories', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
+    const categories = await request.tenantDb.category.findMany({
+      where: { isActive: true },
+      select: { id: true, name: true, parentId: true },
+      orderBy: { name: 'asc' },
+    })
+    return reply.send({ success: true, data: categories })
+  })
+
+  // ─── POST /api/products/categories ───────────────────────────────────────────
+  app.post('/categories', { preHandler: requirePermission('products', 'create') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1), parentId: z.string().uuid().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const category = await request.tenantDb.category.create({ data: { name: parsed.data.name, parentId: parsed.data.parentId ?? null } })
+    return reply.status(201).send({ success: true, data: category })
+  })
+
+  // ─── GET /api/products/tax-rates ─────────────────────────────────────────────
+  app.get('/tax-rates', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
+    const taxRates = await request.tenantDb.taxRate.findMany({
+      select: { id: true, name: true, rate: true, isDefault: true, isActive: true },
+      orderBy: { rate: 'asc' },
+    })
+    return reply.send({ success: true, data: taxRates })
+  })
+
+  // ─── POST /api/products/tax-rates ────────────────────────────────────────────
+  app.post('/tax-rates', { preHandler: requirePermission('products', 'create') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1), rate: z.coerce.number().min(0).max(100), isDefault: z.boolean().default(false) })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    if (parsed.data.isDefault) {
+      await request.tenantDb.taxRate.updateMany({ data: { isDefault: false } })
+    }
+    const taxRate = await request.tenantDb.taxRate.create({ data: { name: parsed.data.name, rate: parsed.data.rate, isDefault: parsed.data.isDefault } })
+    return reply.status(201).send({ success: true, data: taxRate })
+  })
+
+  // ─── PATCH /api/products/tax-rates/:id ───────────────────────────────────────
+  app.patch<{ Params: { id: string } }>('/tax-rates/:id', { preHandler: requirePermission('products', 'update') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1).optional(), rate: z.coerce.number().min(0).max(100).optional(), isDefault: z.boolean().optional(), isActive: z.boolean().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    if (parsed.data.isDefault) {
+      await request.tenantDb.taxRate.updateMany({ data: { isDefault: false } })
+    }
+    const taxRate = await request.tenantDb.taxRate.update({ where: { id: request.params.id }, data: parsed.data })
+    return reply.send({ success: true, data: taxRate })
+  })
+
+  // ─── Product Discounts ────────────────────────────────────────────────────────
+
+  // GET /api/products/discounts — list all product discounts
+  app.get('/discounts', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const q = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(20), productId: z.string().uuid().optional() }).safeParse(request.query)
+    if (!q.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: q.error.errors[0].message } })
+    const { page, limit, productId } = q.data
+    const where = productId ? { productId } : {}
+    const [discounts, total] = await Promise.all([
+      request.tenantDb.productDiscount.findMany({
+        where,
+        include: { product: { select: { id: true, name: true } } },
+        orderBy: { startDate: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      request.tenantDb.productDiscount.count({ where }),
+    ])
+    return reply.send({ success: true, data: discounts, meta: { total, page, limit, pages: Math.ceil(total / limit) } })
+  })
+
+  // POST /api/products/:id/discounts — create a product discount
+  app.post<{ Params: { id: string } }>('/:id/discounts', { preHandler: requirePermission('products', 'update') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({
+      discountType: z.enum(['percentage', 'fixed']),
+      discountValue: z.coerce.number().positive(),
+      startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const discount = await request.tenantDb.productDiscount.create({
+      data: { productId: request.params.id, ...parsed.data },
+      include: { product: { select: { id: true, name: true } } },
+    })
+    return reply.status(201).send({ success: true, data: discount })
+  })
+
+  // DELETE /api/products/discounts/:discountId — remove a product discount
+  app.delete<{ Params: { discountId: string } }>('/discounts/:discountId', { preHandler: requirePermission('products', 'update') }, async (request, reply) => {
+    await request.tenantDb.productDiscount.delete({ where: { id: request.params.discountId } })
+    return reply.send({ success: true })
+  })
 }

@@ -204,13 +204,26 @@ function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => vo
 
 export default function Invoices() {
   const [search, setSearch] = useState('')
+  const [status, setStatus] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
   const [page, setPage] = useState(1)
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null)
   const [returnInvoice, setReturnInvoice] = useState<Invoice | null>(null)
 
+  const resetPage = () => setPage(1)
+
   const { data, isLoading } = useQuery<{ data: Invoice[]; meta: Meta }>({
-    queryKey: ['invoices', search, page],
-    queryFn: async () => (await api.get<{ data: Invoice[]; meta: Meta }>('/invoices', { params: { search, limit: LIMIT, page } })).data,
+    queryKey: ['invoices', search, status, from, to, page],
+    queryFn: async () => (await api.get<{ data: Invoice[]; meta: Meta }>('/invoices', {
+      params: {
+        page, limit: LIMIT,
+        ...(search ? { search } : {}),
+        ...(status ? { status } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+      },
+    })).data,
   })
 
   const invoices = data?.data ?? []
@@ -224,8 +237,27 @@ export default function Invoices() {
   return (
     <AppShell title="الفواتير">
       <div className="flex flex-col gap-6">
-        <div className="max-w-xs">
-          <Input placeholder="بحث برقم الفاتورة..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} startIcon={<Search className="w-4 h-4" />} />
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex-1 max-w-xs">
+            <Input placeholder="بحث برقم الفاتورة..." value={search} onChange={(e) => { setSearch(e.target.value); resetPage() }} startIcon={<Search className="w-4 h-4" />} />
+          </div>
+          <select value={status} onChange={(e) => { setStatus(e.target.value); resetPage() }}
+            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">كل الحالات</option>
+            <option value="completed">مكتملة</option>
+            <option value="pending">معلقة</option>
+            <option value="returned">مرتجعة</option>
+            <option value="cancelled">ملغاة</option>
+          </select>
+          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); resetPage() }}
+            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
+          <span className="text-gray-500 text-sm">—</span>
+          <input type="date" value={to} onChange={(e) => { setTo(e.target.value); resetPage() }}
+            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
+          {(status || from || to) && (
+            <button onClick={() => { setStatus(''); setFrom(''); setTo(''); resetPage() }}
+              className="text-xs text-gray-500 hover:text-gray-300 transition-colors">مسح الفلاتر ×</button>
+          )}
         </div>
 
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (

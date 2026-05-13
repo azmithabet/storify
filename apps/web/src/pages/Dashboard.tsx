@@ -16,6 +16,7 @@ interface DashboardData {
 }
 
 interface SalesDay { date: string; revenue: number; invoiceCount: number }
+interface TopProduct { productName: string; variantSku: string; totalQty: number; totalRevenue: number }
 
 interface RecentInvoice {
   id: string
@@ -117,6 +118,13 @@ export default function Dashboard() {
     queryKey: ['recent-invoices'],
     queryFn: async () => (await api.get<{ data: RecentInvoice[] }>('/invoices', { params: { limit: 6, page: 1 } })).data.data,
     refetchInterval: 60 * 1000,
+  })
+
+  const todayStr = new Date().toISOString().slice(0, 10)
+  const { data: topProducts } = useQuery<TopProduct[]>({
+    queryKey: ['top-products-today'],
+    queryFn: async () => (await api.get<{ data: TopProduct[] }>('/reports/top-products', { params: { from: todayStr, to: todayStr, limit: 5 } })).data.data,
+    refetchInterval: 5 * 60 * 1000,
   })
 
   const pendingCount =
@@ -291,6 +299,31 @@ export default function Dashboard() {
                 <Money value={data!.today.feeExpenses} size="lg" />
               </div>
               <TrendingUp className="w-6 h-6 text-gray-600" />
+            </div>
+          )}
+
+          {/* Top products today */}
+          {topProducts && topProducts.length > 0 && (
+            <div className="mt-4 bg-gray-800 border border-gray-700 rounded-r-xl p-4">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs uppercase tracking-wider text-gray-500 font-medium">أكثر المنتجات مبيعاً اليوم</p>
+                <button onClick={() => navigate('/reports')} className="text-xs text-brand-400 hover:text-brand-300 transition-colors">التقارير ←</button>
+              </div>
+              <div className="flex flex-col gap-2">
+                {topProducts.map((p, i) => (
+                  <div key={p.variantSku} className={cn('flex items-center gap-3 py-2', i < topProducts.length - 1 && 'border-b border-gray-700/50')}>
+                    <span className="w-5 text-center font-mono text-xs text-gray-600">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-200 truncate">{p.productName}</p>
+                      <p className="text-xs text-gray-500 font-mono">{p.variantSku}</p>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-xs text-gray-500">× {p.totalQty}</p>
+                      <Money value={p.totalRevenue} />
+                    </div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

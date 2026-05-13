@@ -20,6 +20,12 @@ interface InstallmentReport { summary: InstallmentSummary }
 
 interface PnLReport { revenue: number; cogs: number; grossProfit: number; grossMargin: number; operatingExpenses: number; netProfit: number; netMargin: number }
 
+interface FeeSummary { totalMerchantFees: number; totalCustomerFees: number; totalFees: number }
+interface FeeByPM { paymentMethod: { id: string; name?: string; type?: string }; feeBearer: string; totalFees: number; count: number }
+interface FeesReport { summary: FeeSummary; byPaymentMethod: FeeByPM[] }
+
+interface TopProduct { productName: string; variantSku: string; totalQty: number; totalRevenue: number }
+
 interface Branch { id: string; name: string }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -143,7 +149,7 @@ export default function Reports() {
   const user = useAuthStore((s) => s.user)
   const isSuperAdmin = user?.roleSlug === 'super_admin'
 
-  const [tab, setTab] = useState<'sales' | 'stock' | 'installments' | 'pnl'>('sales')
+  const [tab, setTab] = useState<'sales' | 'stock' | 'installments' | 'pnl' | 'fees' | 'top'>('sales')
   const [filters, setFilters] = useState<Filters>({
     from: monthStart(),
     to: today(),
@@ -159,6 +165,8 @@ export default function Reports() {
     { id: 'stock', label: 'المخزون' },
     { id: 'installments', label: 'الأقساط' },
     { id: 'pnl', label: 'الأرباح والخسائر' },
+    { id: 'fees', label: 'رسوم الدفع' },
+    { id: 'top', label: 'أكثر المنتجات مبيعاً' },
   ] as const
 
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -195,8 +203,22 @@ export default function Reports() {
   const pnlParams = buildParams(filters)
   const { data: pnlData, isLoading: pnlLoading } = useQuery<PnLReport>({
     queryKey: ['reports-pnl', pnlParams],
-    queryFn: async () => (await api.get<{ data: PnLReport }>('/reports/pnl', { params: pnlParams })).data.data,
+    queryFn: async () => (await api.get<{ data: PnLReport }>('/reports/profit-loss', { params: pnlParams })).data.data,
     enabled: tab === 'pnl',
+  })
+
+  const feesParams = buildParams(filters)
+  const { data: feesData, isLoading: feesLoading } = useQuery<FeesReport>({
+    queryKey: ['reports-fees', feesParams],
+    queryFn: async () => (await api.get<{ data: FeesReport }>('/reports/fees', { params: feesParams })).data.data,
+    enabled: tab === 'fees',
+  })
+
+  const topParams = buildParams(filters, { limit: '20' })
+  const { data: topData, isLoading: topLoading } = useQuery<TopProduct[]>({
+    queryKey: ['reports-top', topParams],
+    queryFn: async () => (await api.get<{ data: TopProduct[] }>('/reports/top-products', { params: topParams })).data.data,
+    enabled: tab === 'top',
   })
 
   const salesSummary = salesData?.summary
@@ -305,7 +327,7 @@ export default function Reports() {
           <>
             <FilterBar filters={filters} onChange={patchFilters} branches={branches} isSuperAdmin={isSuperAdmin} />
             <div className="flex justify-end">
-              <Button variant="ghost" size="sm" onClick={() => downloadExcel('/reports/pnl', pnlParams, 'profit-loss.xlsx')}>
+              <Button variant="ghost" size="sm" onClick={() => downloadExcel('/reports/profit-loss', pnlParams, 'profit-loss.xlsx')}>
                 <Download className="w-3 h-3" />تصدير Excel
               </Button>
             </div>
@@ -329,6 +351,58 @@ export default function Reports() {
                   </div>
                 ))}
               </div>
+            )}
+          </>
+        )}
+
+        {/* ── Fees Tab ──────────────────────────────────────────────────────── */}
+        {tab === 'fees' && (
+          <>
+            <FilterBar filters={filters} onChange={patchFilters} branches={branches} isSuperAdmin={isSuperAdmin} />
+            {feesLoading ? <SkeletonTable rows={5} cols={4} /> : (
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  <StatCard label="إجمالي الرسوم" value={`${(feesData?.summary.totalFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-brand-500" />
+                  <StatCard label="رسوم على التاجر" value={`${(feesData?.summary.totalMerchantFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-danger-500" />
+                  <StatCard label="رسوم على العميل" value={`${(feesData?.summary.totalCustomerFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-success-500" />
+                </div>
+                <Table
+                  columns={[
+                    { key: 'pm', header: 'طريقة الدفع', render: (r) => <span className="font-medium text-gray-100">{r.paymentMethod.name ?? '—'}</span> },
+                    { key: 'bearer', header: 'يتحمل الرسوم', render: (r) => (
+                      <Badge variant={r.feeBearer === 'merchant' ? 'danger' : 'success'}>
+                        {r.feeBearer === 'merchant' ? 'التاجر' : 'العميل'}
+                      </Badge>
+                    )},
+                    { key: 'count', header: 'عدد الفواتير', render: (r) => <span className="font-mono text-gray-400">{r.count}</span> },
+                    { key: 'total', header: 'إجمالي الرسوم', render: (r) => <Money value={r.totalFees} /> },
+                  ]}
+                  data={feesData?.byPaymentMethod ?? []}
+                  keyExtractor={(r) => `${r.paymentMethod.id}-${r.feeBearer}`}
+                  emptyMessage="لا توجد رسوم في هذه الفترة"
+                />
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── Top Products Tab ──────────────────────────────────────────────── */}
+        {tab === 'top' && (
+          <>
+            <FilterBar filters={filters} onChange={patchFilters} branches={branches} isSuperAdmin={isSuperAdmin} />
+            {topLoading ? <SkeletonTable rows={10} cols={4} /> : (
+              <Table
+                columns={[
+                  { key: 'rank', header: '#', render: (r) => <span className="font-mono text-gray-500">{(topData ?? []).indexOf(r) + 1}</span> },
+                  { key: 'product', header: 'المنتج', render: (r) => <span className="font-medium text-gray-100">{r.productName}</span> },
+                  { key: 'sku', header: 'SKU', render: (r) => <span className="font-mono text-gray-500 text-xs">{r.variantSku}</span> },
+                  { key: 'qty', header: 'الكمية المباعة', render: (r) => <span className="font-mono text-brand-400">{r.totalQty.toLocaleString('ar-EG')}</span> },
+                  { key: 'revenue', header: 'الإيرادات', render: (r) => <Money value={r.totalRevenue} /> },
+                ]}
+                data={topData ?? []}
+                keyExtractor={(r) => r.variantSku}
+                emptyMessage="لا توجد بيانات مبيعات في هذه الفترة"
+              />
             )}
           </>
         )}

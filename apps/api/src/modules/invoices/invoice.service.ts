@@ -27,6 +27,8 @@ export async function listInvoices(
     customerId?: string
     branchId?: string
     status?: string
+    etaStatus?: string
+    search?: string
     from?: string
     to?: string
   },
@@ -35,6 +37,7 @@ export async function listInvoices(
     ...(opts.customerId ? { customerId: opts.customerId } : {}),
     ...(opts.branchId ? { branchId: opts.branchId } : {}),
     ...(opts.status ? { status: opts.status } : {}),
+    ...(opts.etaStatus ? { etaStatus: opts.etaStatus } : {}),
     ...(opts.from || opts.to
       ? {
           createdAt: {

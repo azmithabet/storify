@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -19,6 +19,7 @@ const tabs = [
   { id: 'expense-categories', label: 'فئات المصروفات' },
   { id: 'users', label: 'المستخدمون' },
   { id: 'coupons', label: 'الكوبونات' },
+  { id: 'eta', label: 'التقارير الضريبية' },
   { id: 'audit', label: 'سجل التدقيق' },
   { id: 'password', label: 'كلمة المرور' },
 ]
@@ -46,6 +47,7 @@ export default function Settings() {
           {tab === 'expense-categories' && <ExpenseCategoriesSettings />}
           {tab === 'users' && <UsersSettings />}
           {tab === 'coupons' && <CouponsSettings />}
+          {tab === 'eta' && <EtaSettings />}
           {tab === 'audit' && <AuditLogSettings />}
           {tab === 'password' && <ChangePasswordSettings />}
         </div>
@@ -967,6 +969,108 @@ function CouponsSettings() {
           </label>
         </form>
       </Drawer>
+    </div>
+  )
+}
+
+// ─── ETA Settings ─────────────────────────────────────────────────────────────
+
+interface EtaInvoice {
+  id: string
+  invoiceNumber: string
+  etaStatus: string
+  etaError?: string
+  totalAmount: number
+  createdAt: string
+  customer?: { fullName: string }
+}
+
+const etaStatusMap: Record<string, { label: string; variant: 'warning' | 'danger' | 'success' | 'gray' }> = {
+  pending: { label: 'معلق', variant: 'warning' },
+  failed: { label: 'فشل', variant: 'danger' },
+  accepted: { label: 'مقبول', variant: 'success' },
+  not_required: { label: 'غير مطلوب', variant: 'gray' },
+}
+
+function EtaSettings() {
+  const qc = useQueryClient()
+  const [statusFilter, setStatusFilter] = useState('failed')
+  const [page, setPage] = useState(1)
+  const LIMIT = 15
+
+  const { data, isLoading } = useQuery<{ data: EtaInvoice[]; meta: { total: number; page: number; limit: number; pages: number } }>({
+    queryKey: ['eta-invoices', statusFilter, page],
+    queryFn: async () => (await api.get<{ data: EtaInvoice[]; meta: { total: number; page: number; limit: number; pages: number } }>('/invoices', {
+      params: { etaStatus: statusFilter || undefined, limit: LIMIT, page },
+    })).data,
+  })
+
+  const { mutate: retry, isPending: isRetrying } = useMutation({
+    mutationFn: async (invoiceId: string) => api.post(`/admin/eta/resubmit/${invoiceId}`),
+    onSuccess: () => {
+      toast.success('تم إعادة الإرسال إلى منظومة الإيصالات')
+      qc.invalidateQueries({ queryKey: ['eta-invoices'] })
+    },
+    onError: (e: unknown) => {
+      const code = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
+      toast.error(code === 'invoice_already_accepted' ? 'الفاتورة مقبولة بالفعل' : 'فشلت إعادة الإرسال')
+    },
+  })
+
+  const invoices = data?.data ?? []
+  const meta = data?.meta
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-base font-semibold text-gray-100">حالة إرسال الإيصالات الإلكترونية (ETA)</h3>
+        <select
+          value={statusFilter}
+          onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
+          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+        >
+          <option value="">الكل</option>
+          <option value="failed">فشل</option>
+          <option value="pending">معلق</option>
+          <option value="accepted">مقبول</option>
+          <option value="not_required">غير مطلوب</option>
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="flex flex-col gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-12 bg-gray-700 rounded animate-pulse" />)}</div>
+      ) : invoices.length === 0 ? (
+        <p className="text-gray-500 text-sm text-center py-12">لا توجد فواتير بهذه الحالة</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {invoices.map((inv) => {
+            const s = etaStatusMap[inv.etaStatus] ?? { label: inv.etaStatus, variant: 'gray' as const }
+            return (
+              <div key={inv.id} className="bg-gray-750 border border-gray-700 rounded-md p-4 flex items-start gap-4">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-3 mb-1">
+                    <span className="font-mono text-gray-100 text-sm">{inv.invoiceNumber}</span>
+                    <Badge variant={s.variant}>{s.label}</Badge>
+                  </div>
+                  <p className="text-xs text-gray-500">{inv.customer?.fullName ?? 'نقدي'} · {new Date(inv.createdAt).toLocaleDateString('ar-EG')}</p>
+                  {inv.etaError && (
+                    <p className="text-xs text-danger-400 mt-1 bg-danger-500/10 rounded px-2 py-1 font-mono break-all">{inv.etaError}</p>
+                  )}
+                </div>
+                {(inv.etaStatus === 'failed' || inv.etaStatus === 'pending') && (
+                  <Button size="sm" variant="ghost" loading={isRetrying} onClick={() => retry(inv.id)}>
+                    <RefreshCw className="w-3 h-3" />إعادة إرسال
+                  </Button>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {meta && meta.pages > 1 && (
+        <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />
+      )}
     </div>
   )
 }

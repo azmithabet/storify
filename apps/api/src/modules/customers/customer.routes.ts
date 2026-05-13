@@ -203,4 +203,83 @@ export async function customerRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  // ─── GET /api/customers/:id/statement ─────────────────────────────────────────
+  app.get<{ Params: { id: string } }>(
+    '/:id/statement',
+    { preHandler: requirePermission('customers', 'read') },
+    async (request, reply) => {
+      const customer = await request.tenantDb.customer.findUnique({ where: { id: request.params.id } })
+      if (!customer) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'العميل غير موجود' } })
+
+      type InvRow = { invoice_number: string; created_at: Date; pm_name: string | null; total_amount: string; status: string }
+      type InstRow = { created_at: Date; total_amount: string; remaining_amount: string; status: string }
+      type RetRow = { invoice_number: string; created_at: Date; amount: string; return_type: string }
+
+      const cid = request.params.id
+      const [invoices, installments, returns] = await Promise.all([
+        request.tenantDb.$queryRawUnsafe<InvRow[]>(
+          `SELECT i.invoice_number, i.created_at, pm.name AS pm_name, i.total_amount, i.status
+           FROM invoices i LEFT JOIN payment_methods pm ON pm.id = i.payment_method_id
+           WHERE i.customer_id = $1 ORDER BY i.created_at DESC LIMIT 500`, cid),
+        request.tenantDb.$queryRawUnsafe<InstRow[]>(
+          `SELECT created_at, total_amount, remaining_amount, status FROM installment_contracts WHERE customer_id = $1 ORDER BY created_at DESC LIMIT 200`, cid),
+        request.tenantDb.$queryRawUnsafe<RetRow[]>(
+          `SELECT inv.invoice_number, r.created_at, r.amount, r.return_type
+           FROM returns r JOIN invoices inv ON inv.id = r.invoice_id WHERE inv.customer_id = $1 ORDER BY r.created_at DESC LIMIT 200`, cid),
+      ])
+
+      const ExcelJS = await import('exceljs')
+      const wb = new ExcelJS.default.Workbook()
+      wb.creator = 'Storify'
+
+      const headerStyle = (row: import('exceljs').Row) => {
+        row.eachCell((cell) => {
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }
+          cell.alignment = { vertical: 'middle', horizontal: 'center' }
+        })
+      }
+
+      // Sheet 1: Invoices
+      const invSheet = wb.addWorksheet('الفواتير')
+      invSheet.addRow(['رقم الفاتورة', 'التاريخ', 'طريقة الدفع', 'الإجمالي', 'الحالة'])
+      headerStyle(invSheet.lastRow!)
+      for (const i of invoices) {
+        invSheet.addRow([
+          i.invoice_number ?? '—',
+          new Date(i.created_at).toLocaleDateString('ar-EG'),
+          i.pm_name ?? '—',
+          Number(i.total_amount),
+          i.status,
+        ])
+      }
+      invSheet.columns.forEach((c) => { c.width = 18 })
+
+      // Sheet 2: Installments
+      const instSheet = wb.addWorksheet('الأقساط')
+      instSheet.addRow(['التاريخ', 'إجمالي العقد', 'المتبقي', 'الحالة'])
+      headerStyle(instSheet.lastRow!)
+      for (const c of installments) {
+        instSheet.addRow([new Date(c.created_at).toLocaleDateString('ar-EG'), Number(c.total_amount), Number(c.remaining_amount), c.status])
+      }
+      instSheet.columns.forEach((c) => { c.width = 18 })
+
+      // Sheet 3: Returns
+      const retSheet = wb.addWorksheet('المرتجعات')
+      retSheet.addRow(['رقم الفاتورة', 'التاريخ', 'المبلغ', 'النوع'])
+      headerStyle(retSheet.lastRow!)
+      for (const r of returns) {
+        retSheet.addRow([r.invoice_number ?? '—', new Date(r.created_at).toLocaleDateString('ar-EG'), Number(r.amount), r.return_type === 'refund' ? 'استرداد نقدي' : 'رصيد'])
+      }
+      retSheet.columns.forEach((c) => { c.width = 18 })
+
+      const buf = await wb.xlsx.writeBuffer()
+      const safeName = customer.fullName.replace(/[^a-zA-Z0-9؀-ۿ]/g, '_')
+      return reply
+        .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        .header('Content-Disposition', `attachment; filename="statement_${safeName}.xlsx"`)
+        .send(Buffer.from(buf))
+    },
+  )
 }

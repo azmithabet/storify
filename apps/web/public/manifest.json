@@ -1,0 +1,14 @@
+{
+  "name": "Storify POS",
+  "short_name": "Storify",
+  "description": "نقطة بيع Storify",
+  "start_url": "/pos",
+  "display": "standalone",
+  "background_color": "#111827",
+  "theme_color": "#6366f1",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "/vite.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

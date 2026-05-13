@@ -32,7 +32,9 @@ export const listInvoicesSchema = z.object({
   customerId: z.string().uuid().optional(),
   branchId: z.string().uuid().optional(),
   status: z.string().optional(),
-  from: z.string().optional(), // ISO date string
+  etaStatus: z.string().optional(),
+  search: z.string().optional(),
+  from: z.string().optional(),
   to: z.string().optional(),
 })
 

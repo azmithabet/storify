@@ -6,10 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input } from '@/components/ui'
+import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 
 interface Supplier { id: string; name: string; phone?: string; email?: string; balance: number; totalOrders: number; isActive: boolean }
+interface Meta { total: number; page: number; limit: number; pages: number }
+
+const LIMIT = 20
 
 const schema = z.object({
   name: z.string().min(1, 'الاسم مطلوب'),
@@ -24,14 +27,18 @@ type FormData = z.infer<typeof schema>
 
 export default function Suppliers() {
   const qc = useQueryClient()
+  const [page, setPage] = useState(1)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Supplier | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<Supplier | null>(null)
 
-  const { data = [], isLoading } = useQuery<Supplier[]>({
-    queryKey: ['suppliers'],
-    queryFn: async () => (await api.get<{ data: Supplier[] }>('/suppliers', { params: { limit: 100 } })).data.data,
+  const { data, isLoading } = useQuery<{ data: Supplier[]; meta: Meta }>({
+    queryKey: ['suppliers', page],
+    queryFn: async () => (await api.get<{ data: Supplier[]; meta: Meta }>('/suppliers', { params: { limit: LIMIT, page } })).data,
   })
+
+  const suppliers = data?.data ?? []
+  const meta = data?.meta
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) })
 
@@ -74,22 +81,25 @@ export default function Suppliers() {
         </div>
 
         {isLoading ? <SkeletonTable rows={8} cols={5} /> : (
-          <Table
-            columns={[
-              { key: 'name', header: 'المورد', render: (s) => <span className="font-medium text-gray-100">{s.name}</span> },
-              { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
-              { key: 'email', header: 'البريد', className: 'text-gray-500 text-sm' },
-              { key: 'totalOrders', header: 'الطلبات', className: 'text-center font-mono' },
-              { key: 'balance', header: 'الرصيد المستحق', render: (s) => s.balance > 0 ? <Money value={s.balance} /> : <Badge variant="success" dot>مسدد</Badge> },
-              { key: 'actions', header: '', render: (s) => (
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(s) }}><Edit2 className="w-3 h-3" /></Button>
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteTarget(s) }} className="text-danger-500"><Trash2 className="w-3 h-3" /></Button>
-                </div>
-              )},
-            ]}
-            data={data} keyExtractor={(s) => s.id} emptyMessage="لا يوجد موردون"
-          />
+          <>
+            <Table
+              columns={[
+                { key: 'name', header: 'المورد', render: (s) => <span className="font-medium text-gray-100">{s.name}</span> },
+                { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
+                { key: 'email', header: 'البريد', className: 'text-gray-500 text-sm' },
+                { key: 'totalOrders', header: 'الطلبات', className: 'text-center font-mono' },
+                { key: 'balance', header: 'الرصيد المستحق', render: (s) => s.balance > 0 ? <Money value={s.balance} /> : <Badge variant="success" dot>مسدد</Badge> },
+                { key: 'actions', header: '', render: (s) => (
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(s) }}><Edit2 className="w-3 h-3" /></Button>
+                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setDeleteTarget(s) }} className="text-danger-500"><Trash2 className="w-3 h-3" /></Button>
+                  </div>
+                )},
+              ]}
+              data={suppliers} keyExtractor={(s) => s.id} emptyMessage="لا يوجد موردون"
+            />
+            {meta && <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />}
+          </>
         )}
       </div>
 

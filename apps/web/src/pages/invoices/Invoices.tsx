@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Search, Eye } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer } from '@/components/ui'
+import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 
 interface InvoiceItem {
@@ -30,6 +30,10 @@ interface Invoice {
   items?: InvoiceItem[]
 }
 
+interface Meta { total: number; page: number; limit: number; pages: number }
+
+const LIMIT = 20
+
 const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'gray' }> = {
   completed: { label: 'مكتملة', variant: 'success' },
   pending: { label: 'معلقة', variant: 'warning' },
@@ -39,12 +43,16 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'warning' 
 
 export default function Invoices() {
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null)
 
-  const { data = [], isLoading } = useQuery<Invoice[]>({
-    queryKey: ['invoices', search],
-    queryFn: async () => (await api.get<{ data: Invoice[] }>('/invoices', { params: { search, limit: 50 } })).data.data,
+  const { data, isLoading } = useQuery<{ data: Invoice[]; meta: Meta }>({
+    queryKey: ['invoices', search, page],
+    queryFn: async () => (await api.get<{ data: Invoice[]; meta: Meta }>('/invoices', { params: { search, limit: LIMIT, page } })).data,
   })
+
+  const invoices = data?.data ?? []
+  const meta = data?.meta
 
   const openDetail = async (inv: Invoice) => {
     const res = await api.get<{ data: Invoice }>(`/invoices/${inv.id}`)
@@ -55,29 +63,32 @@ export default function Invoices() {
     <AppShell title="الفواتير">
       <div className="flex flex-col gap-6">
         <div className="max-w-xs">
-          <Input placeholder="بحث برقم الفاتورة..." value={search} onChange={(e) => setSearch(e.target.value)} startIcon={<Search className="w-4 h-4" />} />
+          <Input placeholder="بحث برقم الفاتورة..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} startIcon={<Search className="w-4 h-4" />} />
         </div>
 
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
-          <Table
-            columns={[
-              { key: 'invoiceNumber', header: 'رقم الفاتورة', render: (i) => (
-                <button className="font-mono text-brand-400 hover:underline" onClick={() => openDetail(i)}>{i.invoiceNumber}</button>
-              )},
-              { key: 'customer', header: 'العميل', render: (i) => i.customer?.fullName ?? <span className="text-gray-500">—</span> },
-              { key: 'paymentMethod', header: 'طريقة الدفع', render: (i) => <span className="text-gray-400">{i.paymentMethod?.name ?? '—'}</span> },
-              { key: 'totalAmount', header: 'الإجمالي', render: (i) => <Money value={i.totalAmount} /> },
-              { key: 'status', header: 'الحالة', render: (i) => {
-                const s = statusMap[i.status]
-                return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{i.status}</span>
-              }},
-              { key: 'createdAt', header: 'التاريخ', render: (i) => <span className="text-gray-500 text-xs">{new Date(i.createdAt).toLocaleDateString('ar-EG')}</span> },
-              { key: 'actions', header: '', render: (i) => (
-                <Button variant="ghost" size="sm" onClick={() => openDetail(i)}><Eye className="w-3 h-3" /></Button>
-              )},
-            ]}
-            data={data} keyExtractor={(i) => i.id} emptyMessage="لا توجد فواتير"
-          />
+          <>
+            <Table
+              columns={[
+                { key: 'invoiceNumber', header: 'رقم الفاتورة', render: (i) => (
+                  <button className="font-mono text-brand-400 hover:underline" onClick={() => openDetail(i)}>{i.invoiceNumber}</button>
+                )},
+                { key: 'customer', header: 'العميل', render: (i) => i.customer?.fullName ?? <span className="text-gray-500">—</span> },
+                { key: 'paymentMethod', header: 'طريقة الدفع', render: (i) => <span className="text-gray-400">{i.paymentMethod?.name ?? '—'}</span> },
+                { key: 'totalAmount', header: 'الإجمالي', render: (i) => <Money value={i.totalAmount} /> },
+                { key: 'status', header: 'الحالة', render: (i) => {
+                  const s = statusMap[i.status]
+                  return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{i.status}</span>
+                }},
+                { key: 'createdAt', header: 'التاريخ', render: (i) => <span className="text-gray-500 text-xs">{new Date(i.createdAt).toLocaleDateString('ar-EG')}</span> },
+                { key: 'actions', header: '', render: (i) => (
+                  <Button variant="ghost" size="sm" onClick={() => openDetail(i)}><Eye className="w-3 h-3" /></Button>
+                )},
+              ]}
+              data={invoices} keyExtractor={(i) => i.id} emptyMessage="لا توجد فواتير"
+            />
+            {meta && <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />}
+          </>
         )}
       </div>
 

@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Money, SkeletonTable, Button, Drawer } from '@/components/ui'
+import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 
 interface Customer {
@@ -19,6 +19,10 @@ interface Customer {
   creditBalance: number
   _count?: { invoices: number }
 }
+
+interface Meta { total: number; page: number; limit: number; pages: number }
+
+const LIMIT = 20
 
 const schema = z.object({
   fullName: z.string().min(1, 'الاسم مطلوب'),
@@ -33,13 +37,17 @@ type FormData = z.infer<typeof schema>
 export default function Customers() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
+  const [page, setPage] = useState(1)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
 
-  const { data = [], isLoading } = useQuery<Customer[]>({
-    queryKey: ['customers', search],
-    queryFn: async () => (await api.get<{ data: Customer[] }>('/customers', { params: { search, limit: 50 } })).data.data,
+  const { data, isLoading } = useQuery<{ data: Customer[]; meta: Meta }>({
+    queryKey: ['customers', search, page],
+    queryFn: async () => (await api.get<{ data: Customer[]; meta: Meta }>('/customers', { params: { search, limit: LIMIT, page } })).data,
   })
+
+  const customers = data?.data ?? []
+  const meta = data?.meta
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) })
 
@@ -69,27 +77,30 @@ export default function Customers() {
       <div className="flex flex-col gap-6">
         <div className="flex items-center gap-4">
           <div className="flex-1 max-w-xs">
-            <Input placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={(e) => setSearch(e.target.value)} startIcon={<Search className="w-4 h-4" />} />
+            <Input placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} startIcon={<Search className="w-4 h-4" />} />
           </div>
           <Button onClick={openNew}><Plus className="w-4 h-4" />عميل جديد</Button>
         </div>
 
         {isLoading ? <SkeletonTable rows={8} cols={5} /> : (
-          <Table
-            columns={[
-              { key: 'fullName', header: 'الاسم', render: (c) => <span className="font-medium text-gray-100">{c.fullName}</span> },
-              { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
-              { key: 'email', header: 'البريد الإلكتروني', className: 'text-gray-500 text-sm' },
-              { key: 'invoices', header: 'الفواتير', render: (c) => <span className="text-center font-mono">{c._count?.invoices ?? 0}</span> },
-              { key: 'creditBalance', header: 'الرصيد', render: (c) => c.creditBalance > 0 ? <Money value={c.creditBalance} /> : <span className="text-gray-500">—</span> },
-              { key: 'actions', header: '', render: (c) => (
-                <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(c) }}>
-                  <Edit2 className="w-3 h-3" />
-                </Button>
-              )},
-            ]}
-            data={data} keyExtractor={(c) => c.id} emptyMessage="لا يوجد عملاء"
-          />
+          <>
+            <Table
+              columns={[
+                { key: 'fullName', header: 'الاسم', render: (c) => <span className="font-medium text-gray-100">{c.fullName}</span> },
+                { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
+                { key: 'email', header: 'البريد الإلكتروني', className: 'text-gray-500 text-sm' },
+                { key: 'invoices', header: 'الفواتير', render: (c) => <span className="text-center font-mono">{c._count?.invoices ?? 0}</span> },
+                { key: 'creditBalance', header: 'الرصيد', render: (c) => c.creditBalance > 0 ? <Money value={c.creditBalance} /> : <span className="text-gray-500">—</span> },
+                { key: 'actions', header: '', render: (c) => (
+                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(c) }}>
+                    <Edit2 className="w-3 h-3" />
+                  </Button>
+                )},
+              ]}
+              data={customers} keyExtractor={(c) => c.id} emptyMessage="لا يوجد عملاء"
+            />
+            {meta && <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />}
+          </>
         )}
       </div>
 

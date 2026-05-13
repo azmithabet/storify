@@ -213,4 +213,44 @@ export async function authRoutes(app: FastifyInstance) {
       })),
     })
   })
+
+  // ─── POST /api/auth/users — create a new tenant user ─────────────────────
+  const createUserSchema = z.object({
+    fullName: z.string().min(1),
+    email: z.string().email(),
+    password: z.string().min(8),
+    roleId: z.string().uuid(),
+    branchId: z.string().uuid().optional(),
+  })
+
+  app.post('/users', { preHandler: [authenticate, requirePermission('users', 'create')] }, async (request, reply) => {
+    const parsed = createUserSchema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    }
+    const { fullName, email, password, roleId, branchId } = parsed.data
+    const existing = await request.tenantDb.user.findUnique({ where: { email } })
+    if (existing) {
+      return reply.status(409).send({ success: false, error: { code: 'conflict', message: 'البريد الإلكتروني مستخدم بالفعل' } })
+    }
+    const { hashPassword } = await import('../../shared/utils/password')
+    const passwordHash = await hashPassword(password)
+    const user = await request.tenantDb.user.create({
+      data: { fullName, email, passwordHash, roleId, branchId: branchId ?? null },
+      include: { role: { select: { id: true, name: true, slug: true } } },
+    })
+    return reply.status(201).send({
+      success: true,
+      data: { id: user.id, fullName: user.fullName, email: user.email, role: user.role, isActive: user.isActive },
+    })
+  })
+
+  // ─── GET /api/auth/roles — list available roles ───────────────────────────
+  app.get('/roles', { preHandler: [authenticate] }, async (request, reply) => {
+    const roles = await request.tenantDb.role.findMany({
+      select: { id: true, name: true, slug: true },
+      orderBy: { name: 'asc' },
+    })
+    return reply.send({ success: true, data: roles })
+  })
 }

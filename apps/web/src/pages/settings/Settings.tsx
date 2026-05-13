@@ -12,6 +12,7 @@ import { cn } from '@/lib/cn'
 
 const tabs = [
   { id: 'store', label: 'بيانات المتجر' },
+  { id: 'branches', label: 'الفروع' },
   { id: 'payment', label: 'طرق الدفع' },
   { id: 'users', label: 'المستخدمون' },
 ]
@@ -32,6 +33,7 @@ export default function Settings() {
         </nav>
         <div className="flex-1 bg-gray-800 rounded-r-xl border border-gray-700 p-6">
           {tab === 'store' && <StoreSettings />}
+          {tab === 'branches' && <BranchesSettings />}
           {tab === 'payment' && <PaymentMethodsSettings />}
           {tab === 'users' && <UsersSettings />}
         </div>
@@ -58,6 +60,102 @@ function StoreSettings() {
         </div>
         <Button className="w-fit">حفظ التغييرات</Button>
       </div>
+    </div>
+  )
+}
+
+// ─── Branches Settings ────────────────────────────────────────────────────────
+interface Branch { id: string; name: string; isMain: boolean; isActive: boolean; address?: string; phone?: string }
+
+const branchSchema = z.object({
+  name: z.string().min(1, 'الاسم مطلوب'),
+  address: z.string().optional(),
+  phone: z.string().optional(),
+})
+type BranchFormData = z.infer<typeof branchSchema>
+
+function BranchesSettings() {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState<Branch | null>(null)
+
+  const { data: branches = [] } = useQuery<Branch[]>({
+    queryKey: ['branches-settings'],
+    queryFn: async () => (await api.get<{ data: Branch[] }>('/branches')).data.data,
+  })
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<BranchFormData>({ resolver: zodResolver(branchSchema) })
+
+  const openNew = () => { setEditing(null); reset({}); setDrawerOpen(true) }
+  const openEdit = (b: Branch) => { setEditing(b); reset({ name: b.name, address: b.address ?? '', phone: b.phone ?? '' }); setDrawerOpen(true) }
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async (data: BranchFormData) => {
+      if (editing) await api.patch(`/branches/${editing.id}`, data)
+      else await api.post('/branches', data)
+    },
+    onSuccess: () => {
+      toast.success(editing ? 'تم تحديث الفرع' : 'تم إضافة الفرع')
+      qc.invalidateQueries({ queryKey: ['branches-settings'] })
+      qc.invalidateQueries({ queryKey: ['branches'] })
+      setDrawerOpen(false)
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  const { mutate: toggleActive } = useMutation({
+    mutationFn: async (b: Branch) => api.patch(`/branches/${b.id}`, { isActive: !b.isActive }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['branches-settings'] })
+      qc.invalidateQueries({ queryKey: ['branches'] })
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100">الفروع</h3>
+        <Button onClick={openNew}><Plus className="w-4 h-4" />فرع جديد</Button>
+      </div>
+
+      <Table
+        columns={[
+          { key: 'name', header: 'الفرع', render: (b) => (
+            <div>
+              <span className="font-medium text-gray-100">{b.name}</span>
+              {b.isMain && <Badge variant="info" className="mr-2">رئيسي</Badge>}
+            </div>
+          )},
+          { key: 'address', header: 'العنوان', render: (b) => <span className="text-gray-400 text-sm">{b.address ?? '—'}</span> },
+          { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500 text-sm' },
+          { key: 'isActive', header: 'الحالة', render: (b) => <Badge variant={b.isActive ? 'success' : 'gray'} dot>{b.isActive ? 'نشط' : 'معطّل'}</Badge> },
+          { key: 'actions', header: '', render: (b) => (
+            <div className="flex gap-1">
+              <Button variant="ghost" size="sm" onClick={() => openEdit(b)} disabled={b.isMain}><Edit2 className="w-3 h-3" /></Button>
+              <Button variant="ghost" size="sm" onClick={() => toggleActive(b)} disabled={b.isMain}>
+                {b.isActive ? <ToggleRight className="w-4 h-4 text-success-500" /> : <ToggleLeft className="w-4 h-4 text-gray-500" />}
+              </Button>
+            </div>
+          )},
+        ]}
+        data={branches} keyExtractor={(b) => b.id} emptyMessage="لا توجد فروع"
+      />
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل الفرع' : 'فرع جديد'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button>
+            <Button loading={isPending} onClick={handleSubmit((d) => save(d))}>حفظ</Button>
+          </>
+        }
+      >
+        <form className="flex flex-col gap-5">
+          <Input label="اسم الفرع" error={errors.name?.message} {...register('name')} />
+          <Input label="العنوان" {...register('address')} />
+          <Input label="رقم الهاتف" type="tel" {...register('phone')} />
+        </form>
+      </Drawer>
     </div>
   )
 }
@@ -201,20 +299,62 @@ function PaymentMethodsSettings() {
 }
 
 // ─── Users Settings ───────────────────────────────────────────────────────────
-interface TenantUser { id: string; fullName: string; email: string; role: { name: string; slug: string }; isActive: boolean; lastLogin?: string }
+interface TenantUser { id: string; fullName: string; email: string; role: { id: string; name: string; slug: string }; isActive: boolean; lastLogin?: string }
+interface Role { id: string; name: string; slug: string }
+
+const userSchema = z.object({
+  fullName: z.string().min(1, 'الاسم مطلوب'),
+  email: z.string().email('بريد غير صالح'),
+  password: z.string().min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'),
+  roleId: z.string().uuid('اختر دوراً'),
+  branchId: z.string().uuid().optional().or(z.literal('')),
+})
+type UserFormData = z.infer<typeof userSchema>
 
 function UsersSettings() {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
   const { data: users = [], isLoading } = useQuery<TenantUser[]>({
     queryKey: ['tenant-users'],
-    queryFn: async () => {
-      const res = await api.get<{ data: TenantUser[] }>('/auth/users')
-      return res.data.data
+    queryFn: async () => (await api.get<{ data: TenantUser[] }>('/auth/users')).data.data,
+  })
+
+  const { data: roles = [] } = useQuery<Role[]>({
+    queryKey: ['roles'],
+    queryFn: async () => (await api.get<{ data: Role[] }>('/auth/roles')).data.data,
+    enabled: drawerOpen,
+  })
+
+  const { data: branches = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['branches'],
+    queryFn: async () => (await api.get<{ data: { id: string; name: string }[] }>('/branches')).data.data,
+    enabled: drawerOpen,
+  })
+
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<UserFormData>({ resolver: zodResolver(userSchema) })
+
+  const { mutate: createUser, isPending } = useMutation({
+    mutationFn: async (data: UserFormData) => api.post('/auth/users', { ...data, branchId: data.branchId || undefined }),
+    onSuccess: () => {
+      toast.success('تم إضافة المستخدم')
+      qc.invalidateQueries({ queryKey: ['tenant-users'] })
+      setDrawerOpen(false)
+      reset()
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
+      toast.error(msg ?? 'حدث خطأ')
     },
   })
 
   return (
     <div className="flex flex-col gap-6">
-      <h3 className="text-lg font-semibold text-gray-100">المستخدمون والأدوار</h3>
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100">المستخدمون والأدوار</h3>
+        <Button onClick={() => { reset({}); setDrawerOpen(true) }}><Plus className="w-4 h-4" />مستخدم جديد</Button>
+      </div>
+
       {isLoading ? (
         <div className="text-gray-500 text-sm">جارٍ التحميل...</div>
       ) : (
@@ -232,6 +372,36 @@ function UsersSettings() {
           data={users} keyExtractor={(u) => u.id} emptyMessage="لا يوجد مستخدمون"
         />
       )}
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="مستخدم جديد"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button>
+            <Button loading={isPending} onClick={handleSubmit((d) => createUser(d))}>حفظ</Button>
+          </>
+        }
+      >
+        <form className="flex flex-col gap-5">
+          <Input label="الاسم الكامل" error={errors.fullName?.message} {...register('fullName')} />
+          <Input label="البريد الإلكتروني" type="email" error={errors.email?.message} {...register('email')} />
+          <Input label="كلمة المرور" type="password" error={errors.password?.message} {...register('password')} />
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">الدور</label>
+            <select {...register('roleId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+              <option value="">اختر الدور</option>
+              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+            </select>
+            {errors.roleId && <p className="text-danger-500 text-xs mt-1">{errors.roleId.message}</p>}
+          </div>
+          <div>
+            <label className="text-sm text-gray-400 block mb-1">الفرع (اختياري)</label>
+            <select {...register('branchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+              <option value="">كل الفروع</option>
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          </div>
+        </form>
+      </Drawer>
     </div>
   )
 }

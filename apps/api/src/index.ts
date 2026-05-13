@@ -84,14 +84,36 @@ app.register(async function tenantScoped(sub) {
   sub.register(etaRoutes, { prefix: '/api' })
   sub.register(billingRoutes, { prefix: '/api' })
 
-  // Simple branches listing (used by frontend forms)
+  // ─── Branches CRUD ────────────────────────────────────────────────────────
   sub.get('/api/branches', { preHandler: [authenticate] }, async (request, reply) => {
     const branches = await request.tenantDb.branch.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, isMain: true },
+      select: { id: true, name: true, isMain: true, isActive: true, address: true, phone: true },
       orderBy: { isMain: 'desc' },
     })
     return reply.send({ success: true, data: branches })
+  })
+
+  sub.post('/api/branches', { preHandler: [authenticate] }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1), address: z.string().optional(), phone: z.string().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const branch = await request.tenantDb.branch.create({
+      data: { name: parsed.data.name, address: parsed.data.address, phone: parsed.data.phone },
+    })
+    return reply.status(201).send({ success: true, data: branch })
+  })
+
+  sub.patch<{ Params: { id: string } }>('/api/branches/:id', { preHandler: [authenticate] }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1).optional(), address: z.string().optional(), phone: z.string().optional(), isActive: z.boolean().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const branch = await request.tenantDb.branch.update({
+      where: { id: request.params.id },
+      data: parsed.data,
+    })
+    return reply.send({ success: true, data: branch })
   })
 })
 

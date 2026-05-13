@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input } from '@/components/ui'
+import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth.store'
 
@@ -22,6 +22,9 @@ interface Expense {
 
 interface Category { id: string; name: string }
 interface Branch { id: string; name: string; isMain: boolean }
+interface Meta { total: number; page: number; limit: number; pages: number }
+
+const LIMIT = 20
 
 const schema = z.object({
   description: z.string().min(1, 'الوصف مطلوب'),
@@ -42,13 +45,17 @@ const statusMap = {
 export default function Expenses() {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
+  const [page, setPage] = useState(1)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ expense: Expense; type: 'approve' | 'reject' } | null>(null)
 
-  const { data = [], isLoading } = useQuery<Expense[]>({
-    queryKey: ['expenses'],
-    queryFn: async () => (await api.get<{ data: Expense[] }>('/expenses', { params: { limit: 50 } })).data.data,
+  const { data: expenseData, isLoading } = useQuery<{ data: Expense[]; meta: Meta }>({
+    queryKey: ['expenses', page],
+    queryFn: async () => (await api.get<{ data: Expense[]; meta: Meta }>('/expenses', { params: { limit: LIMIT, page } })).data,
   })
+
+  const data = expenseData?.data ?? []
+  const meta = expenseData?.meta
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['expense-categories'],
@@ -101,6 +108,7 @@ export default function Expenses() {
         </div>
 
         {isLoading ? <SkeletonTable rows={8} cols={5} /> : (
+          <>
           <Table
             columns={[
               { key: 'description', header: 'الوصف', render: (e) => <span className="font-medium text-gray-100">{e.description}</span> },
@@ -124,6 +132,8 @@ export default function Expenses() {
             ]}
             data={data} keyExtractor={(e) => e.id} emptyMessage="لا توجد مصروفات"
           />
+            {meta && <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />}
+          </>
         )}
       </div>
 

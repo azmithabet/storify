@@ -57,24 +57,105 @@ export default function Settings() {
 }
 
 // ─── Store Settings ───────────────────────────────────────────────────────────
+interface TenantSetting {
+  id: string
+  currencyDefault: string
+  vatEnabled: boolean
+  vatRate: number | string
+  timezone: string
+  language: string
+}
+
+const storeSchema = z.object({
+  vatEnabled: z.boolean(),
+  vatRate: z.coerce.number().min(0).max(100),
+  timezone: z.string().min(1),
+  currencyDefault: z.string().min(1),
+})
+type StoreFormData = z.infer<typeof storeSchema>
+
 function StoreSettings() {
+  const qc = useQueryClient()
+  const { data: settings, isLoading } = useQuery<TenantSetting>({
+    queryKey: ['tenant-settings'],
+    queryFn: async () => (await api.get<{ data: TenantSetting }>('/settings')).data.data,
+  })
+
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<StoreFormData>({
+    resolver: zodResolver(storeSchema),
+    values: settings ? {
+      vatEnabled: settings.vatEnabled,
+      vatRate: Number(settings.vatRate),
+      timezone: settings.timezone,
+      currencyDefault: settings.currencyDefault,
+    } : undefined,
+  })
+
+  const vatEnabled = watch('vatEnabled')
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async (data: StoreFormData) => api.patch('/settings', data),
+    onSuccess: () => { toast.success('تم حفظ الإعدادات'); qc.invalidateQueries({ queryKey: ['tenant-settings'] }) },
+    onError: () => toast.error('فشل حفظ الإعدادات'),
+  })
+
+  if (isLoading) return <div className="h-40 bg-gray-800 rounded-r-xl animate-pulse" />
+
   return (
-    <div className="flex flex-col gap-6 max-w-lg">
-      <h3 className="text-lg font-semibold text-gray-100">بيانات المتجر</h3>
+    <form onSubmit={handleSubmit((d) => save(d))} className="flex flex-col gap-6 max-w-lg">
+      <h3 className="text-lg font-semibold text-gray-100">إعدادات المتجر</h3>
+
       <div className="flex flex-col gap-4">
         <div>
-          <label className="text-sm text-gray-400 block mb-1">اسم المتجر</label>
-          <input className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500" placeholder="اسم متجرك" />
-        </div>
-        <div>
-          <label className="text-sm text-gray-400 block mb-1">المنطقة الزمنية</label>
-          <select className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100">
-            <option value="Africa/Cairo">Africa/Cairo (GMT+2)</option>
+          <label className="text-sm text-gray-400 block mb-1">العملة الافتراضية</label>
+          <select {...register('currencyDefault')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="EGP">EGP — جنيه مصري</option>
+            <option value="USD">USD — دولار</option>
+            <option value="EUR">EUR — يورو</option>
+            <option value="SAR">SAR — ريال سعودي</option>
+            <option value="AED">AED — درهم إماراتي</option>
           </select>
         </div>
-        <Button className="w-fit">حفظ التغييرات</Button>
+
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">المنطقة الزمنية</label>
+          <select {...register('timezone')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="Africa/Cairo">Africa/Cairo (GMT+2)</option>
+            <option value="Asia/Riyadh">Asia/Riyadh (GMT+3)</option>
+            <option value="Asia/Dubai">Asia/Dubai (GMT+4)</option>
+            <option value="Europe/London">Europe/London (GMT+0)</option>
+          </select>
+        </div>
+
+        <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-md px-4 py-3">
+          <div>
+            <p className="text-sm text-gray-200">ضريبة القيمة المضافة (VAT)</p>
+            <p className="text-xs text-gray-500">تطبيق الضريبة تلقائياً على الفواتير</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setValue('vatEnabled', !vatEnabled)}
+            className={cn('w-10 h-6 rounded-full transition-colors relative', vatEnabled ? 'bg-brand-500' : 'bg-gray-600')}
+          >
+            <span className={cn('absolute top-1 w-4 h-4 bg-white rounded-full transition-transform', vatEnabled ? 'translate-x-5' : 'translate-x-1')} />
+          </button>
+        </div>
+
+        {vatEnabled && (
+          <Input
+            label="نسبة الضريبة (%)"
+            type="number"
+            step="0.01"
+            min="0"
+            max="100"
+            error={errors.vatRate?.message}
+            {...register('vatRate')}
+          />
+        )}
+
+        <Button type="submit" loading={isPending} className="w-fit">حفظ الإعدادات</Button>
       </div>
-    </div>
+    </form>
   )
 }
 

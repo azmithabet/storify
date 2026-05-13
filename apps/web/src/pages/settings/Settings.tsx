@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw } from 'lucide-react'
 import { useForm } from 'react-hook-form'
@@ -20,6 +20,7 @@ const tabs = [
   { id: 'users', label: 'المستخدمون' },
   { id: 'coupons', label: 'الكوبونات' },
   { id: 'eta', label: 'التقارير الضريبية' },
+  { id: 'print-template', label: 'قالب الطباعة' },
   { id: 'audit', label: 'سجل التدقيق' },
   { id: 'password', label: 'كلمة المرور' },
 ]
@@ -48,6 +49,7 @@ export default function Settings() {
           {tab === 'users' && <UsersSettings />}
           {tab === 'coupons' && <CouponsSettings />}
           {tab === 'eta' && <EtaSettings />}
+          {tab === 'print-template' && <PrintTemplateSettings />}
           {tab === 'audit' && <AuditLogSettings />}
           {tab === 'password' && <ChangePasswordSettings />}
         </div>
@@ -64,6 +66,10 @@ interface TenantSetting {
   vatRate: number | string
   timezone: string
   language: string
+  loyaltyEnabled: boolean
+  loyaltyPointsPerUnit: number
+  loyaltyPointValue: number | string
+  dailySalesTarget: number | string
 }
 
 const storeSchema = z.object({
@@ -71,6 +77,10 @@ const storeSchema = z.object({
   vatRate: z.coerce.number().min(0).max(100),
   timezone: z.string().min(1),
   currencyDefault: z.string().min(1),
+  loyaltyEnabled: z.boolean(),
+  loyaltyPointsPerUnit: z.coerce.number().int().min(1),
+  loyaltyPointValue: z.coerce.number().min(0),
+  dailySalesTarget: z.coerce.number().min(0),
 })
 type StoreFormData = z.infer<typeof storeSchema>
 
@@ -88,10 +98,15 @@ function StoreSettings() {
       vatRate: Number(settings.vatRate),
       timezone: settings.timezone,
       currencyDefault: settings.currencyDefault,
+      loyaltyEnabled: settings.loyaltyEnabled ?? false,
+      loyaltyPointsPerUnit: settings.loyaltyPointsPerUnit ?? 1,
+      loyaltyPointValue: Number(settings.loyaltyPointValue ?? 0.01),
+      dailySalesTarget: Number(settings.dailySalesTarget ?? 0),
     } : undefined,
   })
 
   const vatEnabled = watch('vatEnabled')
+  const loyaltyEnabled = watch('loyaltyEnabled')
 
   const { mutate: save, isPending } = useMutation({
     mutationFn: async (data: StoreFormData) => api.patch('/settings', data),
@@ -151,6 +166,50 @@ function StoreSettings() {
             error={errors.vatRate?.message}
             {...register('vatRate')}
           />
+        )}
+
+        <Input
+          label="هدف المبيعات اليومي (ج)"
+          type="number"
+          step="1"
+          min="0"
+          placeholder="0 = غير محدد"
+          error={errors.dailySalesTarget?.message}
+          {...register('dailySalesTarget')}
+        />
+
+        <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-md px-4 py-3">
+          <div>
+            <p className="text-sm text-gray-200">نقاط الولاء</p>
+            <p className="text-xs text-gray-500">اكسب نقاط عند كل عملية شراء</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setValue('loyaltyEnabled', !loyaltyEnabled)}
+            className={cn('w-10 h-6 rounded-full transition-colors relative', loyaltyEnabled ? 'bg-brand-500' : 'bg-gray-600')}
+          >
+            <span className={cn('absolute top-1 w-4 h-4 bg-white rounded-full transition-transform', loyaltyEnabled ? 'translate-x-5' : 'translate-x-1')} />
+          </button>
+        </div>
+
+        {loyaltyEnabled && (
+          <div className="flex gap-3">
+            <Input
+              label="نقطة لكل (ج)"
+              type="number"
+              min="1"
+              error={errors.loyaltyPointsPerUnit?.message}
+              {...register('loyaltyPointsPerUnit')}
+            />
+            <Input
+              label="قيمة النقطة (ج)"
+              type="number"
+              step="0.01"
+              min="0"
+              error={errors.loyaltyPointValue?.message}
+              {...register('loyaltyPointValue')}
+            />
+          </div>
         )}
 
         <Button type="submit" loading={isPending} className="w-fit">حفظ الإعدادات</Button>
@@ -1152,6 +1211,87 @@ function EtaSettings() {
       {meta && meta.pages > 1 && (
         <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />
       )}
+    </div>
+  )
+}
+
+// ─── Print Template Settings ──────────────────────────────────────────────────
+const DEFAULT_PRINT_TEMPLATE = `<!DOCTYPE html>
+<html dir="rtl">
+<head><meta charset="utf-8"><style>
+  body{font-family:monospace;font-size:12px;width:80mm;margin:0 auto;padding:8px}
+  .center{text-align:center}table{width:100%;border-collapse:collapse}
+  td{padding:2px}.dashed{border-bottom:1px dashed #000;margin:4px 0}
+  .total td{font-weight:bold;border-top:1px dashed #000}
+</style></head>
+<body>
+  <div class="center"><h2>{{storeName}}</h2></div>
+  <div class="dashed"></div>
+  <p>رقم الفاتورة: <b>{{invoiceNumber}}</b></p>
+  <p>التاريخ: {{date}}</p>
+  <p>العميل: {{customerName}}</p>
+  <div class="dashed"></div>{{itemsTable}}<div class="dashed"></div>
+  <table>
+    <tr><td>المجموع الفرعي</td><td>{{subtotal}}</td></tr>
+    <tr class="total"><td>الإجمالي</td><td>{{total}}</td></tr>
+  </table>
+  <div class="center" style="margin-top:8px">شكراً لتعاملكم معنا</div>
+</body></html>`
+
+function PrintTemplateSettings() {
+  const qc = useQueryClient()
+  const { data: settings } = useQuery<{ printTemplate?: string }>({
+    queryKey: ['tenant-settings'],
+    queryFn: async () => (await api.get<{ data: { printTemplate?: string } }>('/settings')).data.data,
+  })
+  const [template, setTemplate] = useState(DEFAULT_PRINT_TEMPLATE)
+
+  // Set template when settings loads for the first time
+  useEffect(() => {
+    if (settings?.printTemplate) setTemplate(settings.printTemplate)
+  }, [settings?.printTemplate])
+
+  const { mutate: save, isPending } = useMutation({
+    mutationFn: async () => api.patch('/settings', { printTemplate: template }),
+    onSuccess: () => { toast.success('تم حفظ القالب'); qc.invalidateQueries({ queryKey: ['tenant-settings'] }) },
+    onError: () => toast.error('فشل الحفظ'),
+  })
+
+  const previewPrint = () => {
+    const win = window.open('', '_blank', 'width=420,height=640')
+    if (!win) return
+    const preview = template
+      .replace('{{storeName}}', 'Storify')
+      .replace('{{invoiceNumber}}', 'INV-20260101-ABCDEF')
+      .replace('{{date}}', new Date().toLocaleString('ar-EG'))
+      .replace('{{customerName}}', 'عميل تجريبي')
+      .replace('{{subtotal}}', '500.00 ج')
+      .replace('{{total}}', '500.00 ج')
+      .replace('{{itemsTable}}', '<table><tr><td>منتج تجريبي × 5</td><td>100.00 ج</td></tr></table>')
+    win.document.write(preview)
+    win.document.close()
+    setTimeout(() => win.print(), 500)
+  }
+
+  return (
+    <div className="flex flex-col gap-4 max-w-2xl">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold text-gray-100">قالب الطباعة</h3>
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => setTemplate(DEFAULT_PRINT_TEMPLATE)}><RefreshCw className="w-3 h-3" />إعادة تعيين</Button>
+          <Button variant="outline" size="sm" onClick={previewPrint}>معاينة طباعة</Button>
+        </div>
+      </div>
+      <p className="text-xs text-gray-500">
+        المتغيرات المتاحة: {`{{storeName}} {{invoiceNumber}} {{date}} {{customerName}} {{subtotal}} {{total}} {{itemsTable}}`}
+      </p>
+      <textarea
+        value={template}
+        onChange={(e) => setTemplate(e.target.value)}
+        className="w-full h-96 bg-gray-900 border border-gray-700 rounded-md px-3 py-2 text-xs text-gray-300 font-mono focus:outline-none focus:border-brand-500 resize-none"
+        dir="ltr" spellCheck={false}
+      />
+      <Button onClick={() => save()} loading={isPending} className="w-fit">حفظ القالب</Button>
     </div>
   )
 }

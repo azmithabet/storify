@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, ChevronDown, ChevronUp, Edit2, PlusCircle, ToggleLeft, ToggleRight, Tag, Trash2 } from 'lucide-react'
+import { Plus, Search, ChevronDown, ChevronUp, Edit2, PlusCircle, ToggleLeft, ToggleRight, Tag, Trash2, Upload, Download, Barcode } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -82,6 +82,37 @@ const variantFormSchema = z.object({
 })
 type VariantFormData = z.infer<typeof variantFormSchema>
 
+// ─── Barcode label printer ────────────────────────────────────────────────────
+function printBarcodeLabels(labels: { name: string; sku: string; barcode: string; price: number }[], copies = 1) {
+  const win = window.open('', '_blank', 'width=800,height=600')
+  if (!win) return
+  const repeated = labels.flatMap((l) => Array(copies).fill(l))
+  const cells = repeated.map((l) => `
+    <div class="label">
+      <p class="name">${l.name}</p>
+      <div class="barcode">${l.barcode || l.sku}</div>
+      <p class="sku">${l.sku} — ${Number(l.price).toFixed(2)} ج</p>
+    </div>
+  `).join('')
+  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>ملصقات الباركود</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128+Text&display=swap" rel="stylesheet">
+    <style>
+      *{box-sizing:border-box;margin:0;padding:0}
+      body{font-family:Arial,sans-serif;background:#fff;padding:8px}
+      .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+      .label{border:1px dashed #ccc;border-radius:4px;padding:6px 8px;text-align:center;page-break-inside:avoid}
+      .name{font-size:10px;font-weight:bold;color:#111;margin-bottom:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+      .barcode{font-family:'Libre Barcode 128 Text',monospace;font-size:48px;line-height:1;color:#000;margin:2px 0}
+      .sku{font-size:9px;color:#555;margin-top:3px}
+      @media print{@page{margin:6mm;size:A4}body{padding:0}}
+    </style></head><body>
+    <div class="grid">${cells}</div>
+    <script>window.onload=function(){window.print();window.close()}</script>
+  </body></html>`)
+  win.document.close()
+}
+
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function buildVariantPayload(v: { sku?: string; barcode?: string; costPrice: number; sellPrice: number; attrKey?: string; attrValue?: string }) {
   const attributes: Record<string, string> = {}
@@ -96,6 +127,36 @@ export default function Products() {
   const [page, setPage] = useState(1)
   const [createOpen, setCreateOpen] = useState(false)
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
+  const [importResult, setImportResult] = useState<{ created: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
+  const [selectedForLabels, setSelectedForLabels] = useState<Set<string>>(new Set())
+  const [labelCopies, setLabelCopies] = useState(1)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await api.post<{ data: { created: number; skipped: number; errors: { row: number; reason: string }[] } }>('/products/import', fd, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+      return res.data.data
+    },
+    onSuccess: (result) => {
+      setImportResult(result)
+      qc.invalidateQueries({ queryKey: ['products'] })
+      toast.success(`تم استيراد ${result.created} منتج`)
+    },
+    onError: () => toast.error('فشل الاستيراد'),
+  })
+
+  const downloadSampleCsv = () => {
+    const csv = 'name,sku,sell_price,cost_price,barcode,unit,category,quantity,branch_id\nمنتج تجريبي,SKU001,100,70,,piece,,0,'
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'sample-products.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const { data, isLoading } = useQuery<{ data: Product[]; meta: Meta }>({
     queryKey: ['products', search, page],
@@ -132,6 +193,43 @@ export default function Products() {
               startIcon={<Search className="w-4 h-4" />}
             />
           </div>
+          {selectedForLabels.size > 0 && (
+            <div className="flex items-center gap-2">
+              <input
+                type="number" min={1} max={50} value={labelCopies}
+                onChange={(e) => setLabelCopies(Math.max(1, Number(e.target.value)))}
+                className="w-14 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 text-center"
+              />
+              <Button
+                variant="outline" size="sm"
+                onClick={() => {
+                  const labels = products
+                    .filter((p) => selectedForLabels.has(p.id))
+                    .flatMap((p) => p.variants.map((v) => ({
+                      name: p.name,
+                      sku: v.sku ?? '',
+                      barcode: v.barcode ?? v.sku ?? '',
+                      price: Number(v.sellPrice),
+                    })))
+                  printBarcodeLabels(labels, labelCopies)
+                }}
+              >
+                <Barcode className="w-4 h-4" />طباعة ملصقات ({selectedForLabels.size})
+              </Button>
+            </div>
+          )}
+          <Button variant="outline" size="sm" onClick={downloadSampleCsv}><Download className="w-4 h-4" />نموذج CSV</Button>
+          <Button
+            variant="outline" size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            loading={importMutation.isPending}
+          >
+            <Upload className="w-4 h-4" />استيراد CSV
+          </Button>
+          <input
+            ref={fileInputRef} type="file" accept=".csv" className="hidden"
+            onChange={(e) => { const f = e.target.files?.[0]; if (f) { importMutation.mutate(f); e.target.value = '' } }}
+          />
           <Button onClick={() => setCreateOpen(true)}><Plus className="w-4 h-4" />منتج جديد</Button>
         </div>
 
@@ -139,6 +237,19 @@ export default function Products() {
           <>
             <Table
               columns={[
+                { key: 'select', header: '', render: (p) => (
+                  <input
+                    type="checkbox"
+                    checked={selectedForLabels.has(p.id)}
+                    onChange={(e) => {
+                      const next = new Set(selectedForLabels)
+                      e.target.checked ? next.add(p.id) : next.delete(p.id)
+                      setSelectedForLabels(next)
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-4 h-4 accent-brand-500 cursor-pointer"
+                  />
+                )},
                 { key: 'name', header: 'المنتج', render: (p) => (
                   <div>
                     <button className="font-medium text-gray-100 hover:text-brand-400 text-right" onClick={() => openDetail(p)}>{p.name}</button>
@@ -197,6 +308,42 @@ export default function Products() {
           setDetailProduct(updated)
         }}
       />
+
+      {importResult && (
+        <Modal title="نتيجة الاستيراد" onClose={() => setImportResult(null)}>
+          <div className="space-y-4">
+            <div className="flex gap-6 text-center">
+              <div className="flex-1 bg-green-900/30 rounded-lg p-4">
+                <p className="text-2xl font-bold text-green-400">{importResult.created}</p>
+                <p className="text-sm text-gray-400 mt-1">تم إنشاؤه</p>
+              </div>
+              <div className="flex-1 bg-yellow-900/30 rounded-lg p-4">
+                <p className="text-2xl font-bold text-yellow-400">{importResult.skipped}</p>
+                <p className="text-sm text-gray-400 mt-1">تم تخطيه</p>
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="flex-1 bg-red-900/30 rounded-lg p-4">
+                  <p className="text-2xl font-bold text-red-400">{importResult.errors.length}</p>
+                  <p className="text-sm text-gray-400 mt-1">أخطاء</p>
+                </div>
+              )}
+            </div>
+            {importResult.errors.length > 0 && (
+              <div className="max-h-48 overflow-y-auto space-y-1">
+                <p className="text-sm font-medium text-gray-300 mb-2">تفاصيل الأخطاء:</p>
+                {importResult.errors.map((e) => (
+                  <div key={e.row} className="text-xs text-red-400 bg-red-900/20 rounded px-3 py-1.5">
+                    صف {e.row}: {e.reason}
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <Button onClick={() => setImportResult(null)}>إغلاق</Button>
+            </div>
+          </div>
+        </Modal>
+      )}
     </AppShell>
   )
 }

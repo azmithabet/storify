@@ -115,6 +115,10 @@ model TenantSetting {
   printTemplate   String?  @db.Text         @map("print_template")
   language        String   @default("ar")   @db.VarChar(10)
   timezone        String   @default("Africa/Cairo") @db.VarChar(50)
+  loyaltyEnabled  Boolean  @default(false)  @map("loyalty_enabled")
+  loyaltyPointsPerUnit Int @default(1)      @map("loyalty_points_per_unit")
+  loyaltyPointValue Decimal @default(0.01) @db.Decimal(10, 4) @map("loyalty_point_value")
+  dailySalesTarget Decimal @default(0) @db.Decimal(15, 4) @map("daily_sales_target")
 
   // ETA configuration — v1.2
   etaEnabled      Boolean  @default(false)     @map("eta_enabled")
@@ -300,8 +304,9 @@ model PaymentMethod {
   notes         String?  @db.Text
   createdAt     DateTime @default(now()) @map("created_at")
 
-  invoices           Invoice[]
-  paymentFeeExpenses PaymentFeeExpense[]
+  invoices            Invoice[]           @relation("InvoicePM")
+  splitInvoices       Invoice[]           @relation("InvoiceSplitPM")
+  paymentFeeExpenses  PaymentFeeExpense[]
 
   @@map("payment_methods")
 }
@@ -315,9 +320,10 @@ model Customer {
   nationalId    String?  @db.VarChar(50)  @map("national_id")
   address       String?  @db.Text
   notes         String?  @db.Text
-  creditBalance Decimal  @default(0) @db.Decimal(15, 4) @map("credit_balance")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt      @map("updated_at")
+  creditBalance  Decimal  @default(0) @db.Decimal(15, 4) @map("credit_balance")
+  loyaltyPoints  Int      @default(0) @map("loyalty_points")
+  createdAt      DateTime @default(now()) @map("created_at")
+  updatedAt      DateTime @updatedAt      @map("updated_at")
 
   documents            CustomerDocument[]
   invoices             Invoice[]
@@ -392,7 +398,9 @@ model Invoice {
   feeAmount       Decimal  @default(0) @db.Decimal(15, 4) @map("fee_amount")
   feeBearer       String   @default("merchant") @db.VarChar(20) @map("fee_bearer")
   feeAddedToTotal Boolean  @default(false) @map("fee_added_to_total")
-  invoiceNumber   String?  @unique @db.VarChar(50) @map("invoice_number")
+  invoiceNumber         String?  @unique @db.VarChar(50) @map("invoice_number")
+  splitPaymentMethodId  String?  @db.Uuid @map("split_payment_method_id")
+  splitPaymentAmount    Decimal? @db.Decimal(15, 4) @map("split_payment_amount")
   totalAmount     Decimal  @db.Decimal(15, 4) @map("total_amount")
   paidAmount      Decimal  @default(0) @db.Decimal(15, 4) @map("paid_amount")
   status          String   @default("completed") @db.VarChar(50)
@@ -411,10 +419,11 @@ model Invoice {
 
   createdAt DateTime @default(now()) @map("created_at")
 
-  branch         Branch              @relation(fields: [branchId], references: [id])
-  customer       Customer?           @relation(fields: [customerId], references: [id])
-  cashier        User                @relation(fields: [cashierId], references: [id])
-  paymentMethod  PaymentMethod       @relation(fields: [paymentMethodId], references: [id])
+  branch              Branch              @relation(fields: [branchId], references: [id])
+  customer            Customer?           @relation(fields: [customerId], references: [id])
+  cashier             User                @relation(fields: [cashierId], references: [id])
+  paymentMethod       PaymentMethod       @relation("InvoicePM", fields: [paymentMethodId], references: [id])
+  splitPaymentMethod  PaymentMethod?      @relation("InvoiceSplitPM", fields: [splitPaymentMethodId], references: [id])
   currency       Currency            @relation(fields: [currencyId], references: [id])
   coupon         Coupon?             @relation(fields: [couponId], references: [id])
   items          InvoiceItem[]

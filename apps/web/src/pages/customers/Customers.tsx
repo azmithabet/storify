@@ -17,6 +17,7 @@ interface Customer {
   nationalId?: string
   address?: string
   creditBalance: number
+  loyaltyPoints: number
   _count?: { invoices: number }
 }
 
@@ -66,9 +67,17 @@ function CreditModal({ customer, onClose }: { customer: Customer; onClose: () =>
 
   return (
     <form onSubmit={handleSubmit((d) => mutate(d))} className="flex flex-col gap-5">
-      <div>
-        <p className="text-sm text-gray-400 mb-1">الرصيد الحالي</p>
-        <Money value={customer.creditBalance} size="lg" />
+      <div className="flex gap-4">
+        <div>
+          <p className="text-sm text-gray-400 mb-1">الرصيد الحالي</p>
+          <Money value={customer.creditBalance} size="lg" />
+        </div>
+        {(customer.loyaltyPoints ?? 0) > 0 && (
+          <div>
+            <p className="text-sm text-gray-400 mb-1">نقاط الولاء</p>
+            <p className="text-lg font-bold text-yellow-400">{customer.loyaltyPoints} نقطة</p>
+          </div>
+        )}
       </div>
       <div>
         <p className="text-sm text-gray-400 mb-2">نوع التعديل</p>
@@ -252,6 +261,7 @@ export default function Customers() {
                 { key: 'email', header: 'البريد الإلكتروني', className: 'text-gray-500 text-sm' },
                 { key: 'invoices', header: 'الفواتير', render: (c) => <span className="text-center font-mono">{c._count?.invoices ?? 0}</span> },
                 { key: 'creditBalance', header: 'الرصيد', render: (c) => c.creditBalance > 0 ? <Money value={c.creditBalance} /> : <span className="text-gray-500">—</span> },
+                { key: 'loyaltyPoints', header: 'النقاط', render: (c) => c.loyaltyPoints > 0 ? <span className="font-mono text-yellow-400">{c.loyaltyPoints} نقطة</span> : <span className="text-gray-500">—</span> },
                 { key: 'actions', header: '', render: (c) => (
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" title="السجل" onClick={(e) => { e.stopPropagation(); setDetailCustomer(c) }}>

@@ -127,6 +127,15 @@ export default function Dashboard() {
     refetchInterval: 5 * 60 * 1000,
   })
 
+  const { data: tenantSettings } = useQuery<{ dailySalesTarget: number }>({
+    queryKey: ['tenant-settings'],
+    queryFn: async () => (await api.get<{ data: { dailySalesTarget: number } }>('/settings')).data.data,
+  })
+
+  const dailyTarget = Number(tenantSettings?.dailySalesTarget ?? 0)
+  const todayRevenue = data?.today.revenue ?? 0
+  const targetProgress = dailyTarget > 0 ? Math.min(100, (todayRevenue / dailyTarget) * 100) : 0
+
   const pendingCount =
     (data?.pending.installmentApprovals ?? 0) +
     (data?.pending.overdueInstallmentPayments ?? 0) +
@@ -169,6 +178,25 @@ export default function Dashboard() {
             accentColor="bg-success-500"
             icon={<Clock className="w-4 h-4" />}
           />
+        </div>
+      )}
+
+      {/* ── Daily target progress ── */}
+      {dailyTarget > 0 && (
+        <div className="bg-gray-800 border border-gray-700 rounded-r-xl p-4 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-gray-300 font-medium">تقدم هدف اليوم</p>
+            <p className="text-xs font-mono text-gray-400">
+              {todayRevenue.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} / {dailyTarget.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج
+            </p>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
+            <div
+              className={cn('h-3 rounded-full transition-all duration-500', targetProgress >= 100 ? 'bg-success-500' : targetProgress >= 70 ? 'bg-brand-500' : 'bg-warning-500')}
+              style={{ width: `${targetProgress}%` }}
+            />
+          </div>
+          <p className="text-xs text-gray-500 mt-1">{targetProgress.toFixed(1)}% من الهدف</p>
         </div>
       )}
 

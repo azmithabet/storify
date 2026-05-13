@@ -123,7 +123,7 @@ export async function getInvoice(db: TenantPrismaClient, invoiceId: string) {
 
 export async function createInvoice(
   db: TenantPrismaClient,
-  input: CreateInvoiceInput,
+  input: CreateInvoiceInput & { branchId: string; currencyId: string },
   cashierId: string,
 ) {
   // 1. Validate payment method
@@ -296,6 +296,8 @@ export async function createInvoice(
         paidAmount: totalAmount, // full payment for regular invoices
         status: 'completed',
         notes: input.notes ?? null,
+        splitPaymentMethodId: input.splitPaymentMethodId ?? null,
+        splitPaymentAmount: input.splitPaymentAmount ? toDecimal(input.splitPaymentAmount) : null,
       },
     })
 
@@ -377,6 +379,20 @@ export async function createInvoice(
     const suffix = invoice.id.replace(/-/g, '').slice(-6).toUpperCase()
     const invoiceNumber = `INV-${datePart}-${suffix}`
     await tx.invoice.update({ where: { id: invoice.id }, data: { invoiceNumber } })
+
+    // Award loyalty points to customer if enabled
+    if (input.customerId) {
+      const settings = await tx.tenantSetting.findFirst()
+      if (settings?.loyaltyEnabled && settings.loyaltyPointsPerUnit > 0) {
+        const pointsEarned = Math.floor(totalAmount.toNumber() / settings.loyaltyPointsPerUnit)
+        if (pointsEarned > 0) {
+          await tx.customer.update({
+            where: { id: input.customerId },
+            data: { loyaltyPoints: { increment: pointsEarned } },
+          })
+        }
+      }
+    }
 
     // Mandatory audit log inside transaction
     await tx.auditLog.create({

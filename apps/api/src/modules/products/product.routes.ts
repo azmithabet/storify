@@ -410,4 +410,97 @@ export async function productRoutes(app: FastifyInstance) {
     await request.tenantDb.productDiscount.delete({ where: { id: request.params.discountId } })
     return reply.send({ success: true })
   })
+
+  // ─── POST /api/products/import — bulk CSV import ─────────────────────────────
+  // CSV columns (header required): name, sku, sell_price, cost_price, barcode, unit, category, quantity, branch_id
+  app.post('/import', { preHandler: requirePermission('products', 'create') }, async (request, reply) => {
+    const file = await (request as unknown as { file: () => Promise<{ filename: string; toBuffer: () => Promise<Buffer> }> }).file()
+    if (!file) return reply.status(400).send({ success: false, error: { code: 'no_file', message: 'لم يتم إرسال ملف' } })
+
+    const buf = await file.toBuffer()
+    const text = buf.toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
+    const lines = text.split('\n').filter((l) => l.trim())
+    if (lines.length < 2) return reply.status(400).send({ success: false, error: { code: 'empty_file', message: 'الملف فارغ أو لا يحتوي على بيانات' } })
+
+    // Parse header
+    const parseCsv = (line: string) => line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
+    const headers = parseCsv(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, '_'))
+    const col = (row: string[], name: string) => row[headers.indexOf(name)] ?? ''
+
+    const actor = request.user as JWTPayload
+    const results = { created: 0, skipped: 0, errors: [] as { row: number; reason: string }[] }
+
+    // Pre-load categories for matching by name
+    const categories = await request.tenantDb.category.findMany({ select: { id: true, name: true } })
+    const catMap = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]))
+
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCsv(lines[i])
+      const name = col(row, 'name')
+      const sku = col(row, 'sku')
+      const sellPrice = parseFloat(col(row, 'sell_price'))
+      const costPrice = parseFloat(col(row, 'cost_price') || '0')
+      const barcode = col(row, 'barcode') || null
+      const unit = col(row, 'unit') || null
+      const categoryName = col(row, 'category')
+      const quantity = parseInt(col(row, 'quantity') || '0', 10)
+      const branchId = col(row, 'branch_id') || actor.branchId
+
+      if (!name || !sku || isNaN(sellPrice)) {
+        results.errors.push({ row: i + 1, reason: 'الاسم أو SKU أو السعر مفقود' })
+        results.skipped++
+        continue
+      }
+
+      // Check for duplicate SKU
+      const existing = await request.tenantDb.productVariant.findFirst({ where: { sku } })
+      if (existing) {
+        results.errors.push({ row: i + 1, reason: `SKU مكرر: ${sku}` })
+        results.skipped++
+        continue
+      }
+
+      try {
+        const categoryId = categoryName ? catMap.get(categoryName.toLowerCase()) ?? null : null
+
+        await request.tenantDb.$transaction(async (tx) => {
+          const product = await tx.product.create({
+            data: {
+              name,
+              unit: unit || 'piece',
+              categoryId: categoryId ?? undefined,
+            },
+          })
+
+          const variant = await tx.productVariant.create({
+            data: {
+              productId: product.id,
+              sku,
+              barcode: barcode || null,
+              sellPrice,
+              costPrice,
+              attributes: {},
+            },
+          })
+
+          if (branchId && quantity > 0) {
+            const branch = await tx.branch.findUnique({ where: { id: branchId } })
+            if (branch) {
+              await tx.stock.create({
+                data: { variantId: variant.id, branchId, quantity, minQuantity: 0 },
+              })
+            }
+          }
+        })
+
+        results.created++
+      } catch {
+        results.errors.push({ row: i + 1, reason: 'خطأ أثناء الحفظ' })
+        results.skipped++
+      }
+    }
+
+    await auditLog({ db: request.tenantDb, actorId: actor.userId, entity: 'product', entityId: 'bulk', action: 'bulk_import', after: { created: results.created, skipped: results.skipped } })
+    return reply.send({ success: true, data: results })
+  })
 }

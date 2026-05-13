@@ -100,6 +100,11 @@ app.register(async function tenantScoped(sub) {
       timezone: z.string().optional(),
       language: z.string().optional(),
       currencyDefault: z.string().optional(),
+      loyaltyEnabled: z.boolean().optional(),
+      loyaltyPointsPerUnit: z.coerce.number().int().min(1).optional(),
+      loyaltyPointValue: z.coerce.number().min(0).optional(),
+      printTemplate: z.string().optional(),
+      dailySalesTarget: z.coerce.number().min(0).optional(),
     })
     const parsed = schema.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
@@ -107,6 +112,14 @@ app.register(async function tenantScoped(sub) {
     if (!existing) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الإعدادات غير موجودة' } })
     const updated = await request.tenantDb.tenantSetting.update({ where: { id: existing.id }, data: parsed.data })
     return reply.send({ success: true, data: updated })
+  })
+
+  // ─── Currencies ───────────────────────────────────────────────────────────
+  sub.get('/api/currencies', { preHandler: [authenticate] }, async (request, reply) => {
+    const currencies = await request.tenantDb.currency.findMany({
+      orderBy: [{ isBase: 'desc' }, { code: 'asc' }],
+    })
+    return reply.send({ success: true, data: currencies })
   })
 
   // ─── Branches CRUD ────────────────────────────────────────────────────────

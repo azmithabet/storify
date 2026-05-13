@@ -36,8 +36,19 @@ export async function invoiceRoutes(app: FastifyInstance) {
 
     const actor = request.user as JWTPayload
 
+    // Resolve defaults for optional fields
+    let { branchId, currencyId } = parsed.data
+    if (!branchId) branchId = actor.branchId
+    if (!currencyId) {
+      const baseCurrency = await request.tenantDb.currency.findFirst({ where: { isBase: true } })
+      if (!baseCurrency) {
+        return reply.status(400).send({ success: false, error: { code: 'no_base_currency', message: 'لا توجد عملة أساسية' } })
+      }
+      currencyId = baseCurrency.id
+    }
+
     try {
-      const invoice = await createInvoice(request.tenantDb, parsed.data, actor.userId)
+      const invoice = await createInvoice(request.tenantDb, { ...parsed.data, branchId: branchId!, currencyId: currencyId! }, actor.userId)
       return reply.status(201).send({ success: true, data: invoice })
     } catch (err: unknown) {
       const error = err as Error & { statusCode?: number }

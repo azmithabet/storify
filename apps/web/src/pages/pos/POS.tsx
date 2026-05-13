@@ -45,6 +45,15 @@ interface Customer {
   creditBalance?: number
 }
 
+interface Currency {
+  id: string
+  code: string
+  name: string
+  symbol: string
+  rateToBase: number
+  isBase: boolean
+}
+
 interface AppliedCoupon {
   code: string
   discountType: 'percentage' | 'fixed'
@@ -134,6 +143,9 @@ export default function POS() {
   const [actualCash, setActualCash] = useState('')
   const [useCredit, setUseCredit] = useState(false)
   const [creditAmount, setCreditAmount] = useState('')
+  const [splitPM, setSplitPM] = useState<PaymentMethod | null>(null)
+  const [splitAmount, setSplitAmount] = useState('')
+  const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [offlineQueue, setOfflineQueue] = useState<unknown[]>(() => {
     try { return JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]') } catch { return [] }
@@ -170,6 +182,11 @@ export default function POS() {
   const { data: paymentMethods = [] } = useQuery<PaymentMethod[]>({
     queryKey: ['payment-methods'],
     queryFn: async () => (await api.get<{ data: PaymentMethod[] }>('/payment-methods')).data.data,
+  })
+
+  const { data: currencies = [] } = useQuery<Currency[]>({
+    queryKey: ['currencies'],
+    queryFn: async () => (await api.get<{ data: Currency[] }>('/currencies')).data.data,
   })
 
   const { data: customers = [] } = useQuery<Customer[]>({
@@ -319,6 +336,8 @@ export default function POS() {
     }
   }
 
+  const splitAmountNum = splitPM && Number(splitAmount) > 0 ? Math.min(Number(splitAmount), Math.max(0, total - appliedCredit)) : 0
+
   const { mutate: submitSale, isPending } = useMutation({
     mutationFn: async () => {
       if (!selectedPM) throw new Error('اختر طريقة الدفع')
@@ -326,9 +345,12 @@ export default function POS() {
       const payload = {
         paymentMethodId: selectedPM.id,
         customerId: customer?.id,
+        currencyId: selectedCurrency?.id,
         feeBearer,
         couponCode: appliedCoupon?.code,
         creditAmount: appliedCredit > 0 ? appliedCredit : undefined,
+        splitPaymentMethodId: splitAmountNum > 0 ? splitPM?.id : undefined,
+        splitPaymentAmount: splitAmountNum > 0 ? splitAmountNum : undefined,
         items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
       }
       if (!navigator.onLine) {
@@ -369,6 +391,9 @@ export default function POS() {
       setCouponInput('')
       setUseCredit(false)
       setCreditAmount('')
+      setSplitPM(null)
+      setSplitAmount('')
+      setSelectedCurrency(null)
       toast.success(`تم إنشاء الفاتورة ${apiInvoice.invoiceNumber}`)
     },
     onError: (e: unknown) => {
@@ -609,6 +634,85 @@ export default function POS() {
               </div>
             )}
           </div>
+
+          {/* Currency selector — only shown when multiple currencies exist */}
+          {currencies.length > 1 && (
+            <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-3">
+              <p className="text-xs uppercase text-gray-500 font-medium mb-2">العملة</p>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  onClick={() => setSelectedCurrency(null)}
+                  className={cn(
+                    'px-2.5 py-1 rounded text-xs border transition-all',
+                    !selectedCurrency ? 'border-brand-500 text-brand-300 bg-brand-600/20' : 'border-gray-700 text-gray-400 hover:border-gray-500',
+                  )}
+                >
+                  افتراضي
+                </button>
+                {currencies.filter((c) => !c.isBase).map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setSelectedCurrency(selectedCurrency?.id === c.id ? null : c)}
+                    className={cn(
+                      'px-2.5 py-1 rounded text-xs border transition-all font-mono',
+                      selectedCurrency?.id === c.id ? 'border-brand-500 text-brand-300 bg-brand-600/20' : 'border-gray-700 text-gray-400 hover:border-gray-500',
+                    )}
+                  >
+                    {c.code} ({c.symbol})
+                  </button>
+                ))}
+              </div>
+              {selectedCurrency && (
+                <p className="text-xs text-gray-500 mt-1.5">
+                  سعر الصرف: 1 {selectedCurrency.code} = {Number(selectedCurrency.rateToBase).toFixed(4)} (أساسي)
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Split payment */}
+          {selectedPM && (
+            <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-3 flex flex-col gap-2">
+              <p className="text-xs uppercase text-gray-500 font-medium">دفع منقسم (اختياري)</p>
+              <div className="flex flex-col gap-1.5">
+                {paymentMethods.filter((pm) => pm.id !== selectedPM.id).map((pm) => (
+                  <button
+                    key={pm.id}
+                    onClick={() => { setSplitPM(splitPM?.id === pm.id ? null : pm); setSplitAmount('') }}
+                    className={cn(
+                      'flex items-center justify-between rounded-md px-3 py-1.5 text-xs border transition-all',
+                      splitPM?.id === pm.id
+                        ? 'bg-brand-600/20 border-brand-500 text-brand-300'
+                        : 'border-gray-700 text-gray-400 hover:border-gray-500',
+                    )}
+                  >
+                    <span>{pm.name}</span>
+                  </button>
+                ))}
+              </div>
+              {splitPM && (
+                <div className="flex flex-col gap-1">
+                  <input
+                    type="number"
+                    value={splitAmount}
+                    onChange={(e) => setSplitAmount(e.target.value)}
+                    placeholder={`مبلغ ${splitPM.name}...`}
+                    min={0}
+                    max={Math.max(0, total - appliedCredit)}
+                    step={0.01}
+                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-1.5 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono"
+                    dir="ltr"
+                  />
+                  {splitAmountNum > 0 && (
+                    <p className="text-xs text-gray-500">
+                      {selectedPM.name}: {(Math.max(0, total - appliedCredit) - splitAmountNum).toFixed(2)} ج
+                      {' + '}{splitPM.name}: {splitAmountNum.toFixed(2)} ج
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Coupon input */}
           <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-3">

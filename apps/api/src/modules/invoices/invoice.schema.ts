@@ -1,12 +1,14 @@
 import { z } from 'zod'
 
 export const createInvoiceSchema = z.object({
-  branchId: z.string().uuid(),
+  branchId: z.string().uuid().optional(),
   paymentMethodId: z.string().uuid(),
-  currencyId: z.string().uuid(),
+  currencyId: z.string().uuid().optional(),
   customerId: z.string().uuid().optional(),
   couponCode: z.string().optional(),
   creditAmount: z.coerce.number().min(0).optional(),
+  splitPaymentMethodId: z.string().uuid().optional(),
+  splitPaymentAmount: z.coerce.number().min(0).optional(),
   feeBearer: z.enum(['customer', 'merchant']).optional(),
   notes: z.string().optional(),
   externalFinancing: z

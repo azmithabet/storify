@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Search, ChevronDown, ChevronUp, Edit2, PlusCircle, ToggleLeft, ToggleRight } from 'lucide-react'
+import { Plus, Search, ChevronDown, ChevronUp, Edit2, PlusCircle, ToggleLeft, ToggleRight, Tag, Trash2 } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -35,6 +35,7 @@ interface Product {
 interface Meta { total: number; page: number; limit: number; pages: number }
 interface Category { id: string; name: string }
 interface TaxRate { id: string; name: string; rate: string | number; isDefault: boolean }
+interface ProductDiscount { id: string; discountType: 'percentage' | 'fixed'; discountValue: string | number; startDate: string; endDate: string; isActive: boolean }
 
 const LIMIT = 20
 
@@ -335,6 +336,109 @@ function CreateProductDrawer({ open, onClose, categories, taxRates, onSuccess }:
 }
 
 // ─── Product detail / edit drawer ─────────────────────────────────────────────
+// ─── Product discounts sub-section ────────────────────────────────────────────
+function ProductDiscountsSection({ productId }: { productId: string }) {
+  const qc = useQueryClient()
+  const [showForm, setShowForm] = useState(false)
+  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage')
+  const [discountValue, setDiscountValue] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
+
+  const { data: discounts = [], isLoading } = useQuery<ProductDiscount[]>({
+    queryKey: ['product-discounts', productId],
+    queryFn: async () => (await api.get<{ data: ProductDiscount[] }>('/products/discounts', { params: { productId } })).data.data,
+  })
+
+  const activeDiscounts = discounts.filter((d) => d.productId === productId || true) // all from query filtered by server
+
+  const { mutate: addDiscount, isPending: adding } = useMutation({
+    mutationFn: async () => {
+      if (!discountValue || !startDate || !endDate) throw new Error('جميع الحقول مطلوبة')
+      await api.post(`/products/${productId}/discounts`, { discountType, discountValue: Number(discountValue), startDate, endDate })
+    },
+    onSuccess: () => {
+      toast.success('تم إضافة الخصم')
+      qc.invalidateQueries({ queryKey: ['product-discounts', productId] })
+      setShowForm(false)
+      setDiscountValue('')
+      setStartDate('')
+      setEndDate('')
+    },
+    onError: (e: unknown) => toast.error((e as Error).message === 'جميع الحقول مطلوبة' ? (e as Error).message : 'حدث خطأ'),
+  })
+
+  const { mutate: removeDiscount } = useMutation({
+    mutationFn: async (id: string) => api.delete(`/products/discounts/${id}`),
+    onSuccess: () => { toast.success('تم حذف الخصم'); qc.invalidateQueries({ queryKey: ['product-discounts', productId] }) },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
+  const today = new Date().toISOString().slice(0, 10)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <h4 className="text-sm font-semibold text-gray-300 flex items-center gap-1.5"><Tag className="w-4 h-4 text-brand-400" />خصومات المنتج</h4>
+        <Button variant="ghost" size="sm" onClick={() => setShowForm(!showForm)}>
+          <PlusCircle className="w-3 h-3" />إضافة خصم
+        </Button>
+      </div>
+
+      {showForm && (
+        <div className="bg-gray-900 rounded-md p-3 mb-3 flex flex-col gap-3">
+          <div className="flex gap-2">
+            <select value={discountType} onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'fixed')} className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+              <option value="percentage">نسبة %</option>
+              <option value="fixed">مبلغ ثابت ج</option>
+            </select>
+            <input type="number" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} placeholder="القيمة" className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
+          </div>
+          <div className="flex gap-2">
+            <input type="date" value={startDate} min={today} onChange={(e) => setStartDate(e.target.value)} className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
+            <span className="text-gray-500 self-center">—</span>
+            <input type="date" value={endDate} min={startDate || today} onChange={(e) => setEndDate(e.target.value)} className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
+          </div>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" className="flex-1" onClick={() => setShowForm(false)}>إلغاء</Button>
+            <Button size="sm" className="flex-1" loading={adding} onClick={() => addDiscount()}>حفظ</Button>
+          </div>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="h-8 bg-gray-700 rounded animate-pulse" />
+      ) : activeDiscounts.length === 0 ? (
+        <p className="text-xs text-gray-500 py-2">لا توجد خصومات مجدولة</p>
+      ) : (
+        <div className="flex flex-col gap-1.5">
+          {activeDiscounts.map((d) => {
+            const isLive = d.startDate <= today && d.endDate >= today
+            const isPast = d.endDate < today
+            return (
+              <div key={d.id} className="flex items-center justify-between text-sm bg-gray-900 rounded-md px-3 py-2">
+                <div>
+                  <span className={`font-mono font-semibold ${isLive ? 'text-success-400' : isPast ? 'text-gray-600' : 'text-brand-400'}`}>
+                    {d.discountType === 'percentage' ? `${Number(d.discountValue)}%` : `${Number(d.discountValue)} ج`}
+                  </span>
+                  <span className="text-gray-500 text-xs mr-2">
+                    {new Date(d.startDate).toLocaleDateString('ar-EG')} — {new Date(d.endDate).toLocaleDateString('ar-EG')}
+                  </span>
+                  {isLive && <span className="text-xs text-success-500 font-medium mr-1">● نشط</span>}
+                  {isPast && <span className="text-xs text-gray-600 mr-1">منتهي</span>}
+                </div>
+                <Button variant="ghost" size="sm" className="text-danger-500" onClick={() => removeDiscount(d.id)}>
+                  <Trash2 className="w-3 h-3" />
+                </Button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ProductDetailDrawer({ product, onClose, categories, taxRates, onSuccess }: {
   product: Product | null
   onClose: () => void
@@ -486,6 +590,9 @@ function ProductDetailDrawer({ product, onClose, categories, taxRates, onSuccess
                 )}
               </div>
             </div>
+
+            {/* Discounts */}
+            <ProductDiscountsSection productId={product.id} />
           </div>
         )}
       </Drawer>

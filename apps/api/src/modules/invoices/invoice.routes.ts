@@ -130,4 +130,41 @@ export async function invoiceRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  // ─── GET /api/returns — list all returns ─────────────────────────────────────
+  app.get('/returns', { preHandler: requirePermission('invoices', 'read') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const q = z.object({
+      page: z.coerce.number().int().min(1).default(1),
+      limit: z.coerce.number().int().min(1).max(100).default(20),
+      returnType: z.enum(['refund', 'credit']).optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
+    }).safeParse(request.query)
+
+    if (!q.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: q.error.errors[0].message } })
+    const { page, limit, returnType, from, to } = q.data
+
+    const where = {
+      ...(returnType ? { returnType } : {}),
+      ...(from || to ? { createdAt: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}) } } : {}),
+    }
+
+    const [returns, total] = await Promise.all([
+      request.tenantDb.return.findMany({
+        where,
+        include: {
+          invoice: { select: { invoiceNumber: true, customer: { select: { fullName: true } } } },
+          processedBy: { select: { fullName: true } },
+          items: { include: { variant: { select: { sku: true, product: { select: { name: true } } } } } },
+        },
+        orderBy: { createdAt: 'desc' },
+        skip: (page - 1) * limit,
+        take: limit,
+      }),
+      request.tenantDb.return.count({ where }),
+    ])
+
+    return reply.send({ success: true, data: returns, meta: { total, page, limit, pages: Math.ceil(total / limit) } })
+  })
 }

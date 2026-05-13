@@ -12,6 +12,7 @@ import {
   Receipt,
   LogOut,
   ClipboardList,
+  RotateCcw,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
@@ -23,6 +24,7 @@ const navItems = [
   { to: '/stock', icon: Warehouse, label: 'المخزون' },
   { to: '/customers', icon: Users, label: 'العملاء' },
   { to: '/invoices', icon: FileText, label: 'الفواتير' },
+  { to: '/returns', icon: RotateCcw, label: 'المرتجعات' },
   { to: '/installments', icon: CreditCard, label: 'الأقساط' },
   { to: '/suppliers', icon: Truck, label: 'الموردون' },
   { to: '/purchase-orders', icon: ClipboardList, label: 'أوامر الشراء' },

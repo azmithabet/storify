@@ -107,6 +107,55 @@ export async function customerRoutes(app: FastifyInstance) {
     },
   )
 
+  // POST /api/customers/:id/credit
+  app.post<{ Params: { id: string } }>(
+    '/:id/credit',
+    { preHandler: requirePermission('customers', 'update') },
+    async (request, reply) => {
+      const { z } = await import('zod')
+      const schema = z.object({
+        amount: z.number().positive(),
+        type: z.enum(['add', 'deduct']),
+        note: z.string().optional(),
+      })
+      const parsed = schema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+      }
+
+      const customer = await request.tenantDb.customer.findUnique({ where: { id: request.params.id } })
+      if (!customer) {
+        return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'العميل غير موجود' } })
+      }
+
+      const delta = parsed.data.type === 'add' ? parsed.data.amount : -parsed.data.amount
+      const newBalance = Number(customer.creditBalance) + delta
+      if (newBalance < 0) {
+        return reply.status(400).send({ success: false, error: { code: 'insufficient_credit', message: 'الرصيد غير كافٍ' } })
+      }
+
+      const actor = request.user as JWTPayload
+      const updated = await request.tenantDb.customer.update({
+        where: { id: request.params.id },
+        data: { creditBalance: newBalance },
+      })
+
+      const { auditLog } = await import('../../shared/utils/audit')
+      await auditLog({
+        db: request.tenantDb,
+        actorId: actor.userId,
+        entity: 'customer',
+        entityId: customer.id,
+        action: parsed.data.type === 'add' ? 'credit_add' : 'credit_deduct',
+        before: { creditBalance: customer.creditBalance.toString() },
+        after: { creditBalance: newBalance.toString(), note: parsed.data.note },
+        ip: request.ip,
+      })
+
+      return reply.send({ success: true, data: updated })
+    },
+  )
+
   // POST /api/customers/:id/documents — get presigned URL, then caller stores the returned publicUrl
   app.post<{ Params: { id: string } }>(
     '/:id/documents',

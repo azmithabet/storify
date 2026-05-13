@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check } from 'lucide-react'
+import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button, Input, Badge, Money, Modal } from '@/components/ui'
@@ -64,6 +64,7 @@ export default function POS() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<Variant[]>([])
+  const [barcode, setBarcode] = useState('')
   const [selectedPM, setSelectedPM] = useState<PaymentMethod | null>(null)
   const [feeBearer, setFeeBearer] = useState<'merchant' | 'customer'>('merchant')
   const [customer, setCustomer] = useState<Customer | null>(null)
@@ -71,6 +72,7 @@ export default function POS() {
   const [showCustomerModal, setShowCustomerModal] = useState(false)
   const [completedInvoice, setCompletedInvoice] = useState<CompletedInvoice | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
+  const barcodeRef = useRef<HTMLInputElement>(null)
 
   const { data: paymentMethods = [] } = useQuery<PaymentMethod[]>({
     queryKey: ['payment-methods'],
@@ -100,6 +102,19 @@ export default function POS() {
   }, [search, doSearch])
 
   useEffect(() => { searchRef.current?.focus() }, [])
+
+  const handleBarcodeEnter = async (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== 'Enter' || !barcode.trim()) return
+    const code = barcode.trim()
+    setBarcode('')
+    try {
+      const res = await api.get<{ data: Variant }>(`/products/barcode/${encodeURIComponent(code)}`)
+      addToCart(res.data.data)
+    } catch {
+      toast.error('لم يتم العثور على المنتج بهذا الباركود')
+      barcodeRef.current?.focus()
+    }
+  }
 
   const addToCart = (variant: Variant) => {
     setCart((prev) => {
@@ -183,16 +198,17 @@ export default function POS() {
       <div className="flex gap-6 h-[calc(100vh-8rem)]">
         {/* LEFT: Search + Cart */}
         <div className="flex-1 flex flex-col gap-4 min-w-0">
-          <div className="relative">
+          <div className="flex gap-2">
+            <div className="relative flex-1">
             <Input
               ref={searchRef}
-              placeholder="ابحث عن منتج أو اقرأ الباركود..."
+              placeholder="ابحث عن منتج بالاسم أو SKU..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               startIcon={<Search className="w-4 h-4" />}
             />
             {searchResults.length > 0 && (
-              <div className="absolute z-dropdown top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-r-lg shadow-lg overflow-hidden">
+              <div className="absolute z-50 top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-r-lg shadow-lg overflow-hidden">
                 {searchResults.map((v) => (
                   <button
                     key={v.id}
@@ -213,6 +229,17 @@ export default function POS() {
                 ))}
               </div>
             )}
+            </div>
+            <div className="w-52">
+              <Input
+                ref={barcodeRef}
+                placeholder="باركود..."
+                value={barcode}
+                onChange={(e) => setBarcode(e.target.value)}
+                onKeyDown={handleBarcodeEnter}
+                startIcon={<ScanLine className="w-4 h-4" />}
+              />
+            </div>
           </div>
 
           <div className="flex-1 overflow-y-auto bg-gray-800 rounded-r-xl border border-gray-700">

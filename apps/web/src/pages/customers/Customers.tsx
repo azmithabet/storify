@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Edit2 } from 'lucide-react'
+import { Search, Plus, Edit2, Wallet } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination } from '@/components/ui'
+import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination, Modal } from '@/components/ui'
 import { api } from '@/api/client'
 
 interface Customer {
@@ -34,12 +34,76 @@ const schema = z.object({
 })
 type FormData = z.infer<typeof schema>
 
+const creditSchema = z.object({
+  amount: z.coerce.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
+  type: z.enum(['add', 'deduct']),
+  note: z.string().optional(),
+})
+type CreditFormData = z.infer<typeof creditSchema>
+
+function CreditModal({ customer, onClose }: { customer: Customer; onClose: () => void }) {
+  const qc = useQueryClient()
+  const { register, handleSubmit, watch, formState: { errors } } = useForm<CreditFormData>({
+    resolver: zodResolver(creditSchema),
+    defaultValues: { type: 'add' },
+  })
+  const creditType = watch('type')
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (data: CreditFormData) => {
+      await api.post(`/customers/${customer.id}/credit`, data)
+    },
+    onSuccess: () => {
+      toast.success('تم تعديل الرصيد')
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      onClose()
+    },
+    onError: (e: unknown) => {
+      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
+      toast.error(code === 'insufficient_credit' ? 'الرصيد غير كافٍ' : 'فشل تعديل الرصيد')
+    },
+  })
+
+  return (
+    <form onSubmit={handleSubmit((d) => mutate(d))} className="flex flex-col gap-5">
+      <div>
+        <p className="text-sm text-gray-400 mb-1">الرصيد الحالي</p>
+        <Money value={customer.creditBalance} size="lg" />
+      </div>
+      <div>
+        <p className="text-sm text-gray-400 mb-2">نوع التعديل</p>
+        <div className="flex gap-2">
+          <label className={`flex-1 cursor-pointer py-2 rounded text-sm border text-center transition-all ${creditType === 'add' ? 'border-success-500 text-success-400 bg-success-500/10' : 'border-gray-700 text-gray-400'}`}>
+            <input type="radio" value="add" {...register('type')} className="hidden" />
+            إضافة رصيد
+          </label>
+          <label className={`flex-1 cursor-pointer py-2 rounded text-sm border text-center transition-all ${creditType === 'deduct' ? 'border-danger-500 text-danger-400 bg-danger-500/10' : 'border-gray-700 text-gray-400'}`}>
+            <input type="radio" value="deduct" {...register('type')} className="hidden" />
+            خصم رصيد
+          </label>
+        </div>
+      </div>
+      <Input label="المبلغ" type="number" step="0.01" error={errors.amount?.message} {...register('amount')} />
+      <div>
+        <label className="text-sm text-gray-400 block mb-1">ملاحظة (اختياري)</label>
+        <textarea {...register('note')} rows={2}
+          className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
+      </div>
+      <div className="flex gap-3">
+        <Button type="button" variant="secondary" className="flex-1" onClick={onClose}>إلغاء</Button>
+        <Button type="submit" loading={isPending} className="flex-1">حفظ</Button>
+      </div>
+    </form>
+  )
+}
+
 export default function Customers() {
   const qc = useQueryClient()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<Customer | null>(null)
+  const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null)
 
   const { data, isLoading } = useQuery<{ data: Customer[]; meta: Meta }>({
     queryKey: ['customers', search, page],
@@ -92,9 +156,14 @@ export default function Customers() {
                 { key: 'invoices', header: 'الفواتير', render: (c) => <span className="text-center font-mono">{c._count?.invoices ?? 0}</span> },
                 { key: 'creditBalance', header: 'الرصيد', render: (c) => c.creditBalance > 0 ? <Money value={c.creditBalance} /> : <span className="text-gray-500">—</span> },
                 { key: 'actions', header: '', render: (c) => (
-                  <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(c) }}>
-                    <Edit2 className="w-3 h-3" />
-                  </Button>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setCreditCustomer(c) }}>
+                      <Wallet className="w-3 h-3" />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); openEdit(c) }}>
+                      <Edit2 className="w-3 h-3" />
+                    </Button>
+                  </div>
                 )},
               ]}
               data={customers} keyExtractor={(c) => c.id} emptyMessage="لا يوجد عملاء"
@@ -103,6 +172,10 @@ export default function Customers() {
           </>
         )}
       </div>
+
+      <Modal open={!!creditCustomer} onClose={() => setCreditCustomer(null)} title={`تعديل رصيد: ${creditCustomer?.fullName ?? ''}`}>
+        {creditCustomer && <CreditModal customer={creditCustomer} onClose={() => setCreditCustomer(null)} />}
+      </Modal>
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title={editing ? 'تعديل بيانات العميل' : 'عميل جديد'}
         footer={

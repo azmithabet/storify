@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
-import { Search, Eye } from 'lucide-react'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { Search, Eye, RotateCcw } from 'lucide-react'
+import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination } from '@/components/ui'
+import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination, Modal } from '@/components/ui'
 import { api } from '@/api/client'
 
 interface InvoiceItem {
@@ -32,6 +33,8 @@ interface Invoice {
 
 interface Meta { total: number; page: number; limit: number; pages: number }
 
+interface ReturnItem { itemId: string; quantity: number; maxQty: number; productName: string; variantSku: string }
+
 const LIMIT = 20
 
 const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'gray' }> = {
@@ -41,10 +44,101 @@ const statusMap: Record<string, { label: string; variant: 'success' | 'warning' 
   returned: { label: 'مرتجعة', variant: 'gray' },
 }
 
+function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [returnItems, setReturnItems] = useState<ReturnItem[]>(
+    (invoice.items ?? []).map((i) => ({ itemId: i.id, quantity: 0, maxQty: i.quantity, productName: i.productName, variantSku: i.variantSku }))
+  )
+  const [returnType, setReturnType] = useState<'refund' | 'credit'>('refund')
+  const [reason, setReason] = useState('')
+
+  const { mutate: submitReturn, isPending } = useMutation({
+    mutationFn: async () => {
+      const items = returnItems.filter((i) => i.quantity > 0).map((i) => ({ itemId: i.itemId, quantity: i.quantity }))
+      if (items.length === 0) throw new Error('اختر صنفاً واحداً على الأقل')
+      await api.post(`/invoices/${invoice.id}/return`, { returnType, reason: reason || undefined, items })
+    },
+    onSuccess: () => {
+      toast.success('تم تسجيل المرتجع')
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      onClose()
+    },
+    onError: (e: unknown) => {
+      const msg = (e as Error).message
+      toast.error(msg === 'اختر صنفاً واحداً على الأقل' ? msg : 'فشل تسجيل المرتجع')
+    },
+  })
+
+  return (
+    <div className="flex flex-col gap-5">
+      <div>
+        <p className="text-sm text-gray-400 mb-3">اختر الأصناف المرتجعة والكمية</p>
+        <div className="flex flex-col gap-2">
+          {returnItems.map((item, idx) => (
+            <div key={item.itemId} className="flex items-center gap-3 py-2 border-b border-gray-700 last:border-0">
+              <div className="flex-1">
+                <p className="text-sm text-gray-100">{item.productName}</p>
+                <p className="text-xs text-gray-500 font-mono">{item.variantSku} · الكمية المباعة: {item.maxQty}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setReturnItems((prev) => prev.map((r, i) => i === idx ? { ...r, quantity: Math.max(0, r.quantity - 1) } : r))}
+                  className="w-7 h-7 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-sm"
+                  disabled={item.quantity === 0}
+                >−</button>
+                <span className="w-6 text-center font-mono text-sm">{item.quantity}</span>
+                <button
+                  onClick={() => setReturnItems((prev) => prev.map((r, i) => i === idx ? { ...r, quantity: Math.min(r.maxQty, r.quantity + 1) } : r))}
+                  className="w-7 h-7 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center text-sm"
+                  disabled={item.quantity >= item.maxQty}
+                >+</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-sm text-gray-400 mb-2">نوع المرتجع</p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setReturnType('refund')}
+            className={`flex-1 py-2 rounded text-sm border transition-all ${returnType === 'refund' ? 'border-brand-500 text-brand-400 bg-brand-600/10' : 'border-gray-700 text-gray-400'}`}
+          >استرداد نقدي</button>
+          <button
+            onClick={() => setReturnType('credit')}
+            className={`flex-1 py-2 rounded text-sm border transition-all ${returnType === 'credit' ? 'border-success-500 text-success-400 bg-success-500/10' : 'border-gray-700 text-gray-400'}`}
+          >رصيد للعميل</button>
+        </div>
+      </div>
+
+      <div>
+        <label className="text-sm text-gray-400 block mb-1">سبب الإرجاع (اختياري)</label>
+        <textarea
+          value={reason}
+          onChange={(e) => setReason(e.target.value)}
+          rows={2}
+          className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none"
+          placeholder="عيب في المنتج، مقاس خاطئ..."
+        />
+      </div>
+
+      <div className="flex gap-3">
+        <Button variant="secondary" className="flex-1" onClick={onClose}>إلغاء</Button>
+        <Button className="flex-1" loading={isPending} onClick={() => submitReturn()}>
+          <RotateCcw className="w-4 h-4" />
+          تأكيد الإرجاع
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 export default function Invoices() {
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null)
+  const [returnInvoice, setReturnInvoice] = useState<Invoice | null>(null)
 
   const { data, isLoading } = useQuery<{ data: Invoice[]; meta: Meta }>({
     queryKey: ['invoices', search, page],
@@ -92,7 +186,20 @@ export default function Invoices() {
         )}
       </div>
 
-      <Drawer open={!!detailInvoice} onClose={() => setDetailInvoice(null)} title={`فاتورة ${detailInvoice?.invoiceNumber ?? ''}`} width="w-[520px]">
+      <Drawer
+        open={!!detailInvoice}
+        onClose={() => setDetailInvoice(null)}
+        title={`فاتورة ${detailInvoice?.invoiceNumber ?? ''}`}
+        width="w-[520px]"
+        footer={
+          detailInvoice?.status === 'completed' ? (
+            <Button variant="secondary" onClick={() => { setReturnInvoice(detailInvoice); setDetailInvoice(null) }}>
+              <RotateCcw className="w-4 h-4" />
+              إرجاع
+            </Button>
+          ) : undefined
+        }
+      >
         {detailInvoice && (
           <div className="flex flex-col gap-6">
             <div className="grid grid-cols-2 gap-4 text-sm">
@@ -135,6 +242,9 @@ export default function Invoices() {
           </div>
         )}
       </Drawer>
+      <Modal open={!!returnInvoice} onClose={() => setReturnInvoice(null)} title={`إرجاع فاتورة ${returnInvoice?.invoiceNumber ?? ''}`}>
+        {returnInvoice && <ReturnModal invoice={returnInvoice} onClose={() => setReturnInvoice(null)} />}
+      </Modal>
     </AppShell>
   )
 }

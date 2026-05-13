@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, ReceiptText, CreditCard, Search } from 'lucide-react'
+import { Plus, Edit2, Trash2, ReceiptText, CreditCard, Search, Download } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -102,9 +102,27 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
             ? <Money value={supplier.balance} size="lg" />
             : <Badge variant="success" dot>مسدد بالكامل</Badge>}
         </div>
-        <Button onClick={() => setAddTxnOpen(true)}>
-          <CreditCard className="w-4 h-4" />تسجيل دفعة
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="secondary"
+            onClick={async () => {
+              try {
+                const res = await api.get(`/suppliers/${supplier.id}/statement`, { responseType: 'blob' })
+                const url = URL.createObjectURL(res.data as Blob)
+                const a = document.createElement('a')
+                a.href = url
+                a.download = `supplier-${supplier.name}.xlsx`
+                a.click()
+                URL.revokeObjectURL(url)
+              } catch { toast.error('فشل تصدير كشف الحساب') }
+            }}
+          >
+            <Download className="w-4 h-4" />كشف حساب
+          </Button>
+          <Button onClick={() => setAddTxnOpen(true)}>
+            <CreditCard className="w-4 h-4" />تسجيل دفعة
+          </Button>
+        </div>
       </div>
 
       {/* Transactions list */}

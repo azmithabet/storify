@@ -165,4 +165,86 @@ export async function supplierRoutes(app: FastifyInstance) {
       return reply.status(201).send({ success: true })
     },
   )
+
+  // ─── GET /api/suppliers/:id/statement (Excel export) ─────────────────────────
+  app.get<{ Params: { id: string } }>(
+    '/:id/statement',
+    { preHandler: requirePermission('suppliers', 'read') },
+    async (request, reply) => {
+      const supplier = await request.tenantDb.supplier.findUnique({ where: { id: request.params.id } })
+      if (!supplier) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'المورد غير موجود' } })
+
+      const transactions = await request.tenantDb.supplierTransaction.findMany({
+        where: { supplierId: request.params.id },
+        orderBy: { createdAt: 'asc' },
+        include: { user: { select: { fullName: true } }, branch: { select: { name: true } } },
+      })
+
+      const purchaseOrders = await request.tenantDb.purchaseOrder.findMany({
+        where: { supplierId: request.params.id },
+        orderBy: { createdAt: 'asc' },
+        select: { id: true, createdAt: true, status: true, totalAmount: true },
+      })
+
+      const ExcelJS = await import('exceljs')
+      const wb = new ExcelJS.default.Workbook()
+      wb.creator = 'Storify'
+
+      const styleHeader = (row: import('exceljs').Row) => {
+        row.eachCell((cell) => {
+          cell.font = { bold: true, color: { argb: 'FFFFFFFF' } }
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF4F46E5' } }
+          cell.alignment = { horizontal: 'right' }
+          cell.border = { bottom: { style: 'thin', color: { argb: 'FFCCCCCC' } } }
+        })
+      }
+
+      // Sheet 1: Summary
+      const summary = wb.addWorksheet('ملخص المورد')
+      summary.addRow(['المورد', supplier.name])
+      summary.addRow(['الهاتف', supplier.phone ?? '—'])
+      summary.addRow(['البريد', supplier.email ?? '—'])
+      summary.addRow(['الرصيد المستحق', Number(supplier.balance).toFixed(2) + ' ج'])
+      summary.addRow(['عدد الأوامر', purchaseOrders.length])
+
+      // Sheet 2: Transactions
+      const txSheet = wb.addWorksheet('المعاملات')
+      const txHeader = txSheet.addRow(['التاريخ', 'النوع', 'المبلغ', 'المرجع', 'ملاحظة', 'المستخدم', 'الفرع'])
+      styleHeader(txHeader)
+      const typeLabels: Record<string, string> = { purchase: 'مشتريات', payment: 'دفعة', return: 'مرتجع' }
+      for (const t of transactions) {
+        txSheet.addRow([
+          new Date(t.createdAt).toLocaleDateString('ar-EG'),
+          typeLabels[t.type] ?? t.type,
+          Number(t.amount).toFixed(2),
+          t.reference ?? '',
+          t.note ?? '',
+          t.user?.fullName ?? '',
+          t.branch?.name ?? '',
+        ])
+      }
+      txSheet.columns.forEach((col) => { col.width = 18 })
+
+      // Sheet 3: Purchase Orders
+      const poSheet = wb.addWorksheet('أوامر الشراء')
+      const poHeader = poSheet.addRow(['التاريخ', 'الحالة', 'الإجمالي'])
+      styleHeader(poHeader)
+      const statusLabels: Record<string, string> = { draft: 'مسودة', pending_approval: 'انتظار', approved: 'موافق', received: 'مستلم', cancelled: 'ملغي' }
+      for (const po of purchaseOrders) {
+        poSheet.addRow([
+          new Date(po.createdAt).toLocaleDateString('ar-EG'),
+          statusLabels[po.status] ?? po.status,
+          Number(po.totalAmount).toFixed(2) + ' ج',
+        ])
+      }
+      poSheet.columns.forEach((col) => { col.width = 20 })
+
+      const buf = await wb.xlsx.writeBuffer()
+      const safeName = supplier.name.replace(/[^a-zA-Z0-9؀-ۿ]/g, '_').slice(0, 30)
+      return reply
+        .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+        .header('Content-Disposition', `attachment; filename="supplier-${safeName}.xlsx"`)
+        .send(buf)
+    },
+  )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard, Printer } from 'lucide-react'
+import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard, Printer, SendHorizontal } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -18,16 +18,15 @@ interface POItem {
   variant: { id: string; sku: string; product: { name: string } }
   quantity: number
   unitCost: number
-  totalCost: number
+  subtotal: number
 }
 
 interface PurchaseOrder {
   id: string
-  poNumber: string
   supplier?: { id: string; name: string }
   branch?: { id: string; name: string }
-  status: 'draft' | 'pending_approval' | 'approved' | 'received' | 'cancelled'
-  totalCost: number
+  status: 'draft' | 'pending' | 'approved' | 'received' | 'cancelled'
+  totalAmount: number
   expectedDate?: string
   createdAt: string
   _count?: { items: number }
@@ -42,7 +41,7 @@ function ReceiveModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
   const { register, handleSubmit } = useForm<{ receivedDate?: string; notes?: string }>()
   if (!po) return null
   return (
-    <Modal open={!!po} onClose={onClose} title={`استلام أمر الشراء: ${po.poNumber}`}
+    <Modal open={!!po} onClose={onClose} title={`استلام أمر الشراء: ${po.id.slice(0, 8).toUpperCase()}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
@@ -72,7 +71,7 @@ function PaymentModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
   })
   if (!po) return null
   return (
-    <Modal open={!!po} onClose={onClose} title={`تسجيل دفعة: ${po.poNumber}`}
+    <Modal open={!!po} onClose={onClose} title={`تسجيل دفعة: ${po.id.slice(0, 8).toUpperCase()}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
@@ -100,7 +99,7 @@ function PaymentModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
 
 const statusMap: Record<string, { label: string; variant: 'gray' | 'warning' | 'success' | 'info' | 'danger' }> = {
   draft: { label: 'مسودة', variant: 'gray' },
-  pending_approval: { label: 'انتظار موافقة', variant: 'warning' },
+  pending: { label: 'انتظار موافقة', variant: 'warning' },
   approved: { label: 'موافق', variant: 'success' },
   received: { label: 'مستلم', variant: 'info' },
   cancelled: { label: 'ملغي', variant: 'danger' },
@@ -180,11 +179,12 @@ function VariantSearchField({
 function printPO(po: PurchaseOrder) {
   const win = window.open('', '_blank', 'width=800,height=700')
   if (!win) return
-  const statusLabels: Record<string, string> = { draft: 'مسودة', pending_approval: 'انتظار موافقة', approved: 'موافق', received: 'مستلم', cancelled: 'ملغي' }
+  const statusLabels: Record<string, string> = { draft: 'مسودة', pending: 'انتظار موافقة', approved: 'موافق', received: 'مستلم', cancelled: 'ملغي' }
+  const poRef = po.id.slice(0, 8).toUpperCase()
   const rows = (po.items ?? []).map((item) =>
-    `<tr><td>${item.variant.product.name}</td><td>${item.variant.sku}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:left">${Number(item.unitCost).toFixed(2)} ج</td><td style="text-align:left">${Number(item.totalCost).toFixed(2)} ج</td></tr>`
+    `<tr><td>${item.variant.product.name}</td><td>${item.variant.sku}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:left">${Number(item.unitCost).toFixed(2)} ج</td><td style="text-align:left">${Number(item.subtotal).toFixed(2)} ج</td></tr>`
   ).join('')
-  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>أمر شراء ${po.poNumber}</title><style>
+  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>أمر شراء ${poRef}</title><style>
     *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;padding:24px;color:#000}
     h1{font-size:20px;margin-bottom:4px}h2{font-size:13px;color:#555;margin-bottom:16px}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
@@ -195,7 +195,7 @@ function printPO(po: PurchaseOrder) {
     @media print{@page{margin:15mm;size:A4}}
   </style></head><body>
     <h1>Storify — أمر شراء</h1>
-    <h2>رقم الأمر: <strong>${po.poNumber}</strong> | الحالة: ${statusLabels[po.status] ?? po.status}</h2>
+    <h2>رقم الأمر: <strong>${poRef}</strong> | الحالة: ${statusLabels[po.status] ?? po.status}</h2>
     <div class="grid">
       <div><span>المورد</span>${po.supplier?.name ?? '—'}</div>
       <div><span>الفرع</span>${po.branch?.name ?? '—'}</div>
@@ -206,7 +206,7 @@ function printPO(po: PurchaseOrder) {
     <table>
       <thead><tr><th>المنتج</th><th>SKU</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
       <tbody>${rows}</tbody>
-      <tfoot><tr class="total"><td colspan="4">الإجمالي الكلي</td><td style="text-align:left">${Number(po.totalCost).toFixed(2)} ج</td></tr></tfoot>
+      <tfoot><tr class="total"><td colspan="4">الإجمالي الكلي</td><td style="text-align:left">${Number(po.totalAmount).toFixed(2)} ج</td></tr></tfoot>
     </table>
     <div class="footer">
       <div style="text-align:center;width:40%"><div style="border-top:1px solid #000;margin-top:40px;padding-top:8px">توقيع المستلم</div></div>
@@ -268,6 +268,15 @@ export default function PurchaseOrders() {
     onError: () => toast.error('حدث خطأ'),
   })
 
+  const { mutate: submit, isPending: isSubmitting } = useMutation({
+    mutationFn: async (id: string) => api.patch(`/purchase-orders/${id}/submit`),
+    onSuccess: () => {
+      toast.success('تم إرسال أمر الشراء للموافقة')
+      qc.invalidateQueries({ queryKey: ['purchase-orders'] })
+    },
+    onError: () => toast.error('حدث خطأ'),
+  })
+
   const { mutate: approve, isPending: isApproving } = useMutation({
     mutationFn: async (id: string) => api.patch(`/purchase-orders/${id}/approve`),
     onSuccess: () => {
@@ -305,8 +314,14 @@ export default function PurchaseOrders() {
   })
 
   const openDetail = async (po: PurchaseOrder) => {
-    const res = await api.get<{ data: PurchaseOrder }>(`/purchase-orders/${po.id}`)
-    setDetailPO(res.data.data)
+    try {
+      // Show drawer immediately with list data while fetching details
+      setDetailPO(po)
+      const res = await api.get<{ data: PurchaseOrder }>(`/purchase-orders/${po.id}`)
+      setDetailPO(res.data.data)
+    } catch {
+      toast.error('تعذر تحميل تفاصيل الأمر')
+    }
   }
 
   const items = watch('items')
@@ -328,23 +343,38 @@ export default function PurchaseOrders() {
           <>
           <Table
             columns={[
-              { key: 'poNumber', header: 'رقم الأمر', render: (po) => (
-                <button className="font-mono text-brand-400 hover:underline" onClick={() => openDetail(po)}>{po.poNumber}</button>
+              { key: 'id', header: 'رقم الأمر', render: (po) => (
+                <button className="font-mono text-brand-400 hover:underline text-xs" onClick={() => openDetail(po)}>{po.id.slice(0, 8).toUpperCase()}</button>
               )},
               { key: 'supplier', header: 'المورد', render: (po) => <span className="text-gray-100">{po.supplier?.name ?? '—'}</span> },
               { key: 'branch', header: 'الفرع', render: (po) => <span className="text-gray-400">{po.branch?.name ?? '—'}</span> },
               { key: 'items', header: 'الأصناف', render: (po) => <span className="font-mono text-gray-400">{po._count?.items ?? 0}</span> },
-              { key: 'totalCost', header: 'الإجمالي', render: (po) => <Money value={po.totalCost} /> },
+              { key: 'totalAmount', header: 'الإجمالي', render: (po) => <Money value={Number(po.totalAmount)} /> },
               { key: 'status', header: 'الحالة', render: (po) => {
                 const s = statusMap[po.status]
                 return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{po.status}</span>
               }},
               { key: 'actions', header: '', render: (po) => (
-                <div className="flex gap-1">
+                <div className="flex gap-1 flex-wrap">
                   <Button variant="ghost" size="sm" onClick={() => openDetail(po)}><Eye className="w-3 h-3" /></Button>
-                  {po.status === 'pending_approval' && (
-                    <Button variant="ghost" size="sm" className="text-success-500" onClick={() => setApproveTarget(po)}>
+                  {po.status === 'draft' && (
+                    <Button variant="ghost" size="sm" className="text-warning-500" onClick={() => submit(po.id)} loading={isSubmitting} title="إرسال للموافقة">
+                      <SendHorizontal className="w-3 h-3" />
+                    </Button>
+                  )}
+                  {po.status === 'pending' && (
+                    <Button variant="ghost" size="sm" className="text-success-500" onClick={() => setApproveTarget(po)} title="الموافقة على الأمر">
                       <Check className="w-3 h-3" />
+                    </Button>
+                  )}
+                  {po.status === 'approved' && (
+                    <Button variant="ghost" size="sm" className="text-info-500" onClick={() => setReceiveTarget(po)} title="استلام البضاعة">
+                      <PackageCheck className="w-3 h-3" />
+                    </Button>
+                  )}
+                  {po.status === 'received' && (
+                    <Button variant="ghost" size="sm" className="text-brand-400" onClick={() => setPaymentTarget(po)} title="تسجيل دفعة للمورد">
+                      <CreditCard className="w-3 h-3" />
                     </Button>
                   )}
                 </div>
@@ -440,9 +470,37 @@ export default function PurchaseOrders() {
       </Drawer>
 
       {/* PO Detail Drawer */}
-      <Drawer open={!!detailPO} onClose={() => setDetailPO(null)} title={`أمر شراء ${detailPO?.poNumber ?? ''}`} width="w-[520px]">
+      <Drawer open={!!detailPO} onClose={() => setDetailPO(null)} title={`أمر شراء #${detailPO?.id.slice(0, 8).toUpperCase() ?? ''}`} width="w-[520px]">
         {detailPO && (
           <div className="flex flex-col gap-6">
+            {/* ── Action buttons at the TOP so they're always visible ── */}
+            <div className="flex flex-wrap gap-2">
+              {detailPO.status === 'draft' && (
+                <Button loading={isSubmitting} onClick={() => { submit(detailPO.id); setDetailPO(null) }}>
+                  <SendHorizontal className="w-4 h-4" />إرسال للموافقة
+                </Button>
+              )}
+              {detailPO.status === 'pending' && (
+                <Button onClick={() => { setDetailPO(null); setApproveTarget(detailPO) }}>
+                  <Check className="w-4 h-4" />الموافقة على الأمر
+                </Button>
+              )}
+              {detailPO.status === 'approved' && (
+                <Button onClick={() => { setDetailPO(null); setReceiveTarget(detailPO) }}>
+                  <PackageCheck className="w-4 h-4" />استلام البضاعة
+                </Button>
+              )}
+              {detailPO.status === 'received' && (
+                <Button variant="secondary" onClick={() => { setDetailPO(null); setPaymentTarget(detailPO) }}>
+                  <CreditCard className="w-4 h-4" />تسجيل دفعة للمورد
+                </Button>
+              )}
+              <Button variant="secondary" onClick={() => printPO(detailPO)}>
+                <Printer className="w-4 h-4" />طباعة
+              </Button>
+            </div>
+
+            {/* ── Metadata ── */}
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div><span className="text-gray-500">المورد</span><p className="text-gray-100 font-medium">{detailPO.supplier?.name ?? '—'}</p></div>
               <div><span className="text-gray-500">الفرع</span><p className="text-gray-100">{detailPO.branch?.name ?? '—'}</p></div>
@@ -450,40 +508,24 @@ export default function PurchaseOrders() {
               <div><span className="text-gray-500">أنشأه</span><p className="text-gray-100">{detailPO.createdBy?.fullName ?? '—'}</p></div>
               {detailPO.approvedBy && <div><span className="text-gray-500">وافق عليه</span><p className="text-gray-100">{detailPO.approvedBy.fullName}</p></div>}
             </div>
+
+            {/* ── Items ── */}
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-3">الأصناف</h4>
               {detailPO.items?.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm py-2 border-b border-gray-700 last:border-0">
                   <div>
-                    <p className="text-gray-100">{item.variant.product.name}</p>
-                    <p className="text-gray-500 text-xs font-mono">{item.variant.sku} × {item.quantity}</p>
+                    <p className="text-gray-100">{item.variant?.product?.name ?? '—'}</p>
+                    <p className="text-gray-500 text-xs font-mono">{item.variant?.sku} × {item.quantity}</p>
                   </div>
-                  <Money value={item.totalCost} />
+                  <Money value={Number(item.subtotal)} />
                 </div>
               ))}
               <div className="flex justify-between text-sm font-semibold mt-3 pt-2 border-t border-gray-600">
                 <span className="text-gray-300">الإجمالي</span>
-                <Money value={detailPO.totalCost} />
+                <Money value={Number(detailPO.totalAmount)} />
               </div>
             </div>
-            <Button variant="secondary" onClick={() => printPO(detailPO)}>
-              <Printer className="w-4 h-4" />طباعة الأمر
-            </Button>
-            {detailPO.status === 'pending_approval' && (
-              <Button onClick={() => { setDetailPO(null); setApproveTarget(detailPO) }}>
-                <Check className="w-4 h-4" />الموافقة على الأمر
-              </Button>
-            )}
-            {detailPO.status === 'approved' && (
-              <Button onClick={() => { setDetailPO(null); setReceiveTarget(detailPO) }}>
-                <PackageCheck className="w-4 h-4" />استلام البضاعة
-              </Button>
-            )}
-            {detailPO.status === 'received' && (
-              <Button variant="secondary" onClick={() => { setDetailPO(null); setPaymentTarget(detailPO) }}>
-                <CreditCard className="w-4 h-4" />تسجيل دفعة للمورد
-              </Button>
-            )}
           </div>
         )}
       </Drawer>
@@ -496,7 +538,7 @@ export default function PurchaseOrders() {
           </>
         }
       >
-        <p className="text-gray-300">هل تريد الموافقة على <strong className="text-gray-100">{approveTarget?.poNumber}</strong>؟</p>
+        <p className="text-gray-300">هل تريد الموافقة على الأمر <strong className="text-gray-100 font-mono">#{approveTarget?.id.slice(0, 8).toUpperCase()}</strong>؟</p>
       </Modal>
 
       <ReceiveModal po={receiveTarget} onClose={() => setReceiveTarget(null)} onConfirm={(d) => receiveTarget && receive({ id: receiveTarget.id, ...d })} isPending={isReceiving} />

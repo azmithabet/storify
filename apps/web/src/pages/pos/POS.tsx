@@ -79,7 +79,7 @@ function printReceipt(inv: CompletedInvoice) {
   const win = window.open('', '_blank', 'width=400,height=640')
   if (!win) return
   const rows = inv.items.map((i) =>
-    `<tr><td>${i.productName}<br/><small style="color:#666">${i.sku} × ${i.quantity}</small></td><td style="text-align:left;white-space:nowrap">${i.lineTotal.toFixed(2)} ج</td></tr>`
+    `<tr><td>${i.productName}<br/><small style="color:#666">${i.sku} × ${i.quantity}</small></td><td style="text-align:left;white-space:nowrap">${Number(i.lineTotal).toFixed(2)} ج</td></tr>`
   ).join('')
   win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إيصال ${inv.invoiceNumber}</title><style>
     *{box-sizing:border-box;margin:0;padding:0}
@@ -102,10 +102,10 @@ function printReceipt(inv: CompletedInvoice) {
     <table><tbody>${rows}</tbody></table>
     <div class="dashed"></div>
     <table><tbody>
-      <tr><td>المجموع الفرعي</td><td style="text-align:left">${inv.subtotal.toFixed(2)} ج</td></tr>
-      ${inv.couponDiscount && inv.couponDiscount > 0 ? `<tr><td>خصم (${inv.couponCode ?? ''})</td><td style="text-align:left;color:green">-${inv.couponDiscount.toFixed(2)} ج</td></tr>` : ''}
-      ${inv.feeAmount > 0 ? `<tr><td>رسوم الدفع</td><td style="text-align:left">${inv.feeAmount.toFixed(2)} ج</td></tr>` : ''}
-      <tr class="total"><td>الإجمالي</td><td style="text-align:left">${inv.totalAmount.toFixed(2)} ج</td></tr>
+      <tr><td>المجموع الفرعي</td><td style="text-align:left">${Number(inv.subtotal).toFixed(2)} ج</td></tr>
+      ${inv.couponDiscount && inv.couponDiscount > 0 ? `<tr><td>خصم (${inv.couponCode ?? ''})</td><td style="text-align:left;color:green">-${Number(inv.couponDiscount).toFixed(2)} ج</td></tr>` : ''}
+      ${inv.feeAmount > 0 ? `<tr><td>رسوم الدفع</td><td style="text-align:left">${Number(inv.feeAmount).toFixed(2)} ج</td></tr>` : ''}
+      <tr class="total"><td>الإجمالي</td><td style="text-align:left">${Number(inv.totalAmount).toFixed(2)} ج</td></tr>
     </tbody></table>
     <div class="dashed"></div>
     <div class="center" style="margin-top:8px"><p>شكراً لتعاملكم معنا</p></div>
@@ -367,9 +367,9 @@ export default function POS() {
       const invoiceRecord: CompletedInvoice = {
         id: apiInvoice.id,
         invoiceNumber: apiInvoice.invoiceNumber,
-        totalAmount: apiInvoice.totalAmount,
-        subtotal,
-        feeAmount: feeBearer === 'customer' ? fee : 0,
+        totalAmount: Number(apiInvoice.totalAmount),
+        subtotal: Number(subtotal),
+        feeAmount: feeBearer === 'customer' ? Number(fee) : 0,
         couponCode: appliedCoupon?.code,
         couponDiscount: couponDiscount > 0 ? couponDiscount : undefined,
         customerName: customer?.fullName,
@@ -397,8 +397,12 @@ export default function POS() {
       toast.success(`تم إنشاء الفاتورة ${apiInvoice.invoiceNumber}`)
     },
     onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg ?? 'فشل إنشاء الفاتورة')
+      const errData = (e as { response?: { data?: { error?: { code?: string; message?: string } } } })?.response?.data?.error
+      if (errData?.code === 'insufficient_stock') {
+        toast.error('المخزون غير كافٍ لأحد المنتجات')
+      } else {
+        toast.error(errData?.message ?? 'فشل إنشاء الفاتورة')
+      }
     },
   })
 

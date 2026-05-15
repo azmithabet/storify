@@ -313,8 +313,7 @@ export async function productRoutes(app: FastifyInstance) {
   // ─── GET /api/products/categories ────────────────────────────────────────────
   app.get('/categories', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
     const categories = await request.tenantDb.category.findMany({
-      where: { isActive: true },
-      select: { id: true, name: true, parentId: true },
+      select: { id: true, name: true, parentId: true, isActive: true },
       orderBy: { name: 'asc' },
     })
     return reply.send({ success: true, data: categories })
@@ -328,6 +327,52 @@ export async function productRoutes(app: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
     const category = await request.tenantDb.category.create({ data: { name: parsed.data.name, parentId: parsed.data.parentId ?? null } })
     return reply.status(201).send({ success: true, data: category })
+  })
+
+  // ─── PATCH /api/products/categories/:id ──────────────────────────────────────
+  app.patch<{ Params: { id: string } }>('/categories/:id', { preHandler: requirePermission('products', 'update') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const schema = z.object({ name: z.string().min(1).optional(), parentId: z.string().uuid().nullable().optional(), isActive: z.boolean().optional() })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    const category = await request.tenantDb.category.update({ where: { id: request.params.id }, data: parsed.data })
+    return reply.send({ success: true, data: category })
+  })
+
+  // ─── GET /api/products/search ─────────────────────────────────────────────────
+  app.get('/search', { preHandler: requirePermission('products', 'read') }, async (request, reply) => {
+    const { z } = await import('zod')
+    const q = z.object({ q: z.string().min(1), limit: z.coerce.number().int().min(1).max(50).default(8) }).safeParse(request.query)
+    if (!q.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: q.error.errors[0].message } })
+    const { q: query, limit } = q.data
+    const variants = await request.tenantDb.productVariant.findMany({
+      where: {
+        isActive: true,
+        OR: [
+          { sku: { contains: query, mode: 'insensitive' } },
+          { barcode: { contains: query, mode: 'insensitive' } },
+          { product: { name: { contains: query, mode: 'insensitive' } } },
+        ],
+        product: { isActive: true },
+      },
+      select: {
+        id: true,
+        sku: true,
+        barcode: true,
+        sellPrice: true,
+        costPrice: true,
+        attributes: true,
+        product: { select: { id: true, name: true } },
+        stock: { select: { quantity: true } },
+      },
+      take: limit,
+      orderBy: { product: { name: 'asc' } },
+    })
+    const data = variants.map((v) => ({
+      ...v,
+      stock: v.stock.reduce((sum, s) => sum + s.quantity, 0),
+    }))
+    return reply.send({ success: true, data })
   })
 
   // ─── GET /api/products/tax-rates ─────────────────────────────────────────────

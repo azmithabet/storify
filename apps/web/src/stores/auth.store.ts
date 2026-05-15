@@ -32,7 +32,10 @@ export const useAuthStore = create<AuthState>()(
 
       setAccessToken: (accessToken) => set({ accessToken }),
 
-      logout: () => set({ user: null, accessToken: null, tenantSubdomain: null }),
+      logout: () => {
+        set({ user: null, accessToken: null, tenantSubdomain: null })
+        window.location.href = '/login'
+      },
 
       hasPermission: (resource, action) => {
         const { user } = get()
@@ -45,8 +48,8 @@ export const useAuthStore = create<AuthState>()(
       name: 'storify-auth',
       partialize: (state) => ({
         user: state.user,
+        accessToken: state.accessToken,
         tenantSubdomain: state.tenantSubdomain,
-        // Don't persist access token — we refresh via cookie
       }),
     },
   ),

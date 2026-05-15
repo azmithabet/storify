@@ -1,4 +1,5 @@
 @import './fonts.css';
+@import 'react-day-picker/style.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -116,4 +117,48 @@
     display: inline-block;
     font-family: var(--font-mono);
   }
+}
+
+/* ─── react-day-picker dark theme ───────────────────────────────────────────── */
+.rdp-storify {
+  --rdp-accent-color: #6366F1;
+  --rdp-accent-background-color: rgba(99, 102, 241, 0.18);
+  --rdp-today-color: #818CF8;
+  --rdp-day-height: 36px;
+  --rdp-day-width: 36px;
+  --rdp-day_button-height: 34px;
+  --rdp-day_button-width: 34px;
+  --rdp-range_start-color: #fff;
+  --rdp-range_end-color: #fff;
+  --rdp-range_middle-color: #E0E7FF;
+  --rdp-nav_button-height: 1.75rem;
+  --rdp-nav_button-width: 1.75rem;
+  color: #F1F5F9;
+  font-family: var(--font-body);
+  font-size: 13px;
+}
+.rdp-storify .rdp-weekday {
+  color: #64748B;
+  font-weight: 500;
+  font-size: 11px;
+}
+.rdp-storify .rdp-day_button {
+  color: #CBD5E1;
+}
+.rdp-storify .rdp-day_button:hover:not([disabled]) {
+  background-color: #334155;
+}
+.rdp-storify .rdp-day_outside .rdp-day_button {
+  color: #475569;
+}
+.rdp-storify .rdp-month_caption {
+  color: #F1F5F9;
+  font-weight: 600;
+}
+.rdp-storify .rdp-chevron {
+  fill: #94A3B8;
+}
+.rdp-storify .rdp-button_previous:hover .rdp-chevron,
+.rdp-storify .rdp-button_next:hover .rdp-chevron {
+  fill: #F1F5F9;
 }

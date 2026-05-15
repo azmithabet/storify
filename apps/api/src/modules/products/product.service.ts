@@ -219,6 +219,37 @@ export async function updateVariant(
 
 // ─── Barcode lookup ───────────────────────────────────────────────────────────
 
+/**
+ * Cross-page typeahead — POS, Installments, PurchaseOrders, Stock all hit this.
+ * Searches variant SKU + product name; returns active variants only with the
+ * fields the typeahead UIs render (product name, sku, sellPrice, per-branch stock).
+ */
+export async function searchVariants(
+  db: TenantPrismaClient,
+  q: string,
+  limit: number,
+) {
+  const term = q.trim()
+  if (!term) return []
+  return db.productVariant.findMany({
+    where: {
+      isActive: true,
+      product: { isActive: true },
+      OR: [
+        { sku: { contains: term, mode: 'insensitive' } },
+        { barcode: { contains: term, mode: 'insensitive' } },
+        { product: { name: { contains: term, mode: 'insensitive' } } },
+      ],
+    },
+    include: {
+      product: { select: { id: true, name: true } },
+      stock: { select: { branchId: true, quantity: true } },
+    },
+    take: Math.min(Math.max(limit, 1), 25),
+    orderBy: [{ product: { name: 'asc' } }, { sku: 'asc' }],
+  })
+}
+
 export async function findByBarcode(db: TenantPrismaClient, barcode: string) {
   const variant = await db.productVariant.findFirst({
     where: { barcode, isActive: true },

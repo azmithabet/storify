@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
-import { AuthGuard, GuestGuard } from '@/components/guards/AuthGuard'
+import { lazy, Suspense, type ReactNode } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { AuthGuard, GuestGuard, RoleGuard } from '@/components/guards/AuthGuard'
+import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Skeleton } from '@/components/ui'
 
 const Login = lazy(() => import('@/pages/auth/Login'))
@@ -31,36 +32,45 @@ const PageLoader = () => (
   </div>
 )
 
+function RouteBoundary({ children }: { children: ReactNode }) {
+  const location = useLocation()
+  return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>
+}
+
 export default function App() {
   return (
-    <Suspense fallback={<PageLoader />}>
-      <Routes>
-        {/* Guest routes */}
-        <Route path="/login" element={<GuestGuard><Login /></GuestGuard>} />
-        <Route path="/forgot-password" element={<GuestGuard><ForgotPassword /></GuestGuard>} />
-        <Route path="/reset-password" element={<GuestGuard><ResetPassword /></GuestGuard>} />
-        <Route path="/register" element={<GuestGuard><Register /></GuestGuard>} />
+    <RouteBoundary>
+      <Suspense fallback={<PageLoader />}>
+        <Routes>
+          {/* Guest routes */}
+          <Route path="/login" element={<GuestGuard><Login /></GuestGuard>} />
+          <Route path="/forgot-password" element={<GuestGuard><ForgotPassword /></GuestGuard>} />
+          <Route path="/reset-password" element={<GuestGuard><ResetPassword /></GuestGuard>} />
+          <Route path="/register" element={<GuestGuard><Register /></GuestGuard>} />
 
-        {/* Dev route (no auth required in dev) */}
-        <Route path="/dev/components" element={<ComponentsShowcase />} />
+          {/* Dev route (no auth required in dev) */}
+          <Route path="/dev/components" element={<ComponentsShowcase />} />
 
-        {/* Protected routes */}
-        <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
-        <Route path="/pos" element={<AuthGuard><POS /></AuthGuard>} />
-        <Route path="/products/*" element={<AuthGuard><Products /></AuthGuard>} />
-        <Route path="/stock/*" element={<AuthGuard><Stock /></AuthGuard>} />
-        <Route path="/customers/*" element={<AuthGuard><Customers /></AuthGuard>} />
-        <Route path="/invoices/*" element={<AuthGuard><Invoices /></AuthGuard>} />
-        <Route path="/installments/*" element={<AuthGuard><Installments /></AuthGuard>} />
-        <Route path="/suppliers/*" element={<AuthGuard><Suppliers /></AuthGuard>} />
-        <Route path="/expenses/*" element={<AuthGuard><Expenses /></AuthGuard>} />
-        <Route path="/reports/*" element={<AuthGuard><Reports /></AuthGuard>} />
-        <Route path="/purchase-orders/*" element={<AuthGuard><PurchaseOrders /></AuthGuard>} />
-        <Route path="/settings/*" element={<AuthGuard><Settings /></AuthGuard>} />
-        <Route path="/returns/*" element={<AuthGuard><Returns /></AuthGuard>} />
+          {/* Protected routes — each wrapped in RoleGuard so unauthorized users
+              see a friendly "forbidden" view rather than a half-loaded page
+              with all empty data and 403s in the console. Super-admin bypasses. */}
+          <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
+          <Route path="/pos" element={<AuthGuard><RoleGuard resource="invoices" action="create"><POS /></RoleGuard></AuthGuard>} />
+          <Route path="/products/*" element={<AuthGuard><RoleGuard resource="products" action="read"><Products /></RoleGuard></AuthGuard>} />
+          <Route path="/stock/*" element={<AuthGuard><RoleGuard resource="stock" action="read"><Stock /></RoleGuard></AuthGuard>} />
+          <Route path="/customers/*" element={<AuthGuard><RoleGuard resource="customers" action="read"><Customers /></RoleGuard></AuthGuard>} />
+          <Route path="/invoices/*" element={<AuthGuard><RoleGuard resource="invoices" action="read"><Invoices /></RoleGuard></AuthGuard>} />
+          <Route path="/installments/*" element={<AuthGuard><RoleGuard resource="installments" action="read"><Installments /></RoleGuard></AuthGuard>} />
+          <Route path="/suppliers/*" element={<AuthGuard><RoleGuard resource="suppliers" action="read"><Suppliers /></RoleGuard></AuthGuard>} />
+          <Route path="/expenses/*" element={<AuthGuard><RoleGuard resource="expenses" action="read"><Expenses /></RoleGuard></AuthGuard>} />
+          <Route path="/reports/*" element={<AuthGuard><RoleGuard resource="reports" action="read"><Reports /></RoleGuard></AuthGuard>} />
+          <Route path="/purchase-orders/*" element={<AuthGuard><RoleGuard resource="purchase_orders" action="read"><PurchaseOrders /></RoleGuard></AuthGuard>} />
+          <Route path="/settings/*" element={<AuthGuard><RoleGuard resource="settings" action="read"><Settings /></RoleGuard></AuthGuard>} />
+          <Route path="/returns/*" element={<AuthGuard><RoleGuard resource="invoices" action="read"><Returns /></RoleGuard></AuthGuard>} />
 
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </Suspense>
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Suspense>
+    </RouteBoundary>
   )
 }

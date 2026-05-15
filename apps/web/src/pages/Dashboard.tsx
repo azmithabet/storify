@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { StatCard, Badge, Alert, Skeleton, Money } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
+import { invoiceStatusMap, getStatus } from '@/constants/status'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -80,13 +81,6 @@ function PendingCard({ label, count, icon, onClick }: { label: string; count: nu
 
 // ─── Recent Invoices ──────────────────────────────────────────────────────────
 
-const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'gray' }> = {
-  completed: { label: 'مكتملة', variant: 'success' },
-  pending: { label: 'معلقة', variant: 'warning' },
-  cancelled: { label: 'ملغاة', variant: 'danger' },
-  returned: { label: 'مرتجعة', variant: 'gray' },
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -159,24 +153,28 @@ export default function Dashboard() {
             value={`${(data?.today.revenue ?? 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج`}
             accentColor="bg-brand-500"
             icon={<TrendingUp className="w-4 h-4" />}
+            onClick={() => navigate(`/invoices?from=${fmt(today)}&to=${fmt(today)}`)}
           />
           <StatCard
             label="فواتير اليوم"
             value={data?.today.invoiceCount ?? 0}
             accentColor="bg-violet-500"
             icon={<ShoppingBag className="w-4 h-4" />}
+            onClick={() => navigate(`/invoices?from=${fmt(today)}&to=${fmt(today)}`)}
           />
           <StatCard
             label="تنبيهات مخزون"
             value={data?.lowStockAlerts ?? 0}
             accentColor="bg-warning-500"
             icon={<PackageOpen className="w-4 h-4" />}
+            onClick={() => navigate('/stock?lowStockOnly=true')}
           />
           <StatCard
             label="موافقات معلقة"
             value={pendingCount}
             accentColor="bg-success-500"
             icon={<Clock className="w-4 h-4" />}
+            onClick={pendingCount > 0 ? () => navigate('/installments') : undefined}
           />
         </div>
       )}
@@ -291,7 +289,7 @@ export default function Dashboard() {
             ) : (
               <div className="flex flex-col">
                 {recentInvoices.map((inv, idx) => {
-                  const s = statusMap[inv.status]
+                  const s = getStatus(invoiceStatusMap, inv.status)
                   return (
                     <div key={inv.id} className={cn('flex items-center justify-between py-3', idx < recentInvoices.length - 1 && 'border-b border-gray-700')}>
                       <div className="flex items-center gap-3">
@@ -308,7 +306,7 @@ export default function Dashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
-                        {s && <Badge variant={s.variant}>{s.label}</Badge>}
+                        <Badge variant={s.variant}>{s.label}</Badge>
                         <Money value={inv.totalAmount} />
                         <span className="text-xs text-gray-600">{new Date(inv.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
                       </div>

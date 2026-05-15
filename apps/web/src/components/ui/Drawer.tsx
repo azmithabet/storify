@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from './Button'
@@ -13,6 +13,8 @@ interface DrawerProps {
 }
 
 export function Drawer({ open, onClose, title, children, width = 'w-96', footer }: DrawerProps) {
+  const titleId = useId()
+
   useEffect(() => {
     if (!open) return
     const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
@@ -28,6 +30,7 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
           open ? 'opacity-100' : 'opacity-0 pointer-events-none',
         )}
         onClick={onClose}
+        aria-hidden="true"
       />
       <div
         className={cn(
@@ -38,10 +41,12 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
         )}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={title ? titleId : undefined}
+        aria-hidden={!open}
       >
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-            <h2 className="text-lg font-semibold text-gray-100">{title}</h2>
+            <h2 id={titleId} className="text-lg font-semibold text-gray-100">{title}</h2>
             <Button variant="ghost" size="sm" onClick={onClose} aria-label="إغلاق">
               <X className="w-4 h-4" />
             </Button>

@@ -65,7 +65,16 @@ export async function loginUser(
   return {
     payload,
     refreshToken,
-    user: { id: user.id, email: user.email, fullName: user.fullName, roleSlug: user.role.slug, branchId: user.branchId ?? '' },
+    user: {
+      id: user.id,
+      email: user.email,
+      fullName: user.fullName,
+      roleSlug: user.role.slug,
+      branchId: user.branchId ?? '',
+      // Send permissions to the client so the frontend can hide menu items
+      // and gate routes the user can't reach. Backend still enforces per-route.
+      permissions: (user.role.permissions as Record<string, string[]>) ?? {},
+    },
   }
 }
 

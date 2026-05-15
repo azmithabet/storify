@@ -1,11 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
+import { useHotkeys } from 'react-hotkeys-hook'
 import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag, WifiOff, BookCheck } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Money, Modal } from '@/components/ui'
+import { Button, Input, Badge, Money, Modal, Kbd } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
+import { printReceipt } from '@/lib/print'
+import { getApiErrorMessage } from '@/lib/api-error'
 
 interface Variant {
   id: string
@@ -73,46 +76,6 @@ interface CompletedInvoice {
   paymentMethodName: string
   createdAt: string
   items: { productName: string; sku: string; quantity: number; unitPrice: number; lineTotal: number }[]
-}
-
-function printReceipt(inv: CompletedInvoice) {
-  const win = window.open('', '_blank', 'width=400,height=640')
-  if (!win) return
-  const rows = inv.items.map((i) =>
-    `<tr><td>${i.productName}<br/><small style="color:#666">${i.sku} × ${i.quantity}</small></td><td style="text-align:left;white-space:nowrap">${i.lineTotal.toFixed(2)} ج</td></tr>`
-  ).join('')
-  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إيصال ${inv.invoiceNumber}</title><style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:monospace;font-size:12px;width:80mm;margin:0 auto;padding:8px;color:#000}
-    .center{text-align:center}
-    h2{font-size:15px;margin:6px 0}
-    table{width:100%;border-collapse:collapse}
-    td{padding:3px 2px;vertical-align:top}
-    .dashed{border-bottom:1px dashed #000;margin:6px 0}
-    .total td{font-weight:bold;font-size:14px;border-top:1px dashed #000;padding-top:6px}
-    @media print{@page{margin:4mm;size:80mm auto}}
-  </style></head><body>
-    <div class="center"><h2>Storify</h2><p style="font-size:11px">نقطة البيع</p></div>
-    <div class="dashed"></div>
-    <p>رقم الفاتورة: <b>${inv.invoiceNumber}</b></p>
-    <p>التاريخ: ${new Date(inv.createdAt).toLocaleString('ar-EG')}</p>
-    ${inv.customerName ? `<p>العميل: ${inv.customerName}</p>` : ''}
-    <p>الدفع: ${inv.paymentMethodName}</p>
-    <div class="dashed"></div>
-    <table><tbody>${rows}</tbody></table>
-    <div class="dashed"></div>
-    <table><tbody>
-      <tr><td>المجموع الفرعي</td><td style="text-align:left">${inv.subtotal.toFixed(2)} ج</td></tr>
-      ${inv.couponDiscount && inv.couponDiscount > 0 ? `<tr><td>خصم (${inv.couponCode ?? ''})</td><td style="text-align:left;color:green">-${inv.couponDiscount.toFixed(2)} ج</td></tr>` : ''}
-      ${inv.feeAmount > 0 ? `<tr><td>رسوم الدفع</td><td style="text-align:left">${inv.feeAmount.toFixed(2)} ج</td></tr>` : ''}
-      <tr class="total"><td>الإجمالي</td><td style="text-align:left">${inv.totalAmount.toFixed(2)} ج</td></tr>
-    </tbody></table>
-    <div class="dashed"></div>
-    <div class="center" style="margin-top:8px"><p>شكراً لتعاملكم معنا</p></div>
-  </body></html>`)
-  win.document.close()
-  win.focus()
-  setTimeout(() => { win.print(); win.close() }, 250)
 }
 
 function calculateFee(total: number, pm: PaymentMethod): number {
@@ -195,10 +158,6 @@ export default function POS() {
       (await api.get<{ data: Customer[] }>('/customers', { params: { search: customerSearch, limit: 10 } })).data.data,
     enabled: customerSearch.length > 1,
   })
-
-  const appliedCredit = useCredit && customer?.creditBalance && Number(creditAmount) > 0
-    ? Math.min(Number(creditAmount), customer.creditBalance, total)
-    : 0
 
   const todayDate = new Date().toISOString().slice(0, 10)
 
@@ -315,6 +274,10 @@ export default function POS() {
   const fee = selectedPM ? calculateFee(discountedSubtotal, selectedPM) : 0
   const total = feeBearer === 'customer' ? discountedSubtotal + fee : discountedSubtotal
 
+  const appliedCredit = useCredit && customer?.creditBalance && Number(creditAmount) > 0
+    ? Math.min(Number(creditAmount), customer.creditBalance, total)
+    : 0
+
   const validateCoupon = async () => {
     if (!couponInput.trim()) return
     setCouponLoading(true)
@@ -329,8 +292,7 @@ export default function POS() {
         setCouponInput('')
       }
     } catch (err: unknown) {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast.error(msg ?? 'كوبون غير صالح')
+      toast.error(getApiErrorMessage(err, 'كوبون غير صالح'))
     } finally {
       setCouponLoading(false)
     }
@@ -396,11 +358,24 @@ export default function POS() {
       setSelectedCurrency(null)
       toast.success(`تم إنشاء الفاتورة ${apiInvoice.invoiceNumber}`)
     },
-    onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(msg ?? 'فشل إنشاء الفاتورة')
-    },
+    onError: (e: unknown) => toast.error(getApiErrorMessage(e, 'فشل إنشاء الفاتورة')),
   })
+
+  // ─── Keyboard shortcuts ──────────────────────────────────────────────────────
+  // enableOnFormTags lets these fire even while typing in another input — so the
+  // cashier can hop back to search/barcode without breaking flow.
+  useHotkeys('mod+k', (e) => { e.preventDefault(); searchRef.current?.focus(); searchRef.current?.select() }, { enableOnFormTags: true })
+  useHotkeys('mod+b', (e) => { e.preventDefault(); barcodeRef.current?.focus(); barcodeRef.current?.select() }, { enableOnFormTags: true })
+  useHotkeys(
+    'mod+enter',
+    (e) => {
+      e.preventDefault()
+      if (cart.length === 0 || !selectedPM || isPending) return
+      submitSale()
+    },
+    { enableOnFormTags: true },
+    [cart.length, selectedPM, isPending],
+  )
 
   return (
     <AppShell title="نقطة البيع">
@@ -416,10 +391,10 @@ export default function POS() {
             : `${offlineQueue.length} فاتورة معلقة — سيتم إرسالها تلقائياً`}
         </div>
       )}
-      <div className="flex gap-6 h-[calc(100vh-8rem)]">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)]">
         {/* LEFT: Search + Cart */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
-          <div className="flex gap-2">
+        <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0">
+          <div className="flex flex-col sm:flex-row gap-2">
             <div className="relative flex-1">
             <Input
               ref={searchRef}
@@ -427,6 +402,7 @@ export default function POS() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               startIcon={<Search className="w-4 h-4" />}
+              endIcon={<Kbd>Ctrl K</Kbd>}
             />
             {searchResults.length > 0 && (
               <div className="absolute z-50 top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-r-lg shadow-lg overflow-hidden">
@@ -451,7 +427,7 @@ export default function POS() {
               </div>
             )}
             </div>
-            <div className="w-52">
+            <div className="w-full sm:w-52">
               <Input
                 ref={barcodeRef}
                 placeholder="باركود..."
@@ -459,13 +435,14 @@ export default function POS() {
                 onChange={(e) => setBarcode(e.target.value)}
                 onKeyDown={handleBarcodeEnter}
                 startIcon={<ScanLine className="w-4 h-4" />}
+                endIcon={<Kbd>Ctrl B</Kbd>}
               />
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-gray-800 rounded-r-xl border border-gray-700">
+          <div className="flex-1 overflow-auto bg-gray-800 rounded-r-xl border border-gray-700 min-h-[240px] lg:min-h-0">
             {cart.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-3">
+              <div className="flex flex-col items-center justify-center h-full text-gray-500 gap-3 py-12">
                 <ShoppingCart className="w-12 h-12 opacity-30" />
                 <p>السلة فارغة — ابحث عن منتج للبدء</p>
               </div>
@@ -528,7 +505,7 @@ export default function POS() {
         </div>
 
         {/* RIGHT: Totals + Payment */}
-        <div className="w-80 flex flex-col gap-4">
+        <div className="w-full lg:w-80 lg:flex-shrink-0 flex flex-col gap-4">
           <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-4">
             {customer ? (
               <div className="flex flex-col gap-2">
@@ -798,6 +775,7 @@ export default function POS() {
             disabled={cart.length === 0 || !selectedPM}
           >
             إتمام البيع
+            <Kbd className="mr-2">Ctrl ⏎</Kbd>
           </Button>
 
           <button

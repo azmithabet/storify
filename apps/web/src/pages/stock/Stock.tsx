@@ -1,13 +1,18 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Settings2, ArrowLeftRight, TrendingUp, Search, Plus, Check, X } from 'lucide-react'
+import { Settings2, ArrowLeftRight, TrendingUp, Search, Plus, Check, X, Download } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, SkeletonTable, Button, Modal, Input, Drawer, Pagination } from '@/components/ui'
+import { Table, Badge, SkeletonTable, Button, Modal, Input, Drawer, Pagination, DateRangePicker, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
+import type { PaginationMeta } from '@/types/api'
+import { getApiErrorCode } from '@/lib/api-error'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
 import { useAuthStore } from '@/stores/auth.store'
 import { cn } from '@/lib/cn'
 
@@ -49,7 +54,6 @@ interface TransferDetail extends Omit<Transfer, '_count'> {
 }
 
 interface Branch { id: string; name: string }
-interface Meta { total: number; page: number; limit: number; pages: number }
 
 const LIMIT = 20
 
@@ -82,8 +86,7 @@ function AdjustModal({ entry, onClose }: { entry: StockEntry; onClose: () => voi
       onClose()
     },
     onError: (e: unknown) => {
-      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
-      toast.error(code === 'insufficient_stock' ? 'الكمية الحالية لا تكفي' : 'حدث خطأ في التعديل')
+      toast.error(getApiErrorCode(e) === 'insufficient_stock' ? 'الكمية الحالية لا تكفي' : 'حدث خطأ في التعديل')
     },
   })
 
@@ -303,28 +306,37 @@ const transferStatusMap: Record<string, { label: string; variant: 'warning' | 's
 
 const movTypeMap: Record<string, { label: string; color: string }> = {
   manual_adjustment: { label: 'تعديل يدوي', color: 'text-brand-400' },
+  in: { label: 'دخول', color: 'text-success-400' },
   sale: { label: 'بيع', color: 'text-danger-400' },
   purchase: { label: 'مشتريات', color: 'text-success-400' },
   return: { label: 'مرتجع', color: 'text-warning-400' },
   transfer: { label: 'تحويل', color: 'text-gray-400' },
   correction: { label: 'تصحيح', color: 'text-gray-400' },
+  cancellation: { label: 'إلغاء فاتورة', color: 'text-info-400' },
 }
 
 // ─── Stock Tab ────────────────────────────────────────────────────────────────
 
 function StockTab() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
-  const [lowStockOnly, setLowStockOnly] = useState(false)
+  const lowStockOnly = searchParams.get('lowStockOnly') === 'true'
+  const setLowStockOnly = (v: boolean) => {
+    const next = new URLSearchParams(searchParams)
+    if (v) next.set('lowStockOnly', 'true')
+    else next.delete('lowStockOnly')
+    setSearchParams(next, { replace: true })
+  }
   const [adjustEntry, setAdjustEntry] = useState<StockEntry | null>(null)
   const [minQtyEntry, setMinQtyEntry] = useState<StockEntry | null>(null)
 
-  const { data, isLoading } = useQuery<{ data: StockEntry[]; meta: Meta }>({
+  const { data, isLoading } = useQuery<{ data: StockEntry[]; meta: PaginationMeta }>({
     queryKey: ['stock', page, lowStockOnly],
     queryFn: async () => {
       const params: Record<string, string | number | boolean> = { limit: LIMIT, page }
       if (lowStockOnly) params.lowStock = 'true'
-      return (await api.get<{ data: StockEntry[]; meta: Meta }>('/stock', { params })).data
+      return (await api.get<{ data: StockEntry[]; meta: PaginationMeta }>('/stock', { params })).data
     },
   })
 
@@ -405,37 +417,73 @@ function StockTab() {
 function MovementsTab() {
   const [page, setPage] = useState(1)
   const [typeFilter, setTypeFilter] = useState('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
 
-  const { data, isLoading } = useQuery<{ data: Movement[]; meta: Meta }>({
-    queryKey: ['stock-movements', page, typeFilter],
+  const { data, isLoading } = useQuery<{ data: Movement[]; meta: PaginationMeta }>({
+    queryKey: ['stock-movements', page, typeFilter, from, to],
     queryFn: async () => {
       const params: Record<string, string | number> = { limit: LIMIT, page }
       if (typeFilter) params.type = typeFilter
-      return (await api.get<{ data: Movement[]; meta: Meta }>('/stock/movements', { params })).data
+      if (from) params.from = from
+      if (to) params.to = to
+      return (await api.get<{ data: Movement[]; meta: PaginationMeta }>('/stock/movements', { params })).data
     },
   })
 
   const items = data?.data ?? []
   const meta = data?.meta
 
+  const selection = useSelection(items.map((m) => m.id))
+
+  const bulkExport = () => {
+    const selected = items.filter((m) => selection.isSelected(m.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'المنتج', accessor: (m) => m.variant.product.name, width: 28 },
+        { header: 'SKU', accessor: (m) => m.variant.sku, width: 18 },
+        { header: 'الفرع', accessor: (m) => m.branch.name, width: 16 },
+        { header: 'النوع', accessor: (m) => movTypeMap[m.type]?.label ?? m.type, width: 14 },
+        { header: 'الكمية', accessor: 'quantity', width: 10 },
+        { header: 'المستخدم', accessor: (m) => m.user?.fullName ?? '', width: 22 },
+        { header: 'التاريخ', accessor: (m) => new Date(m.createdAt).toLocaleString('ar-EG'), width: 22 },
+      ],
+      `stock-movements-${selected.length}.xlsx`,
+      'حركات المخزون',
+    )
+  }
+
   return (
     <>
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-wrap">
         <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
           className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
           <option value="">كل الحركات</option>
+          <option value="in">دخول</option>
           <option value="sale">بيع</option>
-          <option value="purchase">مشتريات</option>
           <option value="return">مرتجع</option>
           <option value="transfer">تحويل</option>
           <option value="manual_adjustment">تعديل يدوي</option>
           <option value="correction">تصحيح</option>
+          <option value="cancellation">إلغاء فاتورة</option>
         </select>
+        <DateRangePicker
+          value={{ from, to }}
+          onChange={(v) => { setFrom(v.from); setTo(v.to); setPage(1) }}
+        />
       </div>
 
       {isLoading ? <SkeletonTable rows={10} cols={6} /> : (
         <>
           <Table
+            selection={{
+              isSelected: (m) => selection.isSelected(m.id),
+              onToggle: (m) => selection.toggle(m.id),
+              onToggleAll: selection.toggleAllVisible,
+              allSelected: selection.allVisibleSelected,
+              someSelected: selection.someVisibleSelected,
+            }}
             columns={[
               { key: 'product', header: 'المنتج', render: (m) => (
                 <div>
@@ -463,6 +511,11 @@ function MovementsTab() {
           {meta && <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />}
         </>
       )}
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+      </BulkActionBar>
     </>
   )
 }
@@ -485,12 +538,12 @@ function TransfersTab() {
   })
   const branches = branchData ?? []
 
-  const { data, isLoading } = useQuery<{ data: Transfer[]; meta: Meta }>({
+  const { data, isLoading } = useQuery<{ data: Transfer[]; meta: PaginationMeta }>({
     queryKey: ['stock-transfers', page, statusFilter],
     queryFn: async () => {
       const params: Record<string, string | number> = { limit: LIMIT, page }
       if (statusFilter) params.status = statusFilter
-      return (await api.get<{ data: Transfer[]; meta: Meta }>('/stock/transfers', { params })).data
+      return (await api.get<{ data: Transfer[]; meta: PaginationMeta }>('/stock/transfers', { params })).data
     },
   })
 
@@ -513,8 +566,7 @@ function TransfersTab() {
       setDetailTransfer(null)
     },
     onError: (e: unknown) => {
-      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
-      toast.error(code === 'insufficient_stock' ? 'المخزون غير كافٍ لإتمام التحويل' : 'فشلت العملية')
+      toast.error(getApiErrorCode(e) === 'insufficient_stock' ? 'المخزون غير كافٍ لإتمام التحويل' : 'فشلت العملية')
     },
   })
 

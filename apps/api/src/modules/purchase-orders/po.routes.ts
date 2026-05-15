@@ -153,17 +153,59 @@ export async function purchaseOrderRoutes(app: FastifyInstance) {
         include: { items: true },
       })
       if (!po) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'أمر الشراء غير موجود' } })
-      if (po.status !== 'approved') return reply.status(400).send({ success: false, error: { code: 'invalid_status', message: 'أمر الشراء يجب أن يكون معتمداً أولاً' } })
+      if (po.status !== 'approved' && po.status !== 'partially_received') {
+        return reply.status(400).send({ success: false, error: { code: 'invalid_status', message: 'أمر الشراء يجب أن يكون معتمداً أولاً' } })
+      }
 
       const receivedDate = parsed.data.receivedDate ? new Date(parsed.data.receivedDate) : new Date()
 
-      await request.tenantDb.$transaction(async (tx) => {
-        // Increment stock for each item
+      // Resolve which items + quantities to receive this batch.
+      // Default (no `items` payload): receive all outstanding quantities.
+      // With `items`: validate each row belongs to this PO and the requested
+      // quantity doesn't exceed what's still outstanding.
+      type ReceiveBatch = { item: typeof po.items[number]; quantity: number }
+      const batch: ReceiveBatch[] = []
+      if (parsed.data.items && parsed.data.items.length > 0) {
+        for (const requested of parsed.data.items) {
+          const item = po.items.find((i) => i.id === requested.id)
+          if (!item) {
+            return reply.status(400).send({
+              success: false,
+              error: { code: 'item_not_in_po', message: 'صنف غير موجود في أمر الشراء' },
+            })
+          }
+          const outstanding = item.quantity - item.receivedQuantity
+          if (requested.quantity > outstanding) {
+            return reply.status(400).send({
+              success: false,
+              error: { code: 'qty_exceeds_outstanding', message: `الكمية المطلوبة تتجاوز المتبقي (${outstanding}) للصنف` },
+            })
+          }
+          if (requested.quantity > 0) batch.push({ item, quantity: requested.quantity })
+        }
+      } else {
         for (const item of po.items) {
+          const outstanding = item.quantity - item.receivedQuantity
+          if (outstanding > 0) batch.push({ item, quantity: outstanding })
+        }
+      }
+
+      if (batch.length === 0) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'nothing_to_receive', message: 'لا توجد كميات متبقية للاستلام' },
+        })
+      }
+
+      // Cost of just this batch (proportional supplier liability).
+      const batchCost = batch.reduce((sum, b) => sum + toDecimal(b.item.unitCost).toNumber() * b.quantity, 0)
+
+      const result = await request.tenantDb.$transaction(async (tx) => {
+        for (const { item, quantity } of batch) {
           await tx.stock.upsert({
             where: { uq_stock_variant_branch: { variantId: item.variantId, branchId: po.branchId } },
-            create: { variantId: item.variantId, branchId: po.branchId, quantity: item.quantity, minQuantity: 0, updatedAt: new Date() },
-            update: { quantity: { increment: item.quantity }, updatedAt: new Date() },
+            create: { variantId: item.variantId, branchId: po.branchId, quantity, minQuantity: 0, updatedAt: new Date() },
+            update: { quantity: { increment: quantity }, updatedAt: new Date() },
           })
 
           await tx.stockMovement.create({
@@ -172,13 +214,18 @@ export async function purchaseOrderRoutes(app: FastifyInstance) {
               branchId: po.branchId,
               userId: actor.userId,
               type: 'in',
-              quantity: item.quantity,
+              quantity,
               reference: po.id,
             },
           })
+
+          // Advance the PO item's received counter.
+          await tx.purchaseOrderItem.update({
+            where: { id: item.id },
+            data: { receivedQuantity: { increment: quantity } },
+          })
         }
 
-        // Create receipt
         await tx.purchaseReceipt.create({
           data: {
             orderId: po.id,
@@ -189,26 +236,31 @@ export async function purchaseOrderRoutes(app: FastifyInstance) {
           },
         })
 
-        // Record supplier liability (we now owe them)
+        // Supplier liability is per-batch — only what arrived in this receipt.
         await tx.supplierTransaction.create({
           data: {
             supplierId: po.supplierId,
             branchId: po.branchId,
             userId: actor.userId,
             type: 'purchase',
-            amount: po.totalAmount,
+            amount: batchCost,
             reference: po.id,
           },
         })
         await tx.supplier.update({
           where: { id: po.supplierId },
-          data: { balance: { increment: toDecimal(po.totalAmount).toNumber() } },
+          data: { balance: { increment: batchCost } },
         })
 
-        // Update PO status
+        // Determine the new PO status by re-reading item totals after this
+        // batch's updates have committed inside the transaction.
+        const refreshedItems = await tx.purchaseOrderItem.findMany({ where: { orderId: po.id } })
+        const allFulfilled = refreshedItems.every((i) => i.receivedQuantity >= i.quantity)
+        const newStatus = allFulfilled ? 'received' : 'partially_received'
+
         await tx.purchaseOrder.update({
           where: { id: po.id },
-          data: { status: 'received' },
+          data: { status: newStatus },
         })
 
         await tx.auditLog.create({
@@ -216,13 +268,20 @@ export async function purchaseOrderRoutes(app: FastifyInstance) {
             actorId: actor.userId,
             entity: 'purchase_order',
             entityId: po.id,
-            action: 'receive',
-            after: { status: 'received', itemCount: po.items.length },
+            action: allFulfilled ? 'receive' : 'partial_receive',
+            before: { status: po.status },
+            after: {
+              status: newStatus,
+              itemCount: batch.length,
+              batchCost: String(batchCost),
+            },
           },
         })
+
+        return { status: newStatus, itemsReceived: batch.length }
       })
 
-      return reply.send({ success: true })
+      return reply.send({ success: true, data: result })
     },
   )
 

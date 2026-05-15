@@ -6,8 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer, Modal, Money, SkeletonTable, Pagination } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Modal, Money, SkeletonTable, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
+import { getApiErrorMessage } from '@/lib/api-error'
+import type { PaginationMeta } from '@/types/api'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
+import { printBarcodeLabels } from '@/lib/print'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface ProductVariant {
@@ -32,7 +37,6 @@ interface Product {
   variants: ProductVariant[]
 }
 
-interface Meta { total: number; page: number; limit: number; pages: number }
 interface Category { id: string; name: string }
 interface TaxRate { id: string; name: string; rate: string | number; isDefault: boolean }
 interface ProductDiscount { id: string; discountType: 'percentage' | 'fixed'; discountValue: string | number; startDate: string; endDate: string; isActive: boolean }
@@ -83,36 +87,6 @@ const variantFormSchema = z.object({
 type VariantFormData = z.infer<typeof variantFormSchema>
 
 // ─── Barcode label printer ────────────────────────────────────────────────────
-function printBarcodeLabels(labels: { name: string; sku: string; barcode: string; price: number }[], copies = 1) {
-  const win = window.open('', '_blank', 'width=800,height=600')
-  if (!win) return
-  const repeated = labels.flatMap((l) => Array(copies).fill(l))
-  const cells = repeated.map((l) => `
-    <div class="label">
-      <p class="name">${l.name}</p>
-      <div class="barcode">${l.barcode || l.sku}</div>
-      <p class="sku">${l.sku} — ${Number(l.price).toFixed(2)} ج</p>
-    </div>
-  `).join('')
-  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>ملصقات الباركود</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128+Text&display=swap" rel="stylesheet">
-    <style>
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;background:#fff;padding:8px}
-      .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
-      .label{border:1px dashed #ccc;border-radius:4px;padding:6px 8px;text-align:center;page-break-inside:avoid}
-      .name{font-size:10px;font-weight:bold;color:#111;margin-bottom:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
-      .barcode{font-family:'Libre Barcode 128 Text',monospace;font-size:48px;line-height:1;color:#000;margin:2px 0}
-      .sku{font-size:9px;color:#555;margin-top:3px}
-      @media print{@page{margin:6mm;size:A4}body{padding:0}}
-    </style></head><body>
-    <div class="grid">${cells}</div>
-    <script>window.onload=function(){window.print();window.close()}</script>
-  </body></html>`)
-  win.document.close()
-}
-
 // ─── Helper ───────────────────────────────────────────────────────────────────
 function buildVariantPayload(v: { sku?: string; barcode?: string; costPrice: number; sellPrice: number; attrKey?: string; attrValue?: string }) {
   const attributes: Record<string, string> = {}
@@ -128,7 +102,6 @@ export default function Products() {
   const [createOpen, setCreateOpen] = useState(false)
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [importResult, setImportResult] = useState<{ created: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
-  const [selectedForLabels, setSelectedForLabels] = useState<Set<string>>(new Set())
   const [labelCopies, setLabelCopies] = useState(1)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -158,13 +131,57 @@ export default function Products() {
     URL.revokeObjectURL(url)
   }
 
-  const { data, isLoading } = useQuery<{ data: Product[]; meta: Meta }>({
+  const { data, isLoading } = useQuery<{ data: Product[]; meta: PaginationMeta }>({
     queryKey: ['products', search, page],
-    queryFn: async () => (await api.get<{ data: Product[]; meta: Meta }>('/products', { params: { search, limit: LIMIT, page } })).data,
+    queryFn: async () => (await api.get<{ data: Product[]; meta: PaginationMeta }>('/products', { params: { search, limit: LIMIT, page } })).data,
   })
 
   const products = data?.data ?? []
   const meta = data?.meta
+
+  const selection = useSelection(products.map((p) => p.id))
+
+  const bulkDelete = useMutation({
+    mutationFn: async (ids: string[]) => {
+      await Promise.all(ids.map((id) => api.delete(`/products/${id}`)))
+    },
+    onSuccess: (_, ids) => {
+      toast.success(`تم حذف ${ids.length} منتج`)
+      selection.clear()
+      qc.invalidateQueries({ queryKey: ['products'] })
+    },
+    onError: (e) => toast.error(getApiErrorMessage(e, 'فشل الحذف الجماعي')),
+  })
+
+  const bulkExport = () => {
+    const selected = products.filter((p) => selection.isSelected(p.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'الاسم', accessor: 'name', width: 28 },
+        { header: 'الفئة', accessor: (p) => p.category?.name ?? '', width: 16 },
+        { header: 'الوحدة', accessor: 'unit', width: 10 },
+        { header: 'متغيرات', accessor: (p) => p.variants.length, width: 10 },
+        { header: 'SKU الأول', accessor: (p) => p.variants[0]?.sku ?? '', width: 18 },
+        { header: 'السعر الأدنى', accessor: (p) => Math.min(...p.variants.map((v) => Number(v.sellPrice))), width: 14 },
+        { header: 'نشط', accessor: (p) => (p.isActive ? 'نعم' : 'لا'), width: 8 },
+      ],
+      `products-${selected.length}.xlsx`,
+      'المنتجات',
+    )
+  }
+
+  const bulkPrintLabels = () => {
+    const labels = products
+      .filter((p) => selection.isSelected(p.id))
+      .flatMap((p) => p.variants.map((v) => ({
+        name: p.name,
+        sku: v.sku ?? '',
+        barcode: v.barcode ?? v.sku ?? '',
+        price: Number(v.sellPrice),
+      })))
+    printBarcodeLabels(labels, labelCopies)
+  }
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['product-categories'],
@@ -193,31 +210,6 @@ export default function Products() {
               startIcon={<Search className="w-4 h-4" />}
             />
           </div>
-          {selectedForLabels.size > 0 && (
-            <div className="flex items-center gap-2">
-              <input
-                type="number" min={1} max={50} value={labelCopies}
-                onChange={(e) => setLabelCopies(Math.max(1, Number(e.target.value)))}
-                className="w-14 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 text-center"
-              />
-              <Button
-                variant="outline" size="sm"
-                onClick={() => {
-                  const labels = products
-                    .filter((p) => selectedForLabels.has(p.id))
-                    .flatMap((p) => p.variants.map((v) => ({
-                      name: p.name,
-                      sku: v.sku ?? '',
-                      barcode: v.barcode ?? v.sku ?? '',
-                      price: Number(v.sellPrice),
-                    })))
-                  printBarcodeLabels(labels, labelCopies)
-                }}
-              >
-                <Barcode className="w-4 h-4" />طباعة ملصقات ({selectedForLabels.size})
-              </Button>
-            </div>
-          )}
           <Button variant="outline" size="sm" onClick={downloadSampleCsv}><Download className="w-4 h-4" />نموذج CSV</Button>
           <Button
             variant="outline" size="sm"
@@ -236,20 +228,14 @@ export default function Products() {
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
           <>
             <Table
+              selection={{
+                isSelected: (p) => selection.isSelected(p.id),
+                onToggle: (p) => selection.toggle(p.id),
+                onToggleAll: selection.toggleAllVisible,
+                allSelected: selection.allVisibleSelected,
+                someSelected: selection.someVisibleSelected,
+              }}
               columns={[
-                { key: 'select', header: '', render: (p) => (
-                  <input
-                    type="checkbox"
-                    checked={selectedForLabels.has(p.id)}
-                    onChange={(e) => {
-                      const next = new Set(selectedForLabels)
-                      e.target.checked ? next.add(p.id) : next.delete(p.id)
-                      setSelectedForLabels(next)
-                    }}
-                    onClick={(e) => e.stopPropagation()}
-                    className="w-4 h-4 accent-brand-500 cursor-pointer"
-                  />
-                )},
                 { key: 'name', header: 'المنتج', render: (p) => (
                   <div>
                     <button className="font-medium text-gray-100 hover:text-brand-400 text-right" onClick={() => openDetail(p)}>{p.name}</button>
@@ -310,7 +296,7 @@ export default function Products() {
       />
 
       {importResult && (
-        <Modal title="نتيجة الاستيراد" onClose={() => setImportResult(null)}>
+        <Modal open title="نتيجة الاستيراد" onClose={() => setImportResult(null)}>
           <div className="space-y-4">
             <div className="flex gap-6 text-center">
               <div className="flex-1 bg-green-900/30 rounded-lg p-4">
@@ -344,6 +330,33 @@ export default function Products() {
           </div>
         </Modal>
       )}
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+        <div className="flex items-center gap-1.5">
+          <input
+            type="number" min={1} max={50} value={labelCopies}
+            onChange={(e) => setLabelCopies(Math.max(1, Number(e.target.value)))}
+            className="w-14 bg-gray-700 border border-gray-600 rounded px-2 py-1 text-xs text-gray-100 text-center"
+            aria-label="عدد النسخ"
+          />
+          <Button variant="outline" size="sm" onClick={bulkPrintLabels}>
+            <Barcode className="w-4 h-4" />طباعة ملصقات
+          </Button>
+        </div>
+        <Button
+          variant="danger" size="sm"
+          loading={bulkDelete.isPending}
+          onClick={() => {
+            if (confirm(`هل تريد حذف ${selection.count} منتج؟ لا يمكن التراجع.`)) {
+              bulkDelete.mutate(selection.ids)
+            }
+          }}
+        >
+          <Trash2 className="w-4 h-4" />حذف
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }
@@ -375,10 +388,7 @@ function CreateProductDrawer({ open, onClose, categories, taxRates, onSuccess }:
       variants: data.variants.map(buildVariantPayload),
     }),
     onSuccess: () => { toast.success('تم إنشاء المنتج'); reset(); onSuccess() },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast.error(msg ?? 'حدث خطأ')
-    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
   return (
@@ -497,7 +507,8 @@ function ProductDiscountsSection({ productId }: { productId: string }) {
     queryFn: async () => (await api.get<{ data: ProductDiscount[] }>('/products/discounts', { params: { productId } })).data.data,
   })
 
-  const activeDiscounts = discounts.filter((d) => d.productId === productId || true) // all from query filtered by server
+  // The query already filters by productId server-side.
+  const activeDiscounts = discounts
 
   const { mutate: addDiscount, isPending: adding } = useMutation({
     mutationFn: async () => {
@@ -827,10 +838,7 @@ function AddVariantModal({ open, productId, hasVariants, onClose, onSuccess }: {
     mutationFn: async (data: VariantFormData) =>
       api.post(`/products/${productId}/variants`, buildVariantPayload(data)),
     onSuccess: () => { toast.success('تم إضافة المتغير'); reset(); onSuccess() },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast.error(msg ?? 'حدث خطأ')
-    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
   return (

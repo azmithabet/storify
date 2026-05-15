@@ -1,78 +1,17 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Eye, RotateCcw, Printer } from 'lucide-react'
+import { Search, Eye, RotateCcw, Printer, Download, Ban } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination, Modal } from '@/components/ui'
+import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination, Modal, DateRangePicker, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
-
-function printInvoice(inv: Invoice) {
-  const fmt = (n: number) => n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-  const rows = (inv.items ?? []).map((item) => `
-    <tr>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${item.productName}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${item.quantity}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(item.unitPrice))}</td>
-      <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(item.totalPrice))}</td>
-    </tr>`).join('')
-
-  const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
-    <title>فاتورة ${inv.invoiceNumber}</title>
-    <style>
-      *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:32px}
-      h1{font-size:22px;font-weight:700;margin-bottom:4px}
-      .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0;padding:16px;background:#f9fafb;border-radius:8px}
-      .meta-item label{font-size:11px;color:#6b7280;display:block;margin-bottom:2px}
-      .meta-item p{font-weight:600}
-      table{width:100%;border-collapse:collapse;margin-top:16px}
-      th{background:#f3f4f6;padding:10px 12px;text-align:right;font-size:12px;color:#374151}
-      th:not(:first-child){text-align:center}
-      th:last-child,th:nth-child(3){text-align:left}
-      .totals{margin-top:20px;display:flex;flex-direction:column;align-items:flex-start;gap:6px;min-width:260px}
-      .totals-row{display:flex;justify-content:space-between;width:260px;font-size:13px;color:#374151}
-      .totals-row.total{font-size:16px;font-weight:700;border-top:2px solid #111;padding-top:8px;margin-top:4px}
-      .footer{margin-top:40px;text-align:center;font-size:11px;color:#9ca3af}
-      @media print{body{padding:16px}}
-    </style></head><body>
-    <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div>
-        <h1>فاتورة ضريبية</h1>
-        <p style="color:#6b7280;font-size:12px">Storify POS</p>
-      </div>
-      <div style="text-align:left">
-        <p style="font-size:18px;font-weight:700;font-family:monospace">${inv.invoiceNumber}</p>
-        <p style="font-size:12px;color:#6b7280">${new Date(inv.createdAt).toLocaleString('ar-EG')}</p>
-      </div>
-    </div>
-    <div class="meta">
-      <div class="meta-item"><label>العميل</label><p>${inv.customer?.fullName ?? 'نقدي'}</p></div>
-      <div class="meta-item"><label>طريقة الدفع</label><p>${inv.paymentMethod?.name ?? '—'}</p></div>
-      <div class="meta-item"><label>الكاشير</label><p>${inv.cashier?.fullName ?? '—'}</p></div>
-      <div class="meta-item"><label>الحالة</label><p>${inv.status === 'completed' ? 'مكتملة' : inv.status}</p></div>
-    </div>
-    <table>
-      <thead><tr>
-        <th>الصنف</th><th style="text-align:center">الكمية</th><th style="text-align:left">سعر الوحدة</th><th style="text-align:left">الإجمالي</th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table>
-    <div class="totals">
-      <div class="totals-row"><span>المجموع الفرعي</span><span>${fmt(Number(inv.subtotal))}</span></div>
-      ${Number(inv.discountAmount) > 0 ? `<div class="totals-row" style="color:#dc2626"><span>الخصم</span><span>- ${fmt(Number(inv.discountAmount))}</span></div>` : ''}
-      ${Number(inv.taxTotal) > 0 ? `<div class="totals-row"><span>الضريبة</span><span>${fmt(Number(inv.taxTotal))}</span></div>` : ''}
-      ${Number(inv.feeAmount) > 0 ? `<div class="totals-row"><span>رسوم الدفع</span><span>${fmt(Number(inv.feeAmount))}</span></div>` : ''}
-      <div class="totals-row total"><span>الإجمالي</span><span>${fmt(Number(inv.totalAmount))} ج</span></div>
-    </div>
-    <div class="footer"><p>شكراً لتعاملكم معنا — تم الإنشاء بواسطة Storify</p></div>
-  </body></html>`
-
-  const win = window.open('', '_blank', 'width=800,height=1000')
-  if (!win) return
-  win.document.write(html)
-  win.document.close()
-  setTimeout(() => { win.print(); setTimeout(() => win.close(), 500) }, 300)
-}
+import { printInvoice } from '@/lib/print'
+import type { PaginationMeta } from '@/types/api'
+import { invoiceStatusMap, getStatus } from '@/constants/status'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
+import { getApiErrorMessage } from '@/lib/api-error'
 
 interface InvoiceItem {
   id: string
@@ -99,18 +38,9 @@ interface Invoice {
   items?: InvoiceItem[]
 }
 
-interface Meta { total: number; page: number; limit: number; pages: number }
-
 interface ReturnItem { itemId: string; quantity: number; maxQty: number; productName: string; variantSku: string }
 
 const LIMIT = 20
-
-const statusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'gray' }> = {
-  completed: { label: 'مكتملة', variant: 'success' },
-  pending: { label: 'معلقة', variant: 'warning' },
-  cancelled: { label: 'ملغاة', variant: 'danger' },
-  returned: { label: 'مرتجعة', variant: 'gray' },
-}
 
 function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const qc = useQueryClient()
@@ -203,19 +133,28 @@ function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => vo
 }
 
 export default function Invoices() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
-  const [from, setFrom] = useState('')
-  const [to, setTo] = useState('')
+  const from = searchParams.get('from') ?? ''
+  const to = searchParams.get('to') ?? ''
+  const setRange = (next: { from: string; to: string }) => {
+    const params = new URLSearchParams(searchParams)
+    if (next.from) params.set('from', next.from); else params.delete('from')
+    if (next.to) params.set('to', next.to); else params.delete('to')
+    setSearchParams(params, { replace: true })
+  }
   const [page, setPage] = useState(1)
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null)
   const [returnInvoice, setReturnInvoice] = useState<Invoice | null>(null)
+  const [cancelTarget, setCancelTarget] = useState<Invoice | null>(null)
+  const qc = useQueryClient()
 
   const resetPage = () => setPage(1)
 
-  const { data, isLoading } = useQuery<{ data: Invoice[]; meta: Meta }>({
+  const { data, isLoading } = useQuery<{ data: Invoice[]; meta: PaginationMeta }>({
     queryKey: ['invoices', search, status, from, to, page],
-    queryFn: async () => (await api.get<{ data: Invoice[]; meta: Meta }>('/invoices', {
+    queryFn: async () => (await api.get<{ data: Invoice[]; meta: PaginationMeta }>('/invoices', {
       params: {
         page, limit: LIMIT,
         ...(search ? { search } : {}),
@@ -229,10 +168,47 @@ export default function Invoices() {
   const invoices = data?.data ?? []
   const meta = data?.meta
 
+  const selection = useSelection(invoices.map((i) => i.id))
+
+  const bulkExport = () => {
+    const selected = invoices.filter((i) => selection.isSelected(i.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'رقم الفاتورة', accessor: 'invoiceNumber', width: 18 },
+        { header: 'العميل', accessor: (i) => i.customer?.fullName ?? 'نقدي', width: 24 },
+        { header: 'طريقة الدفع', accessor: (i) => i.paymentMethod?.name ?? '—', width: 16 },
+        { header: 'الكاشير', accessor: (i) => i.cashier?.fullName ?? '—', width: 18 },
+        { header: 'الحالة', accessor: (i) => getStatus(invoiceStatusMap, i.status).label, width: 12 },
+        { header: 'المجموع الفرعي', accessor: 'subtotal', width: 14 },
+        { header: 'الخصم', accessor: 'discountAmount', width: 12 },
+        { header: 'الضريبة', accessor: 'taxTotal', width: 12 },
+        { header: 'رسوم الدفع', accessor: 'feeAmount', width: 12 },
+        { header: 'الإجمالي', accessor: 'totalAmount', width: 14 },
+        { header: 'التاريخ', accessor: (i) => new Date(i.createdAt).toLocaleString('ar-EG'), width: 22 },
+      ],
+      `invoices-${selected.length}.xlsx`,
+      'الفواتير',
+    )
+  }
+
   const openDetail = async (inv: Invoice) => {
     const res = await api.get<{ data: Invoice }>(`/invoices/${inv.id}`)
     setDetailInvoice(res.data.data)
   }
+
+  const { mutate: cancelInvoiceMutation, isPending: isCancelling } = useMutation({
+    mutationFn: async (id: string) => api.post(`/invoices/${id}/cancel`),
+    onSuccess: () => {
+      toast.success('تم إلغاء الفاتورة واستعادة المخزون')
+      qc.invalidateQueries({ queryKey: ['invoices'] })
+      qc.invalidateQueries({ queryKey: ['customer-ledger'] })
+      qc.invalidateQueries({ queryKey: ['stock'] })
+      setCancelTarget(null)
+      setDetailInvoice(null)
+    },
+    onError: (e: unknown) => toast.error(getApiErrorMessage(e, 'فشل إلغاء الفاتورة')),
+  })
 
   return (
     <AppShell title="الفواتير">
@@ -249,13 +225,12 @@ export default function Invoices() {
             <option value="returned">مرتجعة</option>
             <option value="cancelled">ملغاة</option>
           </select>
-          <input type="date" value={from} onChange={(e) => { setFrom(e.target.value); resetPage() }}
-            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
-          <span className="text-gray-500 text-sm">—</span>
-          <input type="date" value={to} onChange={(e) => { setTo(e.target.value); resetPage() }}
-            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
+          <DateRangePicker
+            value={{ from, to }}
+            onChange={(v) => { setRange({ from: v.from, to: v.to }); resetPage() }}
+          />
           {(status || from || to) && (
-            <button onClick={() => { setStatus(''); setFrom(''); setTo(''); resetPage() }}
+            <button onClick={() => { setStatus(''); setRange({ from: '', to: '' }); resetPage() }}
               className="text-xs text-gray-500 hover:text-gray-300 transition-colors">مسح الفلاتر ×</button>
           )}
         </div>
@@ -263,6 +238,13 @@ export default function Invoices() {
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
           <>
             <Table
+              selection={{
+                isSelected: (i) => selection.isSelected(i.id),
+                onToggle: (i) => selection.toggle(i.id),
+                onToggleAll: selection.toggleAllVisible,
+                allSelected: selection.allVisibleSelected,
+                someSelected: selection.someVisibleSelected,
+              }}
               columns={[
                 { key: 'invoiceNumber', header: 'رقم الفاتورة', render: (i) => (
                   <button className="font-mono text-brand-400 hover:underline" onClick={() => openDetail(i)}>{i.invoiceNumber}</button>
@@ -271,8 +253,8 @@ export default function Invoices() {
                 { key: 'paymentMethod', header: 'طريقة الدفع', render: (i) => <span className="text-gray-400">{i.paymentMethod?.name ?? '—'}</span> },
                 { key: 'totalAmount', header: 'الإجمالي', render: (i) => <Money value={i.totalAmount} /> },
                 { key: 'status', header: 'الحالة', render: (i) => {
-                  const s = statusMap[i.status]
-                  return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{i.status}</span>
+                  const s = getStatus(invoiceStatusMap, i.status)
+                  return <Badge variant={s.variant} dot>{s.label}</Badge>
                 }},
                 { key: 'createdAt', header: 'التاريخ', render: (i) => <span className="text-gray-500 text-xs">{new Date(i.createdAt).toLocaleDateString('ar-EG')}</span> },
                 { key: 'actions', header: '', render: (i) => (
@@ -299,6 +281,11 @@ export default function Invoices() {
             {detailInvoice?.status === 'completed' && (
               <Button variant="secondary" onClick={() => { setReturnInvoice(detailInvoice); setDetailInvoice(null) }}>
                 <RotateCcw className="w-4 h-4" />إرجاع
+              </Button>
+            )}
+            {detailInvoice && (detailInvoice.status === 'completed' || detailInvoice.status === 'pending') && (
+              <Button variant="danger" onClick={() => setCancelTarget(detailInvoice)}>
+                <Ban className="w-4 h-4" />إلغاء الفاتورة
               </Button>
             )}
           </div>
@@ -349,6 +336,42 @@ export default function Invoices() {
       <Modal open={!!returnInvoice} onClose={() => setReturnInvoice(null)} title={`إرجاع فاتورة ${returnInvoice?.invoiceNumber ?? ''}`}>
         {returnInvoice && <ReturnModal invoice={returnInvoice} onClose={() => setReturnInvoice(null)} />}
       </Modal>
+      <Modal
+        open={!!cancelTarget}
+        onClose={() => setCancelTarget(null)}
+        title={`إلغاء فاتورة ${cancelTarget?.invoiceNumber ?? ''}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setCancelTarget(null)} disabled={isCancelling}>تراجع</Button>
+            <Button variant="danger" loading={isCancelling} onClick={() => cancelTarget && cancelInvoiceMutation(cancelTarget.id)}>
+              <Ban className="w-4 h-4" />تأكيد الإلغاء
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3 text-sm">
+          <p className="text-gray-300">سيؤدي إلغاء الفاتورة إلى:</p>
+          <ul className="list-disc list-inside text-gray-400 space-y-1 mr-2">
+            <li>إعادة الأصناف إلى المخزون</li>
+            <li>استرداد الرصيد المستخدم للعميل (إن وجد)</li>
+            <li>إلغاء نقاط الولاء المكتسبة (إن وجدت)</li>
+          </ul>
+          <p className="text-xs text-warning-400 bg-warning-500/10 border border-warning-500/30 rounded-md px-3 py-2">
+            هذا الإجراء لا يمكن التراجع عنه.
+          </p>
+        </div>
+      </Modal>
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+        <Button
+          variant="outline" size="sm"
+          onClick={() => invoices.filter((i) => selection.isSelected(i.id)).forEach((i) => printInvoice(i))}
+        >
+          <Printer className="w-4 h-4" />طباعة
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }

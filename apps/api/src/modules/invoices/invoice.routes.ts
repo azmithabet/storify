@@ -6,7 +6,7 @@ import {
   listInvoicesSchema,
   returnInvoiceSchema,
 } from './invoice.schema'
-import { listInvoices, getInvoice, createInvoice, returnInvoice } from './invoice.service'
+import { listInvoices, getInvoice, createInvoice, returnInvoice, cancelInvoice } from './invoice.service'
 
 export async function invoiceRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate)
@@ -136,6 +136,31 @@ export async function invoiceRoutes(app: FastifyInstance) {
         }
         if (error.statusCode === 400) {
           return reply.status(400).send({ success: false, error: { code: error.message, message: error.message } })
+        }
+        throw err
+      }
+    },
+  )
+
+  // ─── POST /api/invoices/:id/cancel ───────────────────────────────────────────
+  app.post<{ Params: { id: string } }>(
+    '/:id/cancel',
+    { preHandler: requirePermission('invoices', 'update') },
+    async (request, reply) => {
+      const actor = request.user as JWTPayload
+      try {
+        const invoice = await cancelInvoice(request.tenantDb, request.params.id, actor.userId)
+        return reply.send({ success: true, data: invoice })
+      } catch (err: unknown) {
+        const error = err as Error & { statusCode?: number }
+        if (error.message === 'not_found') {
+          return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الفاتورة غير موجودة' } })
+        }
+        if (error.message === 'already_cancelled') {
+          return reply.status(409).send({ success: false, error: { code: 'already_cancelled', message: 'الفاتورة ملغاة بالفعل' } })
+        }
+        if (error.message === 'invoice_returned') {
+          return reply.status(409).send({ success: false, error: { code: 'invoice_returned', message: 'لا يمكن إلغاء فاتورة مرتجعة — استخدم تدفق الإرجاع' } })
         }
         throw err
       }

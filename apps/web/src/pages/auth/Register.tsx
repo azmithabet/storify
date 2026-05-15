@@ -6,6 +6,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Button, Input, Alert } from '@/components/ui'
 import { api } from '@/api/client'
+import { getApiErrorMessage } from '@/lib/api-error'
 
 interface Plan {
   id: string
@@ -70,7 +71,7 @@ export default function Register() {
         <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-8 shadow-xl">
           {error && (
             <Alert variant="danger" className="mb-6">
-              {(error as { response?: { data?: { message?: string } } })?.response?.data?.message ?? 'حدث خطأ، حاول مرة أخرى'}
+              {getApiErrorMessage(error)}
             </Alert>
           )}
 

@@ -6,8 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination, Modal, Badge } from '@/components/ui'
+import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination, Modal, Badge, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
+import { downloadFromApi } from '@/lib/download'
+import { getApiErrorCode } from '@/lib/api-error'
+import type { PaginationMeta } from '@/types/api'
+import { invoiceStatusMap, getStatus } from '@/constants/status'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
 
 interface Customer {
   id: string
@@ -20,8 +26,6 @@ interface Customer {
   loyaltyPoints: number
   _count?: { invoices: number }
 }
-
-interface Meta { total: number; page: number; limit: number; pages: number }
 
 const LIMIT = 20
 
@@ -60,8 +64,7 @@ function CreditModal({ customer, onClose }: { customer: Customer; onClose: () =>
       onClose()
     },
     onError: (e: unknown) => {
-      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
-      toast.error(code === 'insufficient_credit' ? 'الرصيد غير كافٍ' : 'فشل تعديل الرصيد')
+      toast.error(getApiErrorCode(e) === 'insufficient_credit' ? 'الرصيد غير كافٍ' : 'فشل تعديل الرصيد')
     },
   })
 
@@ -117,28 +120,50 @@ interface CustomerInvoice {
   paymentMethod?: { name: string }
 }
 
-interface InvoiceMeta { total: number; page: number; limit: number; pages: number }
-
-const invStatusMap: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'gray' }> = {
-  completed: { label: 'مكتملة', variant: 'success' },
-  pending: { label: 'معلقة', variant: 'warning' },
-  cancelled: { label: 'ملغاة', variant: 'danger' },
-  returned: { label: 'مرتجعة', variant: 'gray' },
+// Backend uses `entity: 'customer'` audit logs with these action codes.
+// `after` shape varies by action — see invoice.service.ts / customer.routes.ts.
+type LedgerAction = 'credit_add' | 'credit_deduct' | 'credit_used' | 'loyalty_earned'
+interface LedgerEntry {
+  id: string
+  action: LedgerAction | string
+  createdAt: string
+  actor?: { id: string; fullName: string }
+  before?: { creditBalance?: string } | null
+  after?: {
+    amount?: string
+    points?: number
+    newBalance?: string | number
+    note?: string
+    invoiceId?: string
+    invoiceNumber?: string
+    creditBalance?: string
+  } | null
 }
+interface CreditLedger {
+  balance: { credit: string; loyaltyPoints: number }
+  entries: LedgerEntry[]
+}
+
 
 function CustomerDetailDrawer({ customer }: { customer: Customer }) {
   const [invPage, setInvPage] = useState(1)
 
-  const { data: invData, isLoading } = useQuery<{ data: CustomerInvoice[]; meta: InvoiceMeta }>({
+  const { data: invData, isLoading } = useQuery<{ data: CustomerInvoice[]; meta: PaginationMeta }>({
     queryKey: ['customer-invoices', customer.id, invPage],
     queryFn: async () =>
-      (await api.get<{ data: CustomerInvoice[]; meta: InvoiceMeta }>('/invoices', {
+      (await api.get<{ data: CustomerInvoice[]; meta: PaginationMeta }>('/invoices', {
         params: { customerId: customer.id, limit: 8, page: invPage },
       })).data,
   })
 
   const invoices = invData?.data ?? []
   const meta = invData?.meta
+
+  const { data: ledger } = useQuery<CreditLedger>({
+    queryKey: ['customer-ledger', customer.id],
+    queryFn: async () =>
+      (await api.get<{ data: CreditLedger }>(`/customers/${customer.id}/credit-ledger`)).data.data,
+  })
 
   return (
     <div className="flex flex-col gap-6">
@@ -173,7 +198,7 @@ function CustomerDetailDrawer({ customer }: { customer: Customer }) {
         ) : (
           <div className="flex flex-col divide-y divide-gray-700">
             {invoices.map((inv) => {
-              const s = invStatusMap[inv.status]
+              const s = getStatus(invoiceStatusMap, inv.status)
               return (
                 <div key={inv.id} className="py-3 flex items-center justify-between gap-3">
                   <div>
@@ -184,7 +209,7 @@ function CustomerDetailDrawer({ customer }: { customer: Customer }) {
                     </p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {s && <Badge variant={s.variant}>{s.label}</Badge>}
+                    <Badge variant={s.variant}>{s.label}</Badge>
                     <Money value={inv.totalAmount} />
                   </div>
                 </div>
@@ -196,6 +221,95 @@ function CustomerDetailDrawer({ customer }: { customer: Customer }) {
           <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setInvPage} />
         )}
       </div>
+
+      <CustomerLedger ledger={ledger} />
+    </div>
+  )
+}
+
+// ─── Customer credit + loyalty ledger ────────────────────────────────────────
+const ledgerActionMeta: Record<string, { label: string; tone: 'success' | 'danger' | 'warning' | 'info' }> = {
+  credit_add: { label: 'إضافة رصيد', tone: 'success' },
+  credit_deduct: { label: 'خصم رصيد', tone: 'warning' },
+  credit_used: { label: 'استخدام رصيد', tone: 'danger' },
+  loyalty_earned: { label: 'نقاط ولاء', tone: 'info' },
+  loyalty_reversed: { label: 'عكس نقاط ولاء', tone: 'warning' },
+}
+
+function CustomerLedger({ ledger }: { ledger?: CreditLedger }) {
+  if (!ledger) {
+    return (
+      <div>
+        <h4 className="text-sm font-semibold text-gray-300 mb-3">السجل المالي</h4>
+        <div className="flex flex-col gap-2">
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-10 bg-gray-700 rounded animate-pulse" />)}
+        </div>
+      </div>
+    )
+  }
+
+  const formatAmount = (s?: string | number) => {
+    if (s === undefined || s === null) return ''
+    const n = Number(s)
+    if (Number.isNaN(n)) return String(s)
+    return n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  }
+
+  return (
+    <div>
+      <h4 className="text-sm font-semibold text-gray-300 mb-3">السجل المالي</h4>
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="bg-gray-750 border border-gray-700 rounded-md p-3">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">الرصيد الحالي</p>
+          <Money value={Number(ledger.balance.credit)} />
+        </div>
+        <div className="bg-gray-750 border border-gray-700 rounded-md p-3">
+          <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">نقاط الولاء</p>
+          <p className="font-mono text-base font-bold text-yellow-400 num">{ledger.balance.loyaltyPoints.toLocaleString('ar-EG')}</p>
+        </div>
+      </div>
+
+      {ledger.entries.length === 0 ? (
+        <p className="text-sm text-gray-500 text-center py-6">لا توجد حركات</p>
+      ) : (
+        <ol className="flex flex-col divide-y divide-gray-700">
+          {ledger.entries.map((e) => {
+            const meta = ledgerActionMeta[e.action] ?? { label: e.action, tone: 'info' as const }
+            const after = e.after ?? {}
+            const amount = after.amount ?? after.points
+            const isPoints = e.action === 'loyalty_earned'
+            const sign = e.action === 'credit_deduct' || e.action === 'credit_used' ? '-' : '+'
+            return (
+              <li key={e.id} className="py-2.5 flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <Badge variant={meta.tone}>{meta.label}</Badge>
+                    {after.invoiceNumber && (
+                      <span className="text-xs text-gray-500 font-mono">{after.invoiceNumber}</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-600 mt-0.5">
+                    {new Date(e.createdAt).toLocaleString('ar-EG')}
+                    {e.actor && ` · ${e.actor.fullName}`}
+                  </p>
+                  {after.note && (
+                    <p className="text-xs text-gray-400 mt-1">{after.note}</p>
+                  )}
+                </div>
+                <div className="text-left">
+                  <span className={`font-mono font-semibold text-sm num ${meta.tone === 'success' ? 'text-success-400' : meta.tone === 'danger' ? 'text-danger-400' : meta.tone === 'warning' ? 'text-warning-400' : 'text-info-400'}`}>
+                    {amount !== undefined ? `${sign}${isPoints ? amount : formatAmount(amount)}` : '—'}
+                    {isPoints && <span className="text-[10px] text-gray-500 mr-1">نقطة</span>}
+                  </span>
+                  {after.newBalance !== undefined && !isPoints && (
+                    <p className="text-[10px] text-gray-600 mt-0.5">رصيد: {formatAmount(after.newBalance)} ج</p>
+                  )}
+                </div>
+              </li>
+            )
+          })}
+        </ol>
+      )}
     </div>
   )
 }
@@ -209,13 +323,33 @@ export default function Customers() {
   const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null)
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
 
-  const { data, isLoading } = useQuery<{ data: Customer[]; meta: Meta }>({
+  const { data, isLoading } = useQuery<{ data: Customer[]; meta: PaginationMeta }>({
     queryKey: ['customers', search, page],
-    queryFn: async () => (await api.get<{ data: Customer[]; meta: Meta }>('/customers', { params: { search, limit: LIMIT, page } })).data,
+    queryFn: async () => (await api.get<{ data: Customer[]; meta: PaginationMeta }>('/customers', { params: { search, limit: LIMIT, page } })).data,
   })
 
   const customers = data?.data ?? []
   const meta = data?.meta
+
+  const selection = useSelection(customers.map((c) => c.id))
+
+  const bulkExport = () => {
+    const selected = customers.filter((c) => selection.isSelected(c.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'الاسم', accessor: 'fullName', width: 28 },
+        { header: 'الهاتف', accessor: (c) => c.phone ?? '', width: 16 },
+        { header: 'البريد الإلكتروني', accessor: (c) => c.email ?? '', width: 28 },
+        { header: 'الرقم القومي', accessor: (c) => c.nationalId ?? '', width: 18 },
+        { header: 'الفواتير', accessor: (c) => c._count?.invoices ?? 0, width: 10 },
+        { header: 'الرصيد', accessor: 'creditBalance', width: 12 },
+        { header: 'نقاط الولاء', accessor: 'loyaltyPoints', width: 12 },
+      ],
+      `customers-${selected.length}.xlsx`,
+      'العملاء',
+    )
+  }
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) })
 
@@ -253,6 +387,13 @@ export default function Customers() {
         {isLoading ? <SkeletonTable rows={8} cols={5} /> : (
           <>
             <Table
+              selection={{
+                isSelected: (c) => selection.isSelected(c.id),
+                onToggle: (c) => selection.toggle(c.id),
+                onToggleAll: selection.toggleAllVisible,
+                allSelected: selection.allVisibleSelected,
+                someSelected: selection.someVisibleSelected,
+              }}
               columns={[
                 { key: 'fullName', header: 'الاسم', render: (c) => (
                   <button className="font-medium text-brand-400 hover:underline text-right" onClick={() => setDetailCustomer(c)}>{c.fullName}</button>
@@ -296,13 +437,10 @@ export default function Customers() {
           <Button variant="ghost" onClick={async () => {
             if (!detailCustomer) return
             try {
-              const res = await api.get(`/customers/${detailCustomer.id}/statement`, { responseType: 'blob' })
-              const url = URL.createObjectURL(new Blob([res.data as BlobPart]))
-              const a = document.createElement('a')
-              a.href = url
-              a.download = `كشف_حساب_${detailCustomer.fullName}.xlsx`
-              a.click()
-              URL.revokeObjectURL(url)
+              await downloadFromApi(
+                `/customers/${detailCustomer.id}/statement`,
+                `كشف_حساب_${detailCustomer.fullName}.xlsx`,
+              )
             } catch { toast.error('فشل تصدير كشف الحساب') }
           }}>
             <Download className="w-4 h-4" />تصدير كشف الحساب
@@ -333,6 +471,11 @@ export default function Customers() {
           </div>
         </form>
       </Drawer>
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }

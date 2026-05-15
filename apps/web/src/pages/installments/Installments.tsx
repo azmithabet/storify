@@ -1,14 +1,18 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, Search, Plus, Trash2, Printer } from 'lucide-react'
+import { Check, X, Search, Plus, Trash2, Printer, Download, Clock, AlertCircle } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, Money, SkeletonTable, Button, Modal, Drawer, Input, Pagination } from '@/components/ui'
+import { Table, Badge, Money, SkeletonTable, Button, Modal, Drawer, Input, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth.store'
+import type { PaginationMeta } from '@/types/api'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
+import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
 
 interface Payment {
   id: string
@@ -37,6 +41,132 @@ const statusMap: Record<string, { label: string; variant: 'warning' | 'success' 
   overdue: { label: 'متأخر', variant: 'danger' },
   completed: { label: 'مكتمل', variant: 'info' },
   cancelled: { label: 'ملغي', variant: 'gray' },
+}
+
+// ─── Day-relative label ───────────────────────────────────────────────────────
+
+/**
+ * Human label for a date relative to today, e.g. "اليوم", "متأخر 3 أيام", "بعد 12 يوم".
+ * Returns the absolute date string for anything outside ±60 days.
+ */
+function dayRelative(dateIso: string): string {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const due = new Date(dateIso); due.setHours(0, 0, 0, 0)
+  const diffDays = Math.round((due.getTime() - today.getTime()) / 86_400_000)
+  if (diffDays === 0) return 'اليوم'
+  if (diffDays === 1) return 'غداً'
+  if (diffDays === -1) return 'أمس'
+  if (diffDays < 0 && diffDays >= -60) return `متأخر ${-diffDays} يوم`
+  if (diffDays > 0 && diffDays <= 60) return `بعد ${diffDays} يوم`
+  return new Date(dateIso).toLocaleDateString('ar-EG')
+}
+
+// ─── Payment-schedule timeline ────────────────────────────────────────────────
+
+interface ScheduleTimelineProps {
+  contract: InstallmentContract
+  onRecord: (paymentId: string) => void
+  isRecording: boolean
+}
+
+function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineProps) {
+  const payments = contract.payments ?? []
+  if (payments.length === 0) {
+    return <p className="text-sm text-gray-500">لم يتم إنشاء جدول السداد بعد.</p>
+  }
+
+  const paidCount = payments.filter((p) => p.status === 'paid').length
+  const paidTotal = payments.filter((p) => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0)
+  const remainingTotal = payments.filter((p) => p.status !== 'paid').reduce((s, p) => s + Number(p.amount), 0)
+  const nextDue = payments.find((p) => p.status !== 'paid')
+  const progressPct = payments.length > 0 ? (paidCount / payments.length) * 100 : 0
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Progress + summary */}
+      <div className="bg-gray-900 rounded-lg border border-gray-700 p-4 flex flex-col gap-3">
+        <div className="flex items-center justify-between text-xs">
+          <span className="text-gray-400">التقدم</span>
+          <span className="font-mono text-gray-300">
+            <span className="text-success-400">{paidCount}</span> / {payments.length} قسط
+          </span>
+        </div>
+        <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+          <div
+            className="h-full bg-success-500 transition-all duration-slow"
+            style={{ width: `${progressPct}%` }}
+            role="progressbar"
+            aria-valuenow={Math.round(progressPct)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+          />
+        </div>
+        <div className="grid grid-cols-3 gap-3 pt-1">
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">مدفوع</p>
+            <p className="text-sm font-mono text-success-400 num">{paidTotal.toLocaleString('ar-EG')} ج</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">متبقي</p>
+            <p className="text-sm font-mono text-gray-200 num">{remainingTotal.toLocaleString('ar-EG')} ج</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-wider text-gray-500">القسط التالي</p>
+            <p className="text-sm font-mono text-brand-400">{nextDue ? dayRelative(nextDue.dueDate) : '—'}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Timeline nodes */}
+      <ol className="relative flex flex-col gap-3 pr-6 border-r border-gray-700">
+        {payments.map((p, idx) => {
+          const isPaid = p.status === 'paid'
+          const isOverdue = p.status === 'overdue'
+          const isNext = !isPaid && nextDue?.id === p.id
+          const dot = isPaid
+            ? { bg: 'bg-success-500', ring: 'ring-success-500/30', icon: <Check className="w-3 h-3 text-white" /> }
+            : isOverdue
+            ? { bg: 'bg-danger-500', ring: 'ring-danger-500/30', icon: <AlertCircle className="w-3 h-3 text-white" /> }
+            : { bg: 'bg-gray-700', ring: 'ring-gray-600/30', icon: <Clock className="w-3 h-3 text-gray-400" /> }
+
+          return (
+            <li key={p.id} className="relative">
+              <span
+                className={`absolute -right-[34px] top-2.5 w-6 h-6 rounded-full ${dot.bg} ring-4 ${dot.ring} flex items-center justify-center`}
+                aria-hidden="true"
+              >
+                {dot.icon}
+              </span>
+              <div className={`flex items-center justify-between rounded-md px-3 py-2 border ${isNext ? 'bg-brand-500/5 border-brand-500/30' : isOverdue ? 'bg-danger-500/5 border-danger-500/30' : 'bg-gray-800 border-gray-700'}`}>
+                <div>
+                  <p className="text-sm font-mono text-gray-200">
+                    <span className="text-gray-500 ml-2">#{idx + 1}</span>
+                    {new Date(p.dueDate).toLocaleDateString('ar-EG')}
+                  </p>
+                  <p className={`text-xs mt-0.5 ${isPaid ? 'text-success-400' : isOverdue ? 'text-danger-400' : 'text-gray-500'}`}>
+                    {isPaid
+                      ? p.paidDate
+                        ? `مدفوع · ${new Date(p.paidDate).toLocaleDateString('ar-EG')}`
+                        : 'مدفوع'
+                      : dayRelative(p.dueDate)}
+                  </p>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Money value={p.amount} />
+                  {!isPaid && contract.status === 'active' && (
+                    <Button size="sm" loading={isRecording} onClick={() => onRecord(p.id)}>
+                      <Check className="w-3 h-3" />تسجيل
+                    </Button>
+                  )}
+                  {isPaid && <Badge variant="success" dot>مدفوع</Badge>}
+                </div>
+              </div>
+            </li>
+          )
+        })}
+      </ol>
+    </div>
+  )
 }
 
 // ─── Interfaces for create form ───────────────────────────────────────────────
@@ -176,8 +306,7 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
       onClose()
     },
     onError: (e: unknown) => {
-      const msg = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
-      toast.error(msg === 'insufficient_stock' ? 'المخزون غير كافٍ' : 'فشل إنشاء العقد')
+      toast.error(getApiErrorCode(e) === 'insufficient_stock' ? 'المخزون غير كافٍ' : 'فشل إنشاء العقد')
     },
   })
 
@@ -354,16 +483,38 @@ export default function Installments() {
   const [confirmAction, setConfirmAction] = useState<{ contract: InstallmentContract; type: 'approve' | 'reject' } | null>(null)
   const [detailContract, setDetailContract] = useState<InstallmentContract | null>(null)
 
-  const { data: listData, isLoading } = useQuery<{ data: InstallmentContract[]; meta: { total: number; page: number; limit: number; pages: number } }>({
+  const { data: listData, isLoading } = useQuery<{ data: InstallmentContract[]; meta: PaginationMeta }>({
     queryKey: ['installments', search, page, statusFilter],
     queryFn: async () => {
       const params: Record<string, string | number> = { limit: LIMIT, page }
       if (search) params.search = search
       if (statusFilter) params.status = statusFilter
-      return (await api.get<{ data: InstallmentContract[]; meta: { total: number; page: number; limit: number; pages: number } }>('/installments', { params })).data
+      return (await api.get<{ data: InstallmentContract[]; meta: PaginationMeta }>('/installments', { params })).data
     },
   })
   const data = listData?.data ?? []
+
+  const selection = useSelection(data.map((c) => c.id))
+
+  const bulkExport = () => {
+    const selected = data.filter((c) => selection.isSelected(c.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'رقم العقد', accessor: 'contractNumber', width: 20 },
+        { header: 'العميل', accessor: (c) => c.customer?.fullName ?? '', width: 24 },
+        { header: 'الهاتف', accessor: (c) => c.customer?.phone ?? '', width: 16 },
+        { header: 'الإجمالي', accessor: 'totalAmount', width: 14 },
+        { header: 'المقدم', accessor: 'downPayment', width: 14 },
+        { header: 'المتبقي', accessor: 'remainingAmount', width: 14 },
+        { header: 'عدد الأقساط', accessor: 'installmentsCount', width: 12 },
+        { header: 'الحالة', accessor: (c) => statusMap[c.status]?.label ?? c.status, width: 14 },
+        { header: 'القسط التالي', accessor: (c) => c.nextDueDate ?? '', width: 14 },
+      ],
+      `installments-${selected.length}.xlsx`,
+      'عقود الأقساط',
+    )
+  }
   const meta = listData?.meta
 
   const { mutate: reviewContract, isPending: isReviewing } = useMutation({
@@ -374,10 +525,7 @@ export default function Installments() {
       qc.invalidateQueries({ queryKey: ['installments'] })
       setConfirmAction(null)
     },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast.error(msg ?? 'حدث خطأ')
-    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
   const { mutate: recordPayment, isPending: isRecording } = useMutation({
@@ -425,6 +573,13 @@ export default function Installments() {
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
           <>
           <Table
+            selection={{
+              isSelected: (c) => selection.isSelected(c.id),
+              onToggle: (c) => selection.toggle(c.id),
+              onToggleAll: selection.toggleAllVisible,
+              allSelected: selection.allVisibleSelected,
+              someSelected: selection.someVisibleSelected,
+            }}
             columns={[
               { key: 'contractNumber', header: 'رقم العقد', render: (c) => (
                 <button className="font-mono text-brand-400 hover:underline" onClick={() => openDetail(c)}>{c.contractNumber}</button>
@@ -483,25 +638,11 @@ export default function Installments() {
 
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-3">جدول السداد</h4>
-              <div className="flex flex-col gap-2">
-                {detailContract.payments?.map((p) => (
-                  <div key={p.id} className="flex items-center justify-between bg-gray-750 rounded-md px-3 py-2 border border-gray-700">
-                    <div>
-                      <p className="text-sm font-mono text-gray-300">{new Date(p.dueDate).toLocaleDateString('ar-EG')}</p>
-                      <p className="text-xs text-gray-500">{p.status === 'paid' ? `مدفوع ${p.paidDate ? new Date(p.paidDate).toLocaleDateString('ar-EG') : ''}` : p.status === 'overdue' ? 'متأخر' : 'معلق'}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Money value={p.amount} />
-                      {p.status !== 'paid' && detailContract.status === 'active' && (
-                        <Button size="sm" loading={isRecording} onClick={() => recordPayment({ contractId: detailContract.id, paymentId: p.id })}>
-                          <Check className="w-3 h-3" />تسجيل
-                        </Button>
-                      )}
-                      {p.status === 'paid' && <Badge variant="success" dot>مدفوع</Badge>}
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <ScheduleTimeline
+                contract={detailContract}
+                isRecording={isRecording}
+                onRecord={(paymentId) => recordPayment({ contractId: detailContract.id, paymentId })}
+              />
             </div>
           </div>
         )}
@@ -536,6 +677,11 @@ export default function Installments() {
             : `هل تريد رفض عقد ${confirmAction?.contract.contractNumber}؟`}
         </p>
       </Modal>
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }

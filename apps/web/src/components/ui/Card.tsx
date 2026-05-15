@@ -30,11 +30,16 @@ interface StatCardProps {
   change?: { value: string; positive: boolean }
   accentColor?: string
   icon?: ReactNode
+  /**
+   * When provided, the card renders as a button and shows a hover state.
+   * Use to wire dashboard cards to a pre-filtered detail page.
+   */
+  onClick?: () => void
 }
 
-export function StatCard({ label, value, change, accentColor = 'bg-brand-500', icon }: StatCardProps) {
-  return (
-    <div className="bg-gray-800 rounded-r-xl p-4 shadow-sm border border-gray-700 flex flex-col gap-3 relative overflow-hidden">
+export function StatCard({ label, value, change, accentColor = 'bg-brand-500', icon, onClick }: StatCardProps) {
+  const inner = (
+    <>
       <div className={cn('absolute top-0 right-0 w-1 h-full', accentColor)} />
       <div className="flex items-center justify-between">
         <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">{label}</span>
@@ -46,6 +51,21 @@ export function StatCard({ label, value, change, accentColor = 'bg-brand-500', i
           {change.positive ? '▲' : '▼'} {change.value}
         </span>
       )}
-    </div>
+    </>
   )
+
+  const baseClasses = 'bg-gray-800 rounded-r-xl p-4 shadow-sm border border-gray-700 flex flex-col gap-3 relative overflow-hidden'
+
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={cn(baseClasses, 'text-right hover:border-gray-500 hover:bg-gray-750 transition-colors duration-fast focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500')}
+      >
+        {inner}
+      </button>
+    )
+  }
+  return <div className={baseClasses}>{inner}</div>
 }

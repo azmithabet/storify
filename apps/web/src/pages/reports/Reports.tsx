@@ -2,8 +2,14 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Download, Filter } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
-import { StatCard, Button, SkeletonTable, Table, Money, Badge } from '@/components/ui'
+import {
+  StatCard, Button, SkeletonTable, Table, Money, Badge,
+  ChartCard, AreaChartView, BarChartView, DonutChartView,
+  chartPalette, DateRangePicker,
+} from '@/components/ui'
 import { api } from '@/api/client'
+import { downloadFromApi } from '@/lib/download'
+import { exportRowsToExcel } from '@/lib/export'
 import { useAuthStore } from '@/stores/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -32,6 +38,16 @@ interface Branch { id: string; name: string }
 function today() { return new Date().toISOString().slice(0, 10) }
 function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10) }
 
+// ─── Number formatters ───────────────────────────────────────────────────────
+function formatCurrency(v: number) {
+  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M ج`
+  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(1)}K ج`
+  return `${v.toLocaleString('ar-EG')} ج`
+}
+function formatNumber(v: number) {
+  return v.toLocaleString('ar-EG')
+}
+
 // ─── Filter bar ───────────────────────────────────────────────────────────────
 interface Filters {
   from: string
@@ -59,24 +75,10 @@ function FilterBar({
   return (
     <div className="flex flex-wrap items-center gap-3 p-3 bg-gray-800 border border-gray-700 rounded-lg">
       <Filter className="w-4 h-4 text-gray-500 shrink-0" />
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-gray-500">من</label>
-        <input
-          type="date"
-          value={filters.from}
-          onChange={(e) => onChange({ from: e.target.value })}
-          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
-        />
-      </div>
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-gray-500">إلى</label>
-        <input
-          type="date"
-          value={filters.to}
-          onChange={(e) => onChange({ to: e.target.value })}
-          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
-        />
-      </div>
+      <DateRangePicker
+        value={{ from: filters.from, to: filters.to }}
+        onChange={(v) => onChange({ from: v.from, to: v.to })}
+      />
       {isSuperAdmin && branches.length > 1 && (
         <select
           value={filters.branchId}
@@ -106,23 +108,6 @@ function FilterBar({
           منخفض المخزون فقط
         </label>
       )}
-      <div className="flex gap-2 mr-auto">
-        <button
-          className="text-xs text-gray-500 hover:text-gray-300 underline"
-          onClick={() => onChange({ from: monthStart(), to: today() })}
-        >هذا الشهر</button>
-        <button
-          className="text-xs text-gray-500 hover:text-gray-300 underline"
-          onClick={() => {
-            const d = new Date(); d.setFullYear(d.getFullYear() - 1)
-            onChange({ from: d.toISOString().slice(0, 10), to: today() })
-          }}
-        >سنة كاملة</button>
-        <button
-          className="text-xs text-gray-500 hover:text-gray-300 underline"
-          onClick={() => onChange({ from: '', to: '' })}
-        >الكل</button>
-      </div>
     </div>
   )
 }
@@ -136,12 +121,8 @@ function buildParams(filters: Filters, extra?: Record<string, string>) {
   return { ...p, ...extra }
 }
 
-async function downloadExcel(path: string, params: Record<string, string>, filename: string) {
-  const res = await api.get(path, { params: { ...params, format: 'excel' }, responseType: 'blob' })
-  const url = URL.createObjectURL(new Blob([res.data as BlobPart]))
-  const a = document.createElement('a')
-  a.href = url; a.download = filename; a.click()
-  URL.revokeObjectURL(url)
+function downloadExcel(path: string, params: Record<string, string>, filename: string) {
+  return downloadFromApi(path, filename, { ...params, format: 'excel' })
 }
 
 // ─── Main page ────────────────────────────────────────────────────────────────
@@ -255,6 +236,30 @@ export default function Reports() {
                 <Download className="w-3 h-3" />تصدير Excel
               </Button>
             </div>
+            {!salesLoading && byPeriod.length > 0 && (
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                <div className="lg:col-span-2">
+                  <ChartCard title="تطور الإيرادات" subtitle={filters.groupBy === 'day' ? 'يومي' : filters.groupBy === 'week' ? 'أسبوعي' : 'شهري'} height={260}>
+                    <AreaChartView
+                      data={byPeriod}
+                      xKey="period"
+                      series={[{ key: 'revenue', name: 'الإيرادات', color: chartPalette[0] }]}
+                      formatY={formatCurrency}
+                      formatTooltip={(v) => formatCurrency(v)}
+                    />
+                  </ChartCard>
+                </div>
+                <ChartCard title="عدد الفواتير" height={260}>
+                  <BarChartView
+                    data={byPeriod}
+                    xKey="period"
+                    series={[{ key: 'count', name: 'الفواتير', color: chartPalette[1] }]}
+                    formatY={formatNumber}
+                    formatTooltip={(v) => formatNumber(v)}
+                  />
+                </ChartCard>
+              </div>
+            )}
             {salesLoading ? <SkeletonTable rows={8} cols={3} /> : (
               <Table
                 columns={[
@@ -282,6 +287,43 @@ export default function Reports() {
                 <Download className="w-3 h-3" />تصدير Excel
               </Button>
             </div>
+            {!stockLoading && stockItems.length > 0 && (() => {
+              const outOfStock = stockItems.filter((s) => s.quantity === 0).length
+              const lowStock = stockItems.filter((s) => s.isLowStock && s.quantity > 0).length
+              const healthy = stockItems.length - outOfStock - lowStock
+              const topByValue = [...stockItems]
+                .sort((a, b) => b.stockValue - a.stockValue)
+                .slice(0, 10)
+                .map((s) => ({ name: `${s.product.name} (${s.sku})`, value: s.stockValue }))
+              return (
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  <ChartCard title="حالة المخزون" height={280}>
+                    <DonutChartView
+                      data={[
+                        { name: 'سليم', value: healthy, color: '#10B981' },
+                        { name: 'منخفض', value: lowStock, color: '#F59E0B' },
+                        { name: 'نفذ', value: outOfStock, color: '#EF4444' },
+                      ]}
+                      formatValue={(v) => `${formatNumber(v)} صنف`}
+                      centerLabel="إجمالي"
+                      centerValue={formatNumber(stockItems.length)}
+                    />
+                  </ChartCard>
+                  <div className="lg:col-span-2">
+                    <ChartCard title="أعلى 10 أصناف من حيث القيمة" height={280}>
+                      <BarChartView
+                        data={topByValue}
+                        xKey="name"
+                        series={[{ key: 'value', name: 'القيمة', color: chartPalette[0] }]}
+                        formatY={formatCurrency}
+                        formatTooltip={(v) => formatCurrency(v)}
+                        layout="vertical"
+                      />
+                    </ChartCard>
+                  </div>
+                </div>
+              )
+            })()}
             {stockLoading ? <SkeletonTable rows={8} cols={5} /> : (
               <Table
                 columns={[
@@ -308,16 +350,56 @@ export default function Reports() {
         {tab === 'installments' && (
           <>
             <FilterBar filters={filters} onChange={patchFilters} branches={branches} isSuperAdmin={isSuperAdmin} />
+            <div className="flex justify-end">
+              <Button
+                variant="ghost" size="sm"
+                disabled={!installSummary}
+                onClick={() => installSummary && exportRowsToExcel(
+                  [
+                    { label: 'عقود نشطة', value: installSummary.active },
+                    { label: 'متأخرة', value: installSummary.overdue },
+                    { label: 'انتظار موافقة', value: installSummary.pendingApproval },
+                    { label: 'مكتملة', value: installSummary.completed },
+                    { label: 'إجمالي المستحقات', value: installSummary.totalReceivables },
+                  ],
+                  [
+                    { header: 'الحالة', accessor: 'label', width: 24 },
+                    { header: 'القيمة', accessor: 'value', width: 16 },
+                  ],
+                  'installments-summary.xlsx',
+                  'الأقساط',
+                )}
+              >
+                <Download className="w-3 h-3" />تصدير Excel
+              </Button>
+            </div>
             <div className="grid grid-cols-3 gap-4">
               <StatCard label="عقود نشطة" value={installSummary?.active ?? 0} accentColor="bg-success-500" />
               <StatCard label="متأخرة" value={installSummary?.overdue ?? 0} accentColor="bg-danger-500" />
               <StatCard label="إجمالي المستحقات" value={`${(installSummary?.totalReceivables ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-brand-500" />
             </div>
             {installLoading ? <SkeletonTable rows={4} cols={3} /> : (
-              <div className="grid grid-cols-2 gap-4">
-                <StatCard label="انتظار موافقة" value={installSummary?.pendingApproval ?? 0} accentColor="bg-warning-500" />
-                <StatCard label="مكتملة" value={installSummary?.completed ?? 0} accentColor="bg-gray-500" />
-              </div>
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <StatCard label="انتظار موافقة" value={installSummary?.pendingApproval ?? 0} accentColor="bg-warning-500" />
+                  <StatCard label="مكتملة" value={installSummary?.completed ?? 0} accentColor="bg-gray-500" />
+                </div>
+                {installSummary && (
+                  <ChartCard title="توزيع عقود التقسيط" height={300}>
+                    <DonutChartView
+                      data={[
+                        { name: 'نشطة', value: installSummary.active, color: '#10B981' },
+                        { name: 'متأخرة', value: installSummary.overdue, color: '#EF4444' },
+                        { name: 'انتظار موافقة', value: installSummary.pendingApproval, color: '#F59E0B' },
+                        { name: 'مكتملة', value: installSummary.completed, color: '#64748B' },
+                      ]}
+                      formatValue={(v) => `${formatNumber(v)} عقد`}
+                      centerLabel="مستحقات"
+                      centerValue={formatCurrency(installSummary.totalReceivables)}
+                    />
+                  </ChartCard>
+                )}
+              </>
             )}
           </>
         )}
@@ -331,6 +413,24 @@ export default function Reports() {
                 <Download className="w-3 h-3" />تصدير Excel
               </Button>
             </div>
+            {!pnlLoading && pnlData && (
+              <ChartCard title="مقارنة بنود الأرباح والخسائر" height={280}>
+                <BarChartView
+                  data={[
+                    { label: 'الإيرادات', value: pnlData.revenue },
+                    { label: 'تكلفة المبيعات', value: pnlData.cogs },
+                    { label: 'إجمالي الربح', value: pnlData.grossProfit },
+                    { label: 'مصروفات التشغيل', value: pnlData.operatingExpenses },
+                    { label: 'صافي الربح', value: pnlData.netProfit },
+                  ]}
+                  xKey="label"
+                  series={[{ key: 'value', name: 'القيمة' }]}
+                  formatY={formatCurrency}
+                  formatTooltip={(v) => formatCurrency(v)}
+                  colorByIndex={['#10B981', '#EF4444', '#6366F1', '#F59E0B', pnlData.netProfit >= 0 ? '#10B981' : '#EF4444']}
+                />
+              </ChartCard>
+            )}
             {pnlLoading ? <SkeletonTable rows={6} cols={2} /> : (
               <div className="max-w-lg bg-gray-800 rounded-xl border border-gray-700 divide-y divide-gray-700">
                 {[
@@ -359,6 +459,25 @@ export default function Reports() {
         {tab === 'fees' && (
           <>
             <FilterBar filters={filters} onChange={patchFilters} branches={branches} isSuperAdmin={isSuperAdmin} />
+            <div className="flex justify-end">
+              <Button
+                variant="ghost" size="sm"
+                disabled={!feesData || feesData.byPaymentMethod.length === 0}
+                onClick={() => feesData && exportRowsToExcel(
+                  feesData.byPaymentMethod,
+                  [
+                    { header: 'طريقة الدفع', accessor: (r) => r.paymentMethod.name ?? '—', width: 24 },
+                    { header: 'يتحمل الرسوم', accessor: (r) => r.feeBearer === 'merchant' ? 'التاجر' : 'العميل', width: 14 },
+                    { header: 'عدد الفواتير', accessor: 'count', width: 12 },
+                    { header: 'إجمالي الرسوم', accessor: 'totalFees', width: 16 },
+                  ],
+                  'fees-report.xlsx',
+                  'رسوم الدفع',
+                )}
+              >
+                <Download className="w-3 h-3" />تصدير Excel
+              </Button>
+            </div>
             {feesLoading ? <SkeletonTable rows={5} cols={4} /> : (
               <>
                 <div className="grid grid-cols-3 gap-4">
@@ -366,6 +485,36 @@ export default function Reports() {
                   <StatCard label="رسوم على التاجر" value={`${(feesData?.summary.totalMerchantFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-danger-500" />
                   <StatCard label="رسوم على العميل" value={`${(feesData?.summary.totalCustomerFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-success-500" />
                 </div>
+                {feesData && feesData.byPaymentMethod.length > 0 && (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    <ChartCard title="من يتحمل الرسوم" height={260}>
+                      <DonutChartView
+                        data={[
+                          { name: 'التاجر', value: feesData.summary.totalMerchantFees, color: '#EF4444' },
+                          { name: 'العميل', value: feesData.summary.totalCustomerFees, color: '#10B981' },
+                        ]}
+                        formatValue={formatCurrency}
+                        centerLabel="إجمالي"
+                        centerValue={formatCurrency(feesData.summary.totalFees)}
+                      />
+                    </ChartCard>
+                    <div className="lg:col-span-2">
+                      <ChartCard title="الرسوم حسب طريقة الدفع" height={260}>
+                        <BarChartView
+                          data={feesData.byPaymentMethod.map((r) => ({
+                            name: `${r.paymentMethod.name ?? '—'} (${r.feeBearer === 'merchant' ? 'تاجر' : 'عميل'})`,
+                            value: r.totalFees,
+                          }))}
+                          xKey="name"
+                          series={[{ key: 'value', name: 'الرسوم', color: chartPalette[0] }]}
+                          formatY={formatCurrency}
+                          formatTooltip={(v) => formatCurrency(v)}
+                          layout="vertical"
+                        />
+                      </ChartCard>
+                    </div>
+                  </div>
+                )}
                 <Table
                   columns={[
                     { key: 'pm', header: 'طريقة الدفع', render: (r) => <span className="font-medium text-gray-100">{r.paymentMethod.name ?? '—'}</span> },
@@ -390,6 +539,37 @@ export default function Reports() {
         {tab === 'top' && (
           <>
             <FilterBar filters={filters} onChange={patchFilters} branches={branches} isSuperAdmin={isSuperAdmin} />
+            <div className="flex justify-end">
+              <Button
+                variant="ghost" size="sm"
+                disabled={!topData || topData.length === 0}
+                onClick={() => topData && exportRowsToExcel(
+                  topData,
+                  [
+                    { header: 'المنتج', accessor: 'productName', width: 32 },
+                    { header: 'SKU', accessor: 'variantSku', width: 16 },
+                    { header: 'الكمية المباعة', accessor: 'totalQty', width: 14 },
+                    { header: 'الإيرادات', accessor: 'totalRevenue', width: 16 },
+                  ],
+                  'top-products.xlsx',
+                  'أكثر المنتجات مبيعاً',
+                )}
+              >
+                <Download className="w-3 h-3" />تصدير Excel
+              </Button>
+            </div>
+            {!topLoading && topData && topData.length > 0 && (
+              <ChartCard title="أعلى 10 منتجات حسب الإيرادات" height={320}>
+                <BarChartView
+                  data={topData.slice(0, 10).map((r) => ({ name: r.productName, value: r.totalRevenue }))}
+                  xKey="name"
+                  series={[{ key: 'value', name: 'الإيرادات', color: chartPalette[0] }]}
+                  formatY={formatCurrency}
+                  formatTooltip={(v) => formatCurrency(v)}
+                  layout="vertical"
+                />
+              </ChartCard>
+            )}
             {topLoading ? <SkeletonTable rows={10} cols={4} /> : (
               <Table
                 columns={[

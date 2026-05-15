@@ -130,12 +130,18 @@ export async function setMinQuantity(
 
 export async function listMovements(
   db: TenantPrismaClient,
-  opts: { variantId?: string; branchId?: string; type?: string; page: number; limit: number },
+  opts: { variantId?: string; branchId?: string; type?: string; from?: string; to?: string; page: number; limit: number },
 ) {
   const where = {
     ...(opts.variantId ? { variantId: opts.variantId } : {}),
     ...(opts.branchId ? { branchId: opts.branchId } : {}),
     ...(opts.type ? { type: opts.type } : {}),
+    ...(opts.from || opts.to ? {
+      createdAt: {
+        ...(opts.from ? { gte: new Date(opts.from) } : {}),
+        ...(opts.to ? { lte: new Date(`${opts.to}T23:59:59.999Z`) } : {}),
+      },
+    } : {}),
   }
 
   const [total, items] = await Promise.all([

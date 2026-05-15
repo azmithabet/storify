@@ -1,13 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard, Printer, SendHorizontal } from 'lucide-react'
+import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard, Printer, SendHorizontal, Download } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, Money, SkeletonTable, Button, Drawer, Modal, Input, Pagination } from '@/components/ui'
+import { Table, Badge, Money, SkeletonTable, Button, Drawer, Modal, Input, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
+import { getApiErrorCode } from '@/lib/api-error'
+import { purchaseOrderStatusMap, getStatus } from '@/constants/status'
+import { printPurchaseOrder } from '@/lib/print'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
 
 interface Supplier { id: string; name: string }
 interface Branch { id: string; name: string; isMain: boolean }
@@ -17,6 +22,7 @@ interface POItem {
   id: string
   variant: { id: string; sku: string; product: { name: string } }
   quantity: number
+  receivedQuantity?: number
   unitCost: number
   subtotal: number
 }
@@ -25,7 +31,7 @@ interface PurchaseOrder {
   id: string
   supplier?: { id: string; name: string }
   branch?: { id: string; name: string }
-  status: 'draft' | 'pending' | 'approved' | 'received' | 'cancelled'
+  status: 'draft' | 'pending' | 'approved' | 'partially_received' | 'received' | 'cancelled'
   totalAmount: number
   expectedDate?: string
   createdAt: string
@@ -37,26 +43,124 @@ interface PurchaseOrder {
 
 // ─── Receive Modal ────────────────────────────────────────────────────────────
 
-function ReceiveModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder | null; onClose: () => void; onConfirm: (d: { receivedDate?: string; notes?: string }) => void; isPending: boolean }) {
-  const { register, handleSubmit } = useForm<{ receivedDate?: string; notes?: string }>()
+interface ReceivePayload {
+  receivedDate?: string
+  notes?: string
+  items?: { id: string; quantity: number }[]
+}
+
+function ReceiveModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder | null; onClose: () => void; onConfirm: (d: ReceivePayload) => void; isPending: boolean }) {
+  const [date, setDate] = useState('')
+  const [notes, setNotes] = useState('')
+  // qty[itemId] = how much to receive in this batch
+  const [qty, setQty] = useState<Record<string, number>>({})
+
+  // Seed the quantity inputs with each line's outstanding amount whenever the
+  // modal opens for a new PO — so the default action is "receive everything
+  // remaining" and partial is opt-in by editing.
+  useEffect(() => {
+    if (!po?.items) return
+    const seed: Record<string, number> = {}
+    for (const it of po.items) {
+      const outstanding = it.quantity - (it.receivedQuantity ?? 0)
+      seed[it.id] = Math.max(0, outstanding)
+    }
+    setQty(seed)
+    setDate('')
+    setNotes('')
+  }, [po?.id])
+
   if (!po) return null
+  const items = po.items ?? []
+  const anyToReceive = Object.values(qty).some((q) => q > 0)
+  const totalToReceive = Object.values(qty).reduce((s, q) => s + q, 0)
+
+  const setItemQty = (id: string, value: number, max: number) => {
+    const clamped = Math.max(0, Math.min(value, max))
+    setQty((prev) => ({ ...prev, [id]: clamped }))
+  }
+  const fillAll = () => {
+    const next: Record<string, number> = {}
+    for (const it of items) next[it.id] = Math.max(0, it.quantity - (it.receivedQuantity ?? 0))
+    setQty(next)
+  }
+  const clearAll = () => setQty(Object.fromEntries(items.map((i) => [i.id, 0])))
+
+  const submit = () => onConfirm({
+    receivedDate: date || undefined,
+    notes: notes || undefined,
+    items: items
+      .map((it) => ({ id: it.id, quantity: qty[it.id] ?? 0 }))
+      .filter((r) => r.quantity > 0),
+  })
+
   return (
     <Modal open={!!po} onClose={onClose} title={`استلام أمر الشراء: ${po.id.slice(0, 8).toUpperCase()}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
-          <Button loading={isPending} onClick={handleSubmit(onConfirm)}>
-            <PackageCheck className="w-4 h-4" />تأكيد الاستلام
+          <Button loading={isPending} disabled={!anyToReceive} onClick={submit}>
+            <PackageCheck className="w-4 h-4" />تأكيد الاستلام ({totalToReceive})
           </Button>
         </>
       }
     >
       <div className="flex flex-col gap-4">
-        <p className="text-sm text-gray-400">سيتم تحديث المخزون تلقائياً بكميات جميع الأصناف في هذا الأمر.</p>
-        <Input label="تاريخ الاستلام" type="date" {...register('receivedDate')} />
+        <p className="text-sm text-gray-400">
+          عدّل الكمية لكل صنف لتسجيل استلام جزئي. ستُحوّل حالة الأمر تلقائياً إلى
+          <span className="text-warning-400 mx-1">"مستلم جزئياً"</span>
+          إذا بقيت كميات.
+        </p>
+
+        <div className="bg-gray-900 border border-gray-700 rounded-md overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-gray-800 text-xs uppercase text-gray-500">
+              <tr>
+                <th className="text-right px-3 py-2 font-medium">الصنف</th>
+                <th className="text-center px-3 py-2 font-medium w-20">مطلوب</th>
+                <th className="text-center px-3 py-2 font-medium w-20">سابقاً</th>
+                <th className="text-center px-3 py-2 font-medium w-24">استلام الآن</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it) => {
+                const received = it.receivedQuantity ?? 0
+                const outstanding = it.quantity - received
+                return (
+                  <tr key={it.id} className="border-t border-gray-700/50">
+                    <td className="px-3 py-2">
+                      <p className="text-gray-100">{it.variant.product.name}</p>
+                      <p className="text-xs text-gray-500 font-mono">{it.variant.sku}</p>
+                    </td>
+                    <td className="px-3 py-2 text-center font-mono text-gray-400">{it.quantity}</td>
+                    <td className="px-3 py-2 text-center font-mono text-gray-500">{received}</td>
+                    <td className="px-3 py-2 text-center">
+                      <input
+                        type="number"
+                        min={0}
+                        max={outstanding}
+                        value={qty[it.id] ?? 0}
+                        disabled={outstanding === 0}
+                        onChange={(e) => setItemQty(it.id, Number(e.target.value), outstanding)}
+                        className="w-16 text-center bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100 font-mono focus:outline-none focus:border-brand-500 disabled:opacity-40"
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+        <div className="flex gap-2 -mt-2">
+          <button type="button" onClick={fillAll} className="text-xs text-brand-400 hover:text-brand-300">استلام الكل المتبقي</button>
+          <span className="text-gray-700">·</span>
+          <button type="button" onClick={clearAll} className="text-xs text-gray-500 hover:text-gray-300">مسح</button>
+        </div>
+
+        <Input label="تاريخ الاستلام" type="date" value={date} onChange={(e) => setDate(e.target.value)} />
         <div>
           <label className="text-sm text-gray-400 block mb-1">ملاحظات (اختياري)</label>
-          <textarea {...register('notes')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
         </div>
       </div>
     </Modal>
@@ -95,14 +199,6 @@ function PaymentModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
       </div>
     </Modal>
   )
-}
-
-const statusMap: Record<string, { label: string; variant: 'gray' | 'warning' | 'success' | 'info' | 'danger' }> = {
-  draft: { label: 'مسودة', variant: 'gray' },
-  pending: { label: 'انتظار موافقة', variant: 'warning' },
-  approved: { label: 'موافق', variant: 'success' },
-  received: { label: 'مستلم', variant: 'info' },
-  cancelled: { label: 'ملغي', variant: 'danger' },
 }
 
 const schema = z.object({
@@ -177,44 +273,8 @@ function VariantSearchField({
 }
 
 function printPO(po: PurchaseOrder) {
-  const win = window.open('', '_blank', 'width=800,height=700')
-  if (!win) return
-  const statusLabels: Record<string, string> = { draft: 'مسودة', pending: 'انتظار موافقة', approved: 'موافق', received: 'مستلم', cancelled: 'ملغي' }
-  const poRef = po.id.slice(0, 8).toUpperCase()
-  const rows = (po.items ?? []).map((item) =>
-    `<tr><td>${item.variant.product.name}</td><td>${item.variant.sku}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:left">${Number(item.unitCost).toFixed(2)} ج</td><td style="text-align:left">${Number(item.subtotal).toFixed(2)} ج</td></tr>`
-  ).join('')
-  win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>أمر شراء ${poRef}</title><style>
-    *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;padding:24px;color:#000}
-    h1{font-size:20px;margin-bottom:4px}h2{font-size:13px;color:#555;margin-bottom:16px}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
-    .grid div{font-size:12px}.grid div span{color:#777;display:block;font-size:11px}
-    table{width:100%;border-collapse:collapse;margin-top:8px}th,td{border:1px solid #ddd;padding:6px 8px;text-align:right}
-    th{background:#f5f5f5;font-weight:600}.total td{font-weight:bold;border-top:2px solid #999}
-    .footer{margin-top:40px;display:flex;justify-content:space-between}
-    @media print{@page{margin:15mm;size:A4}}
-  </style></head><body>
-    <h1>Storify — أمر شراء</h1>
-    <h2>رقم الأمر: <strong>${poRef}</strong> | الحالة: ${statusLabels[po.status] ?? po.status}</h2>
-    <div class="grid">
-      <div><span>المورد</span>${po.supplier?.name ?? '—'}</div>
-      <div><span>الفرع</span>${po.branch?.name ?? '—'}</div>
-      <div><span>أنشأه</span>${po.createdBy?.fullName ?? '—'}</div>
-      <div><span>تاريخ الإنشاء</span>${new Date(po.createdAt).toLocaleDateString('ar-EG')}</div>
-      ${po.approvedBy ? `<div><span>وافق عليه</span>${po.approvedBy.fullName}</div>` : ''}
-    </div>
-    <table>
-      <thead><tr><th>المنتج</th><th>SKU</th><th>الكمية</th><th>سعر الوحدة</th><th>الإجمالي</th></tr></thead>
-      <tbody>${rows}</tbody>
-      <tfoot><tr class="total"><td colspan="4">الإجمالي الكلي</td><td style="text-align:left">${Number(po.totalAmount).toFixed(2)} ج</td></tr></tfoot>
-    </table>
-    <div class="footer">
-      <div style="text-align:center;width:40%"><div style="border-top:1px solid #000;margin-top:40px;padding-top:8px">توقيع المستلم</div></div>
-      <div style="text-align:center;width:40%"><div style="border-top:1px solid #000;margin-top:40px;padding-top:8px">توقيع المورد</div></div>
-    </div>
-  </body></html>`)
-  win.document.close()
-  setTimeout(() => { win.print(); win.close() }, 300)
+  const statusLabel = getStatus(purchaseOrderStatusMap, po.status).label
+  printPurchaseOrder(po, statusLabel)
 }
 
 export default function PurchaseOrders() {
@@ -233,6 +293,27 @@ export default function PurchaseOrders() {
 
   const data = poData?.data ?? []
   const meta = poData?.meta
+
+  const selection = useSelection(data.map((p) => p.id))
+
+  const bulkExport = () => {
+    const selected = data.filter((p) => selection.isSelected(p.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'رقم الأمر', accessor: (p) => p.id.slice(0, 8).toUpperCase(), width: 18 },
+        { header: 'المورد', accessor: (p) => p.supplier?.name ?? '', width: 24 },
+        { header: 'الفرع', accessor: (p) => p.branch?.name ?? '', width: 16 },
+        { header: 'الحالة', accessor: (p) => getStatus(purchaseOrderStatusMap, p.status).label, width: 14 },
+        { header: 'الأصناف', accessor: (p) => p._count?.items ?? 0, width: 10 },
+        { header: 'الإجمالي', accessor: 'totalAmount', width: 14 },
+        { header: 'التاريخ المتوقع', accessor: (p) => p.expectedDate ?? '', width: 14 },
+        { header: 'أُنشئ', accessor: (p) => new Date(p.createdAt).toLocaleDateString('ar-EG'), width: 14 },
+      ],
+      `purchase-orders-${selected.length}.xlsx`,
+      'أوامر الشراء',
+    )
+  }
 
   const { data: suppliers = [] } = useQuery<Supplier[]>({
     queryKey: ['suppliers'],
@@ -288,17 +369,22 @@ export default function PurchaseOrders() {
   })
 
   const { mutate: receive, isPending: isReceiving } = useMutation({
-    mutationFn: async ({ id, receivedDate, notes }: { id: string; receivedDate?: string; notes?: string }) =>
-      api.post(`/purchase-orders/${id}/receive`, { receivedDate: receivedDate || undefined, notes: notes || undefined }),
-    onSuccess: () => {
-      toast.success('تم استلام أمر الشراء وتحديث المخزون')
+    mutationFn: async ({ id, ...payload }: { id: string } & ReceivePayload) =>
+      (await api.post<{ data: { status: string; itemsReceived: number } }>(`/purchase-orders/${id}/receive`, payload)).data.data,
+    onSuccess: (result) => {
+      toast.success(result.status === 'received' ? 'تم استلام أمر الشراء بالكامل' : 'تم تسجيل الاستلام الجزئي')
       qc.invalidateQueries({ queryKey: ['purchase-orders'] })
       qc.invalidateQueries({ queryKey: ['stock'] })
       setReceiveTarget(null)
     },
     onError: (e: unknown) => {
-      const code = (e as { response?: { data?: { error?: { code?: string } } } })?.response?.data?.error?.code
-      toast.error(code === 'invalid_status' ? 'أمر الشراء يجب أن يكون معتمداً أولاً' : 'حدث خطأ في الاستلام')
+      const code = getApiErrorCode(e)
+      toast.error(
+        code === 'invalid_status' ? 'أمر الشراء يجب أن يكون معتمداً أولاً'
+        : code === 'qty_exceeds_outstanding' ? 'الكمية المطلوبة تتجاوز المتبقي'
+        : code === 'nothing_to_receive' ? 'لا توجد كميات متبقية للاستلام'
+        : 'حدث خطأ في الاستلام',
+      )
     },
   })
 
@@ -342,6 +428,13 @@ export default function PurchaseOrders() {
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
           <>
           <Table
+            selection={{
+              isSelected: (p) => selection.isSelected(p.id),
+              onToggle: (p) => selection.toggle(p.id),
+              onToggleAll: selection.toggleAllVisible,
+              allSelected: selection.allVisibleSelected,
+              someSelected: selection.someVisibleSelected,
+            }}
             columns={[
               { key: 'id', header: 'رقم الأمر', render: (po) => (
                 <button className="font-mono text-brand-400 hover:underline text-xs" onClick={() => openDetail(po)}>{po.id.slice(0, 8).toUpperCase()}</button>
@@ -351,8 +444,8 @@ export default function PurchaseOrders() {
               { key: 'items', header: 'الأصناف', render: (po) => <span className="font-mono text-gray-400">{po._count?.items ?? 0}</span> },
               { key: 'totalAmount', header: 'الإجمالي', render: (po) => <Money value={Number(po.totalAmount)} /> },
               { key: 'status', header: 'الحالة', render: (po) => {
-                const s = statusMap[po.status]
-                return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{po.status}</span>
+                const s = getStatus(purchaseOrderStatusMap, po.status)
+                return <Badge variant={s.variant} dot>{s.label}</Badge>
               }},
               { key: 'actions', header: '', render: (po) => (
                 <div className="flex gap-1 flex-wrap">
@@ -504,7 +597,7 @@ export default function PurchaseOrders() {
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div><span className="text-gray-500">المورد</span><p className="text-gray-100 font-medium">{detailPO.supplier?.name ?? '—'}</p></div>
               <div><span className="text-gray-500">الفرع</span><p className="text-gray-100">{detailPO.branch?.name ?? '—'}</p></div>
-              <div><span className="text-gray-500">الحالة</span>{(() => { const s = statusMap[detailPO.status]; return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{detailPO.status}</span> })()}</div>
+              <div><span className="text-gray-500">الحالة</span>{(() => { const s = getStatus(purchaseOrderStatusMap, detailPO.status); return <Badge variant={s.variant} dot>{s.label}</Badge> })()}</div>
               <div><span className="text-gray-500">أنشأه</span><p className="text-gray-100">{detailPO.createdBy?.fullName ?? '—'}</p></div>
               {detailPO.approvedBy && <div><span className="text-gray-500">وافق عليه</span><p className="text-gray-100">{detailPO.approvedBy.fullName}</p></div>}
             </div>
@@ -512,20 +605,52 @@ export default function PurchaseOrders() {
             {/* ── Items ── */}
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-3">الأصناف</h4>
-              {detailPO.items?.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm py-2 border-b border-gray-700 last:border-0">
-                  <div>
-                    <p className="text-gray-100">{item.variant?.product?.name ?? '—'}</p>
-                    <p className="text-gray-500 text-xs font-mono">{item.variant?.sku} × {item.quantity}</p>
+              {detailPO.items?.map((item) => {
+                const received = item.receivedQuantity ?? 0
+                const outstanding = item.quantity - received
+                const fullyReceived = outstanding === 0 && received > 0
+                const partial = received > 0 && outstanding > 0
+                return (
+                  <div key={item.id} className="flex justify-between text-sm py-2 border-b border-gray-700 last:border-0">
+                    <div>
+                      <p className="text-gray-100">{item.variant?.product?.name ?? '—'}</p>
+                      <p className="text-gray-500 text-xs font-mono">{item.variant?.sku} × {item.quantity}</p>
+                      {(partial || fullyReceived) && (
+                        <p className="text-[10px] mt-0.5">
+                          <span className={fullyReceived ? 'text-success-400' : 'text-warning-400'}>
+                            استُلم {received}/{item.quantity}
+                          </span>
+                          {partial && <span className="text-gray-500"> · متبقي {outstanding}</span>}
+                        </p>
+                      )}
+                    </div>
+                    <Money value={Number(item.subtotal)} />
                   </div>
-                  <Money value={Number(item.subtotal)} />
-                </div>
-              ))}
+                )
+              })}
               <div className="flex justify-between text-sm font-semibold mt-3 pt-2 border-t border-gray-600">
                 <span className="text-gray-300">الإجمالي</span>
                 <Money value={Number(detailPO.totalAmount)} />
               </div>
             </div>
+            <Button variant="secondary" onClick={() => printPO(detailPO)}>
+              <Printer className="w-4 h-4" />طباعة الأمر
+            </Button>
+            {detailPO.status === 'pending' && (
+              <Button onClick={() => { setDetailPO(null); setApproveTarget(detailPO) }}>
+                <Check className="w-4 h-4" />الموافقة على الأمر
+              </Button>
+            )}
+            {(detailPO.status === 'approved' || detailPO.status === 'partially_received') && (
+              <Button onClick={() => { setDetailPO(null); setReceiveTarget(detailPO) }}>
+                <PackageCheck className="w-4 h-4" />{detailPO.status === 'partially_received' ? 'استكمال الاستلام' : 'استلام البضاعة'}
+              </Button>
+            )}
+            {detailPO.status === 'received' && (
+              <Button variant="secondary" onClick={() => { setDetailPO(null); setPaymentTarget(detailPO) }}>
+                <CreditCard className="w-4 h-4" />تسجيل دفعة للمورد
+              </Button>
+            )}
           </div>
         )}
       </Drawer>
@@ -543,6 +668,11 @@ export default function PurchaseOrders() {
 
       <ReceiveModal po={receiveTarget} onClose={() => setReceiveTarget(null)} onConfirm={(d) => receiveTarget && receive({ id: receiveTarget.id, ...d })} isPending={isReceiving} />
       <PaymentModal po={paymentTarget} onClose={() => setPaymentTarget(null)} onConfirm={(d) => paymentTarget && recordPayment({ id: paymentTarget.id, ...d })} isPending={isPaymentPending} />
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }

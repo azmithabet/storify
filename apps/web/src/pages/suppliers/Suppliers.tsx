@@ -6,9 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Pagination } from '@/components/ui'
+import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
+import { downloadFromApi } from '@/lib/download'
 import { cn } from '@/lib/cn'
+import type { PaginationMeta } from '@/types/api'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
 
 interface Supplier { id: string; name: string; phone?: string; email?: string; balance: number; totalOrders: number; isActive: boolean }
 interface SupplierTransaction {
@@ -22,7 +26,6 @@ interface SupplierTransaction {
   branch?: { id: string; name: string }
 }
 interface Branch { id: string; name: string }
-interface Meta { total: number; page: number; limit: number; pages: number }
 
 const LIMIT = 20
 
@@ -59,9 +62,9 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
   const [txnPage, setTxnPage] = useState(1)
   const [addTxnOpen, setAddTxnOpen] = useState(false)
 
-  const { data: txnData, isLoading: txnLoading } = useQuery<{ data: SupplierTransaction[]; meta: Meta }>({
+  const { data: txnData, isLoading: txnLoading } = useQuery<{ data: SupplierTransaction[]; meta: PaginationMeta }>({
     queryKey: ['supplier-txns', supplier.id, txnPage],
-    queryFn: async () => (await api.get<{ data: SupplierTransaction[]; meta: Meta }>(`/suppliers/${supplier.id}/transactions`, { params: { page: txnPage, limit: 10 } })).data,
+    queryFn: async () => (await api.get<{ data: SupplierTransaction[]; meta: PaginationMeta }>(`/suppliers/${supplier.id}/transactions`, { params: { page: txnPage, limit: 10 } })).data,
   })
 
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -107,13 +110,10 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
             variant="secondary"
             onClick={async () => {
               try {
-                const res = await api.get(`/suppliers/${supplier.id}/statement`, { responseType: 'blob' })
-                const url = URL.createObjectURL(res.data as Blob)
-                const a = document.createElement('a')
-                a.href = url
-                a.download = `supplier-${supplier.name}.xlsx`
-                a.click()
-                URL.revokeObjectURL(url)
+                await downloadFromApi(
+                  `/suppliers/${supplier.id}/statement`,
+                  `supplier-${supplier.name}.xlsx`,
+                )
               } catch { toast.error('فشل تصدير كشف الحساب') }
             }}
           >
@@ -221,13 +221,32 @@ export default function Suppliers() {
     return () => clearTimeout(t)
   }, [search])
 
-  const { data, isLoading } = useQuery<{ data: Supplier[]; meta: Meta }>({
+  const { data, isLoading } = useQuery<{ data: Supplier[]; meta: PaginationMeta }>({
     queryKey: ['suppliers', page, debouncedSearch],
-    queryFn: async () => (await api.get<{ data: Supplier[]; meta: Meta }>('/suppliers', { params: { limit: LIMIT, page, ...(debouncedSearch ? { search: debouncedSearch } : {}) } })).data,
+    queryFn: async () => (await api.get<{ data: Supplier[]; meta: PaginationMeta }>('/suppliers', { params: { limit: LIMIT, page, ...(debouncedSearch ? { search: debouncedSearch } : {}) } })).data,
   })
 
   const suppliers = data?.data ?? []
   const meta = data?.meta
+
+  const selection = useSelection(suppliers.map((s) => s.id))
+
+  const bulkExport = () => {
+    const selected = suppliers.filter((s) => selection.isSelected(s.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'الاسم', accessor: 'name', width: 28 },
+        { header: 'الهاتف', accessor: (s) => s.phone ?? '', width: 16 },
+        { header: 'البريد', accessor: (s) => s.email ?? '', width: 28 },
+        { header: 'الرصيد المستحق', accessor: 'balance', width: 16 },
+        { header: 'الطلبات', accessor: 'totalOrders', width: 10 },
+        { header: 'نشط', accessor: (s) => (s.isActive ? 'نعم' : 'لا'), width: 8 },
+      ],
+      `suppliers-${selected.length}.xlsx`,
+      'الموردون',
+    )
+  }
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<FormData>({ resolver: zodResolver(schema) })
 
@@ -281,6 +300,13 @@ export default function Suppliers() {
         {isLoading ? <SkeletonTable rows={8} cols={5} /> : (
           <>
             <Table
+              selection={{
+                isSelected: (s) => selection.isSelected(s.id),
+                onToggle: (s) => selection.toggle(s.id),
+                onToggleAll: selection.toggleAllVisible,
+                allSelected: selection.allVisibleSelected,
+                someSelected: selection.someVisibleSelected,
+              }}
               columns={[
                 { key: 'name', header: 'المورد', render: (s) => (
                   <button className="font-medium text-brand-400 hover:underline text-right" onClick={() => setDetailSupplier(s)}>{s.name}</button>
@@ -343,6 +369,11 @@ export default function Suppliers() {
       >
         <p className="text-gray-300">هل أنت متأكد من حذف المورد <strong className="text-gray-100">{deleteTarget?.name}</strong>؟ لا يمكن التراجع عن هذا الإجراء.</p>
       </Modal>
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }

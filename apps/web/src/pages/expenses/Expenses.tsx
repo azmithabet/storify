@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Check, X } from 'lucide-react'
+import { Plus, Check, X, Download, Wallet, Trash2, Edit2, Copy, FileText } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input, Pagination } from '@/components/ui'
+import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
+import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
+import type { PaginationMeta } from '@/types/api'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
 
 interface Expense {
   id: string
@@ -22,7 +26,28 @@ interface Expense {
 
 interface Category { id: string; name: string }
 interface Branch { id: string; name: string; isMain: boolean }
-interface Meta { total: number; page: number; limit: number; pages: number }
+
+interface Budget {
+  id: string
+  categoryId: string
+  period: 'monthly' | 'yearly'
+  amount: string
+  spent: string
+  category: { id: string; name: string; color?: string }
+}
+
+interface ExpenseTemplate {
+  id: string
+  name: string
+  description: string
+  amount: string
+  categoryId: string
+  branchId?: string | null
+  paymentMethod?: string | null
+  lastUsedAt?: string | null
+  category: { id: string; name: string; color?: string }
+  branch?: { id: string; name: string } | null
+}
 
 const LIMIT = 20
 
@@ -42,6 +67,387 @@ const statusMap = {
   rejected: { label: 'مرفوض', variant: 'danger' as const },
 }
 
+// ─── Budget panel ─────────────────────────────────────────────────────────────
+// Reads budgets (with computed spent figures) and renders progress bars per
+// category. The "ميزانية" button opens a modal that upserts a (category, period)
+// budget row.
+function BudgetUpsertModal({
+  open, onClose, categories, existing,
+}: {
+  open: boolean
+  onClose: () => void
+  categories: Category[]
+  existing: Budget | null
+}) {
+  const qc = useQueryClient()
+  const [categoryId, setCategoryId] = useState('')
+  const [period, setPeriod] = useState<'monthly' | 'yearly'>('monthly')
+  const [amount, setAmount] = useState('')
+
+  useEffect(() => {
+    if (existing) {
+      setCategoryId(existing.categoryId)
+      setPeriod(existing.period)
+      setAmount(existing.amount)
+    } else {
+      setCategoryId('')
+      setPeriod('monthly')
+      setAmount('')
+    }
+  }, [existing, open])
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => api.post('/expenses/budgets', { categoryId, period, amount: Number(amount) }),
+    onSuccess: () => {
+      toast.success(existing ? 'تم تحديث الميزانية' : 'تم إنشاء الميزانية')
+      qc.invalidateQueries({ queryKey: ['expense-budgets'] })
+      onClose()
+    },
+    onError: () => toast.error('فشل حفظ الميزانية'),
+  })
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={existing ? 'تعديل الميزانية' : 'ميزانية جديدة'}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isPending}>إلغاء</Button>
+          <Button loading={isPending} disabled={!categoryId || !amount} onClick={() => mutate()}>
+            <Check className="w-4 h-4" />حفظ
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">الفئة</label>
+          <select
+            value={categoryId}
+            onChange={(e) => setCategoryId(e.target.value)}
+            disabled={!!existing}
+            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 disabled:opacity-60"
+          >
+            <option value="">— اختر فئة —</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+        </div>
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">الفترة</label>
+          <div className="flex gap-2">
+            {(['monthly', 'yearly'] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPeriod(p)}
+                disabled={!!existing}
+                className={cn(
+                  'flex-1 px-3 py-2 rounded-md text-sm border transition-colors disabled:opacity-60',
+                  period === p ? 'border-brand-500 bg-brand-600/10 text-brand-300' : 'border-gray-600 text-gray-400',
+                )}
+              >
+                {p === 'monthly' ? 'شهرياً' : 'سنوياً'}
+              </button>
+            ))}
+          </div>
+        </div>
+        <Input
+          label="المبلغ (ج)"
+          type="number"
+          step="0.01"
+          value={amount}
+          onChange={(e) => setAmount(e.target.value)}
+        />
+      </div>
+    </Modal>
+  )
+}
+
+function BudgetPanel({ categories }: { categories: Category[] }) {
+  const qc = useQueryClient()
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing] = useState<Budget | null>(null)
+
+  const { data: budgets = [], isLoading } = useQuery<Budget[]>({
+    queryKey: ['expense-budgets'],
+    queryFn: async () => (await api.get<{ data: Budget[] }>('/expenses/budgets')).data.data,
+  })
+
+  const { mutate: deleteBudget } = useMutation({
+    mutationFn: async (id: string) => api.delete(`/expenses/budgets/${id}`),
+    onSuccess: () => {
+      toast.success('تم حذف الميزانية')
+      qc.invalidateQueries({ queryKey: ['expense-budgets'] })
+    },
+    onError: () => toast.error('فشل الحذف'),
+  })
+
+  const openCreate = () => { setEditing(null); setModalOpen(true) }
+  const openEdit = (b: Budget) => { setEditing(b); setModalOpen(true) }
+
+  return (
+    <div className="bg-gray-800 border border-gray-700 rounded-r-xl">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-2">
+          <Wallet className="w-4 h-4 text-brand-400" />الميزانيات
+        </h3>
+        <Button variant="outline" size="sm" onClick={openCreate}>
+          <Plus className="w-3 h-3" />ميزانية جديدة
+        </Button>
+      </div>
+      <div className="p-4">
+        {isLoading ? (
+          <div className="text-gray-500 text-sm">جارٍ التحميل...</div>
+        ) : budgets.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-4">
+            لم تُحدَّد ميزانيات بعد. أضف ميزانية لتتبّع الإنفاق لكل فئة.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {budgets.map((b) => {
+              const amount = Number(b.amount)
+              const spent = Number(b.spent)
+              const pct = amount > 0 ? Math.min(100, (spent / amount) * 100) : 0
+              const overBudget = spent > amount
+              const tone = overBudget ? 'bg-danger-500' : pct >= 80 ? 'bg-warning-500' : 'bg-success-500'
+              return (
+                <div key={b.id} className="bg-gray-900 border border-gray-700 rounded-md p-3 flex flex-col gap-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-100 truncate">{b.category.name}</p>
+                      <p className="text-[10px] text-gray-500">{b.period === 'monthly' ? 'هذا الشهر' : 'هذا العام'}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => openEdit(b)} className="text-gray-500 hover:text-gray-200 transition-colors p-1" aria-label="تعديل">
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`حذف ميزانية ${b.category.name}؟`)) deleteBudget(b.id) }}
+                        className="text-gray-500 hover:text-danger-400 transition-colors p-1"
+                        aria-label="حذف"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
+                    <div className={cn('h-full transition-all duration-slow', tone)} style={{ width: `${pct}%` }} />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className={cn('font-mono num', overBudget ? 'text-danger-400 font-semibold' : 'text-gray-300')}>
+                      {spent.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} / {amount.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج
+                    </span>
+                    <span className={cn('font-mono num', overBudget ? 'text-danger-400 font-semibold' : pct >= 80 ? 'text-warning-400' : 'text-gray-500')}>
+                      {pct.toFixed(0)}%
+                    </span>
+                  </div>
+                  {overBudget && (
+                    <p className="text-[10px] text-danger-400">
+                      تجاوزت الميزانية بـ {(spent - amount).toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج
+                    </p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      <BudgetUpsertModal open={modalOpen} onClose={() => setModalOpen(false)} categories={categories} existing={editing} />
+    </div>
+  )
+}
+
+// ─── Templates panel ─────────────────────────────────────────────────────────
+const templateFormSchema = z.object({
+  name: z.string().min(1, 'الاسم مطلوب'),
+  description: z.string().min(1, 'الوصف مطلوب'),
+  amount: z.coerce.number().positive('المبلغ يجب أن يكون أكبر من صفر'),
+  categoryId: z.string().uuid('اختر فئة'),
+  paymentMethod: z.string().optional(),
+})
+type TemplateFormData = z.infer<typeof templateFormSchema>
+
+function TemplateUpsertDrawer({
+  open, onClose, categories, existing,
+}: {
+  open: boolean
+  onClose: () => void
+  categories: Category[]
+  existing: ExpenseTemplate | null
+}) {
+  const qc = useQueryClient()
+  const { register, handleSubmit, reset, formState: { errors } } = useForm<TemplateFormData>({
+    resolver: zodResolver(templateFormSchema),
+  })
+
+  useEffect(() => {
+    if (existing) {
+      reset({
+        name: existing.name,
+        description: existing.description,
+        amount: Number(existing.amount),
+        categoryId: existing.categoryId,
+        paymentMethod: existing.paymentMethod ?? '',
+      })
+    } else {
+      reset({ name: '', description: '', amount: 0, categoryId: '', paymentMethod: '' })
+    }
+  }, [existing, open, reset])
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async (data: TemplateFormData) => {
+      const payload = {
+        name: data.name,
+        description: data.description,
+        amount: data.amount,
+        categoryId: data.categoryId,
+        paymentMethod: data.paymentMethod || undefined,
+      }
+      if (existing) {
+        await api.patch(`/expenses/templates/${existing.id}`, payload)
+      } else {
+        await api.post('/expenses/templates', payload)
+      }
+    },
+    onSuccess: () => {
+      toast.success(existing ? 'تم تحديث القالب' : 'تم إنشاء القالب')
+      qc.invalidateQueries({ queryKey: ['expense-templates'] })
+      onClose()
+    },
+    onError: () => toast.error('فشل حفظ القالب'),
+  })
+
+  return (
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title={existing ? 'تعديل القالب' : 'قالب جديد'}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isPending}>إلغاء</Button>
+          <Button loading={isPending} onClick={handleSubmit((d) => mutate(d))}>
+            <Check className="w-4 h-4" />حفظ
+          </Button>
+        </>
+      }
+    >
+      <form className="flex flex-col gap-4">
+        <Input label="اسم القالب" placeholder="مثال: إيجار المحل" error={errors.name?.message} {...register('name')} />
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">الوصف</label>
+          <textarea {...register('description')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
+          {errors.description && <p className="text-xs text-danger-400 mt-1">{errors.description.message}</p>}
+        </div>
+        <Input label="المبلغ (ج)" type="number" step="0.01" error={errors.amount?.message} {...register('amount')} />
+        <div>
+          <label className="text-sm text-gray-400 block mb-1">الفئة</label>
+          <select {...register('categoryId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <option value="">— اختر فئة —</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          {errors.categoryId && <p className="text-xs text-danger-400 mt-1">{errors.categoryId.message}</p>}
+        </div>
+        <Input label="طريقة الدفع (اختياري)" placeholder="نقدي / تحويل بنكي / ..." {...register('paymentMethod')} />
+      </form>
+    </Drawer>
+  )
+}
+
+function TemplatesPanel({ categories }: { categories: Category[] }) {
+  const qc = useQueryClient()
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editing, setEditing] = useState<ExpenseTemplate | null>(null)
+
+  const { data: templates = [], isLoading } = useQuery<ExpenseTemplate[]>({
+    queryKey: ['expense-templates'],
+    queryFn: async () => (await api.get<{ data: ExpenseTemplate[] }>('/expenses/templates')).data.data,
+  })
+
+  const { mutate: instantiate, isPending: isInstantiating, variables: instantiatingId } = useMutation({
+    mutationFn: async (id: string) => api.post(`/expenses/templates/${id}/instantiate`),
+    onSuccess: () => {
+      toast.success('تم إنشاء المصروف من القالب')
+      qc.invalidateQueries({ queryKey: ['expenses'] })
+      qc.invalidateQueries({ queryKey: ['expense-templates'] })
+    },
+    onError: () => toast.error('فشل إنشاء المصروف'),
+  })
+
+  const { mutate: deleteTemplate } = useMutation({
+    mutationFn: async (id: string) => api.delete(`/expenses/templates/${id}`),
+    onSuccess: () => {
+      toast.success('تم حذف القالب')
+      qc.invalidateQueries({ queryKey: ['expense-templates'] })
+    },
+    onError: () => toast.error('فشل الحذف'),
+  })
+
+  return (
+    <div className="bg-gray-800 border border-gray-700 rounded-r-xl">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-700">
+        <h3 className="text-sm font-semibold text-gray-100 flex items-center gap-2">
+          <FileText className="w-4 h-4 text-brand-400" />القوالب
+        </h3>
+        <Button variant="outline" size="sm" onClick={() => { setEditing(null); setDrawerOpen(true) }}>
+          <Plus className="w-3 h-3" />قالب جديد
+        </Button>
+      </div>
+      <div className="p-4">
+        {isLoading ? (
+          <div className="text-gray-500 text-sm">جارٍ التحميل...</div>
+        ) : templates.length === 0 ? (
+          <p className="text-sm text-gray-500 text-center py-4">
+            لا توجد قوالب. أنشئ قالباً للمصاريف المتكررة (مثل الإيجار أو فواتير الكهرباء) لإضافتها بضغطة واحدة.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+            {templates.map((t) => {
+              const isBusy = isInstantiating && instantiatingId === t.id
+              return (
+                <div key={t.id} className="bg-gray-900 border border-gray-700 rounded-md p-3 flex flex-col gap-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-gray-100 truncate">{t.name}</p>
+                      <p className="text-[10px] text-gray-500 truncate">{t.category.name}</p>
+                    </div>
+                    <div className="flex gap-1 shrink-0">
+                      <button onClick={() => { setEditing(t); setDrawerOpen(true) }} className="text-gray-500 hover:text-gray-200 transition-colors p-1" aria-label="تعديل" title="تعديل">
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                      <button
+                        onClick={() => { if (confirm(`حذف القالب "${t.name}"؟`)) deleteTemplate(t.id) }}
+                        className="text-gray-500 hover:text-danger-400 transition-colors p-1"
+                        aria-label="حذف"
+                        title="حذف"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400 truncate">{t.description}</p>
+                  <div className="flex items-center justify-between">
+                    <span className="text-base font-mono font-bold text-brand-400 num">
+                      {Number(t.amount).toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ج
+                    </span>
+                    <Button size="sm" loading={isBusy} onClick={() => instantiate(t.id)}>
+                      <Copy className="w-3 h-3" />استخدام
+                    </Button>
+                  </div>
+                  {t.lastUsedAt && (
+                    <p className="text-[10px] text-gray-600">آخر استخدام: {new Date(t.lastUsedAt).toLocaleDateString('ar-EG')}</p>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+      <TemplateUpsertDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} categories={categories} existing={editing} />
+    </div>
+  )
+}
+
 export default function Expenses() {
   const qc = useQueryClient()
   const user = useAuthStore((s) => s.user)
@@ -49,13 +455,32 @@ export default function Expenses() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ expense: Expense; type: 'approve' | 'reject' } | null>(null)
 
-  const { data: expenseData, isLoading } = useQuery<{ data: Expense[]; meta: Meta }>({
+  const { data: expenseData, isLoading } = useQuery<{ data: Expense[]; meta: PaginationMeta }>({
     queryKey: ['expenses', page],
-    queryFn: async () => (await api.get<{ data: Expense[]; meta: Meta }>('/expenses', { params: { limit: LIMIT, page } })).data,
+    queryFn: async () => (await api.get<{ data: Expense[]; meta: PaginationMeta }>('/expenses', { params: { limit: LIMIT, page } })).data,
   })
 
   const data = expenseData?.data ?? []
   const meta = expenseData?.meta
+
+  const selection = useSelection(data.map((e) => e.id))
+
+  const bulkExport = () => {
+    const selected = data.filter((e) => selection.isSelected(e.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'الوصف', accessor: 'description', width: 32 },
+        { header: 'الفئة', accessor: (e) => e.category?.name ?? '', width: 16 },
+        { header: 'المبلغ', accessor: 'amount', width: 14 },
+        { header: 'تاريخ المصروف', accessor: 'expenseDate', width: 14 },
+        { header: 'الحالة', accessor: (e) => statusMap[e.status].label, width: 12 },
+        { header: 'أُنشئ', accessor: (e) => new Date(e.createdAt).toLocaleDateString('ar-EG'), width: 14 },
+      ],
+      `expenses-${selected.length}.xlsx`,
+      'المصروفات',
+    )
+  }
 
   const { data: categories = [] } = useQuery<Category[]>({
     queryKey: ['expense-categories'],
@@ -101,6 +526,8 @@ export default function Expenses() {
   return (
     <AppShell title="المصروفات">
       <div className="flex flex-col gap-6">
+        <BudgetPanel categories={categories} />
+        <TemplatesPanel categories={categories} />
         <div className="flex justify-end">
           <Button onClick={() => { reset({ expenseDate: new Date().toISOString().slice(0, 10), branchId: defaultBranch?.id }); setDrawerOpen(true) }}>
             <Plus className="w-4 h-4" />مصروف جديد
@@ -110,6 +537,13 @@ export default function Expenses() {
         {isLoading ? <SkeletonTable rows={8} cols={5} /> : (
           <>
           <Table
+            selection={{
+              isSelected: (e) => selection.isSelected(e.id),
+              onToggle: (e) => selection.toggle(e.id),
+              onToggleAll: selection.toggleAllVisible,
+              allSelected: selection.allVisibleSelected,
+              someSelected: selection.someVisibleSelected,
+            }}
             columns={[
               { key: 'description', header: 'الوصف', render: (e) => <span className="font-medium text-gray-100">{e.description}</span> },
               { key: 'category', header: 'الفئة', render: (e) => <span className="text-gray-400">{e.category?.name ?? '—'}</span> },
@@ -194,6 +628,11 @@ export default function Expenses() {
           {' '}بقيمة <strong className="text-gray-100">{confirmAction?.expense.amount} ج</strong>؟
         </p>
       </Modal>
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }

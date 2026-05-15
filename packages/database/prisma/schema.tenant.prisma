@@ -31,6 +31,7 @@ model Branch {
   stockTransfersTo    StockTransfer[]         @relation("TransferTo")
   invoices            Invoice[]
   expenses            Expense[]
+  expenseTemplates    ExpenseTemplate[]
   supplierTransactions SupplierTransaction[]
   purchaseOrders      PurchaseOrder[]
   paymentFeeExpenses  PaymentFeeExpense[]
@@ -633,6 +634,7 @@ model PurchaseOrderItem {
   orderId  String  @db.Uuid @map("order_id")
   variantId String @db.Uuid @map("variant_id")
   quantity Int
+  receivedQuantity Int @default(0) @map("received_quantity")
   unitCost Decimal @db.Decimal(15, 4) @map("unit_cost")
   subtotal Decimal @db.Decimal(15, 4)
 
@@ -682,9 +684,50 @@ model ExpenseCategory {
   color    String? @db.VarChar(20)
   isActive Boolean @default(true) @map("is_active")
 
-  expenses Expense[]
+  expenses  Expense[]
+  budgets   ExpenseBudget[]
+  templates ExpenseTemplate[]
 
   @@map("expense_categories")
+}
+
+// One budget row per category × period; period values: 'monthly' | 'yearly'.
+// The budget figure is reset implicitly by the calendar — UI compares this
+// figure against the SUM of approved expenses for the current period.
+model ExpenseBudget {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  categoryId String   @db.Uuid @map("category_id")
+  period     String   @default("monthly") @db.VarChar(20)
+  amount     Decimal  @db.Decimal(15, 4)
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @updatedAt @map("updated_at")
+
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id])
+
+  @@unique([categoryId, period], map: "uq_expense_budget_cat_period")
+  @@map("expense_budgets")
+}
+
+// Reusable expense preset. Admins instantiate a template to create a new
+// pending expense with today's date — useful for predictable monthly costs
+// (rent, utilities, salaries) without retyping every time.
+model ExpenseTemplate {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name          String   @db.VarChar(200)
+  description   String   @db.Text
+  amount        Decimal  @db.Decimal(15, 4)
+  categoryId    String   @db.Uuid @map("category_id")
+  branchId      String?  @db.Uuid @map("branch_id")
+  paymentMethod String?  @db.VarChar(50) @map("payment_method")
+  isActive      Boolean  @default(true) @map("is_active")
+  lastUsedAt    DateTime? @map("last_used_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  category ExpenseCategory @relation(fields: [categoryId], references: [id])
+  branch   Branch?         @relation(fields: [branchId], references: [id])
+
+  @@map("expense_templates")
 }
 
 model Expense {

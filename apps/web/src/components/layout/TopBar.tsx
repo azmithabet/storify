@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Bell, PackageOpen, Clock, AlertTriangle } from 'lucide-react'
+import { Bell, PackageOpen, Clock, AlertTriangle, Menu } from 'lucide-react'
 import { useAuthStore } from '@/stores/auth.store'
 import { Badge } from '@/components/ui'
 import { api } from '@/api/client'
@@ -70,7 +70,7 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
   )
 }
 
-export function TopBar({ title }: { title?: string }) {
+export function TopBar({ title, onMenuClick }: { title?: string; onMenuClick?: () => void }) {
   const { tenantSubdomain } = useAuthStore()
   const [open, setOpen] = useState(false)
 
@@ -89,8 +89,17 @@ export function TopBar({ title }: { title?: string }) {
     (data?.etaFailures ?? 0)
 
   return (
-    <header className="h-14 bg-gray-900 border-b border-gray-800 flex items-center px-6 gap-4">
-      {title && <h2 className="text-base font-semibold text-gray-100 flex-1">{title}</h2>}
+    <header className="h-14 bg-gray-900 border-b border-gray-800 flex items-center px-4 sm:px-6 gap-3 sm:gap-4">
+      {onMenuClick && (
+        <button
+          onClick={onMenuClick}
+          aria-label="فتح القائمة"
+          className="lg:hidden w-8 h-8 rounded-md text-gray-400 hover:text-gray-100 hover:bg-gray-800 flex items-center justify-center transition-colors"
+        >
+          <Menu className="w-5 h-5" />
+        </button>
+      )}
+      {title && <h2 className="text-base font-semibold text-gray-100 flex-1 truncate">{title}</h2>}
       {!title && <div className="flex-1" />}
 
       {tenantSubdomain && <Badge variant="brand" dot>{tenantSubdomain}</Badge>}

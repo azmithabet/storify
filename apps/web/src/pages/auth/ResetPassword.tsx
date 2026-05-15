@@ -6,6 +6,7 @@ import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Button, Input, Alert } from '@/components/ui'
 import { api } from '@/api/client'
+import { getApiErrorMessage } from '@/lib/api-error'
 
 const schema = z
   .object({
@@ -62,8 +63,7 @@ export default function ResetPassword() {
         <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-8 shadow-xl">
           {error && (
             <Alert variant="danger" className="mb-6">
-              {(error as { response?: { data?: { message?: string } } })?.response?.data?.message ??
-                'الرابط منتهي الصلاحية أو غير صالح'}
+              {getApiErrorMessage(error, 'الرابط منتهي الصلاحية أو غير صالح')}
             </Alert>
           )}
           <form onSubmit={handleSubmit((d) => mutate(d))} className="flex flex-col gap-5">

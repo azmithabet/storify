@@ -1,8 +1,12 @@
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { Download } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, Money, SkeletonTable, Pagination, Drawer } from '@/components/ui'
+import { Table, Badge, Money, SkeletonTable, Pagination, Drawer, DateRangePicker, BulkActionBar, Button } from '@/components/ui'
 import { api } from '@/api/client'
+import type { PaginationMeta } from '@/types/api'
+import { useSelection } from '@/hooks/useSelection'
+import { exportRowsToExcel } from '@/lib/export'
 
 interface ReturnItem {
   id: string
@@ -21,7 +25,6 @@ interface Return {
   items: ReturnItem[]
 }
 
-interface Meta { total: number; page: number; limit: number; pages: number }
 
 const LIMIT = 20
 
@@ -74,10 +77,10 @@ export default function Returns() {
   const [to, setTo] = useState('')
   const [detail, setDetail] = useState<Return | null>(null)
 
-  const { data, isLoading } = useQuery<{ data: Return[]; meta: Meta }>({
+  const { data, isLoading } = useQuery<{ data: Return[]; meta: PaginationMeta }>({
     queryKey: ['returns', page, typeFilter, from, to],
     queryFn: async () =>
-      (await api.get<{ data: Return[]; meta: Meta }>('/invoices/returns', {
+      (await api.get<{ data: Return[]; meta: PaginationMeta }>('/invoices/returns', {
         params: {
           page, limit: LIMIT,
           ...(typeFilter ? { returnType: typeFilter } : {}),
@@ -89,6 +92,27 @@ export default function Returns() {
 
   const returns = data?.data ?? []
   const meta = data?.meta
+
+  const selection = useSelection(returns.map((r) => r.id))
+
+  const bulkExport = () => {
+    const selected = returns.filter((r) => selection.isSelected(r.id))
+    exportRowsToExcel(
+      selected,
+      [
+        { header: 'الفاتورة', accessor: (r) => r.invoice.invoiceNumber, width: 18 },
+        { header: 'العميل', accessor: (r) => r.invoice.customer?.fullName ?? 'نقدي', width: 24 },
+        { header: 'النوع', accessor: (r) => typeMap[r.returnType].label, width: 14 },
+        { header: 'عدد الأصناف', accessor: (r) => r.items.length, width: 12 },
+        { header: 'المبلغ', accessor: 'amount', width: 14 },
+        { header: 'الموظف', accessor: (r) => r.processedBy.fullName, width: 18 },
+        { header: 'السبب', accessor: (r) => r.reason ?? '', width: 30 },
+        { header: 'التاريخ', accessor: (r) => new Date(r.createdAt).toLocaleString('ar-EG'), width: 22 },
+      ],
+      `returns-${selected.length}.xlsx`,
+      'المرتجعات',
+    )
+  }
 
   return (
     <AppShell title="المرتجعات">
@@ -104,26 +128,22 @@ export default function Returns() {
             <option value="refund">استرداد نقدي</option>
             <option value="credit">رصيد عميل</option>
           </select>
-          <div className="flex items-center gap-2">
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => { setFrom(e.target.value); setPage(1) }}
-              className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
-            />
-            <span className="text-gray-500 text-sm">—</span>
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => { setTo(e.target.value); setPage(1) }}
-              className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
-            />
-          </div>
+          <DateRangePicker
+            value={{ from, to }}
+            onChange={(v) => { setFrom(v.from); setTo(v.to); setPage(1) }}
+          />
         </div>
 
         {isLoading ? <SkeletonTable rows={8} cols={6} /> : (
           <>
             <Table
+              selection={{
+                isSelected: (r) => selection.isSelected(r.id),
+                onToggle: (r) => selection.toggle(r.id),
+                onToggleAll: selection.toggleAllVisible,
+                allSelected: selection.allVisibleSelected,
+                someSelected: selection.someVisibleSelected,
+              }}
               columns={[
                 { key: 'invoice', header: 'الفاتورة', render: (r) => (
                   <button className="font-mono text-brand-400 hover:underline" onClick={() => setDetail(r)}>
@@ -147,6 +167,11 @@ export default function Returns() {
       <Drawer open={!!detail} onClose={() => setDetail(null)} title={`مرتجع فاتورة ${detail?.invoice.invoiceNumber ?? ''}`} width="w-[480px]">
         {detail && <ReturnDetailDrawer ret={detail} />}
       </Drawer>
+      <BulkActionBar count={selection.count} onClear={selection.clear}>
+        <Button variant="outline" size="sm" onClick={bulkExport}>
+          <Download className="w-4 h-4" />تصدير
+        </Button>
+      </BulkActionBar>
     </AppShell>
   )
 }

@@ -282,4 +282,44 @@ export async function customerRoutes(app: FastifyInstance) {
         .send(Buffer.from(buf))
     },
   )
+
+  // ─── GET /api/customers/:id/credit-ledger ─────────────────────────────────
+  // Synthesizes the customer's credit + loyalty history from audit_logs. No
+  // dedicated ledger table — `createInvoice` and `PATCH /:id/credit` both
+  // write `entity: 'customer'` audit entries with action codes we know.
+  app.get<{ Params: { id: string } }>(
+    '/:id/credit-ledger',
+    { preHandler: requirePermission('customers', 'read') },
+    async (request, reply) => {
+      const customer = await request.tenantDb.customer.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, creditBalance: true, loyaltyPoints: true },
+      })
+      if (!customer) {
+        return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'العميل غير موجود' } })
+      }
+
+      const entries = await request.tenantDb.auditLog.findMany({
+        where: {
+          entity: 'customer',
+          entityId: request.params.id,
+          action: { in: ['credit_add', 'credit_deduct', 'credit_used', 'loyalty_earned', 'loyalty_reversed'] },
+        },
+        include: { actor: { select: { id: true, fullName: true } } },
+        orderBy: { createdAt: 'desc' },
+        take: 200,
+      })
+
+      return reply.send({
+        success: true,
+        data: {
+          balance: {
+            credit: customer.creditBalance.toString(),
+            loyaltyPoints: customer.loyaltyPoints,
+          },
+          entries,
+        },
+      })
+    },
+  )
 }

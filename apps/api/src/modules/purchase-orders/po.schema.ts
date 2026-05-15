@@ -16,10 +16,18 @@ export const createPoSchema = z.object({
     .min(1),
 })
 
+// Partial receipts: omit `items` to receive the full outstanding quantity for
+// every line (backwards-compatible with the original full-receive UI).
+// Pass `items` with per-line quantities to record a partial receipt; only
+// listed items are advanced, others stay outstanding.
 export const receivePoSchema = z.object({
   receivedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   notes: z.string().optional(),
   invoiceImageUrl: z.string().url().optional(),
+  items: z.array(z.object({
+    id: z.string().uuid(),
+    quantity: z.number().int().positive(),
+  })).optional(),
 })
 
 export const poPaymentSchema = z.object({

@@ -18,23 +18,46 @@ import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
 import { api } from '@/api/client'
 
-const navItems = [
-  { to: '/pos', icon: ShoppingCart, label: 'نقطة البيع' },
-  { to: '/products', icon: Package, label: 'المنتجات' },
-  { to: '/stock', icon: Warehouse, label: 'المخزون' },
-  { to: '/customers', icon: Users, label: 'العملاء' },
-  { to: '/invoices', icon: FileText, label: 'الفواتير' },
-  { to: '/returns', icon: RotateCcw, label: 'المرتجعات' },
-  { to: '/installments', icon: CreditCard, label: 'الأقساط' },
-  { to: '/suppliers', icon: Truck, label: 'الموردون' },
-  { to: '/purchase-orders', icon: ClipboardList, label: 'أوامر الشراء' },
-  { to: '/expenses', icon: Receipt, label: 'المصروفات' },
-  { to: '/reports', icon: BarChart3, label: 'التقارير' },
-  { to: '/settings', icon: Settings, label: 'الإعدادات' },
+// Each entry is gated by a (resource, action) the user must have to see it.
+// Super-admin bypasses these via `hasPermission`. The backend enforces the
+// same checks per-route, so this is purely UX — hides menu items the user
+// would 403 on anyway. POS / settings/password are visible to everyone.
+const navItems: Array<{
+  to: string
+  icon: typeof ShoppingCart
+  label: string
+  permission?: { resource: string; action: string }
+}> = [
+  { to: '/pos', icon: ShoppingCart, label: 'نقطة البيع', permission: { resource: 'invoices', action: 'create' } },
+  { to: '/products', icon: Package, label: 'المنتجات', permission: { resource: 'products', action: 'read' } },
+  { to: '/stock', icon: Warehouse, label: 'المخزون', permission: { resource: 'stock', action: 'read' } },
+  { to: '/customers', icon: Users, label: 'العملاء', permission: { resource: 'customers', action: 'read' } },
+  { to: '/invoices', icon: FileText, label: 'الفواتير', permission: { resource: 'invoices', action: 'read' } },
+  { to: '/returns', icon: RotateCcw, label: 'المرتجعات', permission: { resource: 'invoices', action: 'read' } },
+  { to: '/installments', icon: CreditCard, label: 'الأقساط', permission: { resource: 'installments', action: 'read' } },
+  { to: '/suppliers', icon: Truck, label: 'الموردون', permission: { resource: 'suppliers', action: 'read' } },
+  { to: '/purchase-orders', icon: ClipboardList, label: 'أوامر الشراء', permission: { resource: 'purchase_orders', action: 'read' } },
+  { to: '/expenses', icon: Receipt, label: 'المصروفات', permission: { resource: 'expenses', action: 'read' } },
+  { to: '/reports', icon: BarChart3, label: 'التقارير', permission: { resource: 'reports', action: 'read' } },
+  // Settings is split — most pages need settings.read, but every user can
+  // still reach the password tab via direct URL. Filter on settings.read
+  // for the nav, and route-level guard allows password tab regardless.
+  { to: '/settings', icon: Settings, label: 'الإعدادات', permission: { resource: 'settings', action: 'read' } },
 ]
 
-export function Sidebar() {
-  const { user, logout } = useAuthStore()
+interface SidebarProps {
+  /** Whether the mobile drawer is open. Ignored on lg+ (always visible there). */
+  open: boolean
+  /** Close handler — called after navigation on mobile so the drawer auto-dismisses. */
+  onClose: () => void
+}
+
+export function Sidebar({ open, onClose }: SidebarProps) {
+  const { user, logout, hasPermission } = useAuthStore()
+
+  const visibleItems = navItems.filter(
+    (item) => !item.permission || hasPermission(item.permission.resource, item.permission.action),
+  )
 
   const handleLogout = async () => {
     try {
@@ -45,18 +68,25 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="fixed top-0 right-0 h-full w-60 bg-gray-900 border-l border-gray-800 flex flex-col z-10">
+    <aside
+      className={cn(
+        'fixed top-0 right-0 h-full w-60 bg-gray-900 border-l border-gray-800 flex flex-col z-40',
+        'transition-transform duration-slow lg:translate-x-0',
+        open ? 'translate-x-0' : 'translate-x-full',
+      )}
+    >
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-800">
         <h1 className="font-display text-2xl font-bold text-brand-400">Storify</h1>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-4 overflow-y-auto">
-        {navItems.map(({ to, icon: Icon, label }) => (
+      <nav className="flex-1 py-4 overflow-y-auto" aria-label="القائمة الرئيسية">
+        {visibleItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
+            onClick={onClose}
             className={({ isActive }) =>
               cn(
                 'flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-fast mx-2 rounded-r-md',

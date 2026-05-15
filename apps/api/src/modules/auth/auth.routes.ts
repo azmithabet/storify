@@ -248,11 +248,169 @@ export async function authRoutes(app: FastifyInstance) {
   // ─── GET /api/auth/roles — list available roles ───────────────────────────
   app.get('/roles', { preHandler: [authenticate] }, async (request, reply) => {
     const roles = await request.tenantDb.role.findMany({
-      select: { id: true, name: true, slug: true },
+      select: { id: true, name: true, slug: true, permissions: true, isSystem: true },
       orderBy: { name: 'asc' },
     })
     return reply.send({ success: true, data: roles })
   })
+
+  // ─── POST /api/auth/roles — create a custom (non-system) role ────────────
+  const createRoleSchema = z.object({
+    name: z.string().trim().min(1, 'الاسم مطلوب').max(100),
+    slug: z.string().trim().toLowerCase().regex(/^[a-z0-9_-]+$/, 'المعرّف يجب أن يحتوي حروفاً لاتينية صغيرة وأرقام و- أو _ فقط').min(1).max(50),
+    permissions: z.record(z.string(), z.array(z.string())).default({}),
+  })
+
+  app.post(
+    '/roles',
+    { preHandler: [authenticate, requirePermission('users', 'update')] },
+    async (request, reply) => {
+      const parsed = createRoleSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'validation_error', message: parsed.error.errors[0].message },
+        })
+      }
+
+      const existing = await request.tenantDb.role.findUnique({
+        where: { slug: parsed.data.slug },
+        select: { id: true },
+      })
+      if (existing) {
+        return reply.status(409).send({
+          success: false,
+          error: { code: 'slug_taken', message: 'هذا المعرّف مستخدم بالفعل' },
+        })
+      }
+
+      const actor = request.user as JWTPayload
+      const role = await request.tenantDb.role.create({
+        data: {
+          name: parsed.data.name,
+          slug: parsed.data.slug,
+          permissions: parsed.data.permissions,
+          isSystem: false,
+        },
+        select: { id: true, name: true, slug: true, permissions: true, isSystem: true },
+      })
+
+      const { auditLog } = await import('../../shared/utils/audit')
+      await auditLog({
+        db: request.tenantDb,
+        actorId: actor.userId,
+        entity: 'role',
+        entityId: role.id,
+        action: 'create',
+        after: { name: role.name, slug: role.slug },
+        ip: request.ip,
+      })
+
+      return reply.status(201).send({ success: true, data: role })
+    },
+  )
+
+  // ─── PATCH /api/auth/roles/:id — update a role's permissions and/or name ──
+  // System roles (e.g., super_admin) are read-only on purpose — losing their
+  // permissions would lock the tenant out of recovery. Slugs are immutable
+  // even for custom roles because JWTs and a few hardcoded checks reference
+  // them by value.
+  const updateRoleSchema = z.object({
+    permissions: z.record(z.string(), z.array(z.string())).optional(),
+    name: z.string().trim().min(1).max(100).optional(),
+  }).refine(
+    (v) => v.permissions !== undefined || v.name !== undefined,
+    { message: 'لا توجد تغييرات' },
+  )
+
+  app.patch<{ Params: { id: string } }>(
+    '/roles/:id',
+    { preHandler: [authenticate, requirePermission('users', 'update')] },
+    async (request, reply) => {
+      const parsed = updateRoleSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'validation_error', message: parsed.error.errors[0].message },
+        })
+      }
+
+      const existing = await request.tenantDb.role.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, name: true, slug: true, permissions: true, isSystem: true },
+      })
+      if (!existing) {
+        return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الدور غير موجود' } })
+      }
+      if (existing.isSystem) {
+        return reply.status(403).send({ success: false, error: { code: 'system_role_readonly', message: 'لا يمكن تعديل دور نظامي' } })
+      }
+
+      const actor = request.user as JWTPayload
+      const updated = await request.tenantDb.role.update({
+        where: { id: request.params.id },
+        data: {
+          ...(parsed.data.permissions !== undefined ? { permissions: parsed.data.permissions } : {}),
+          ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
+        },
+        select: { id: true, name: true, slug: true, permissions: true, isSystem: true },
+      })
+
+      const { auditLog } = await import('../../shared/utils/audit')
+      await auditLog({
+        db: request.tenantDb,
+        actorId: actor.userId,
+        entity: 'role',
+        entityId: updated.id,
+        action: parsed.data.permissions !== undefined ? 'permissions_update' : 'rename',
+        before: { name: existing.name, permissions: existing.permissions },
+        after: { name: updated.name, permissions: updated.permissions },
+        ip: request.ip,
+      })
+
+      return reply.send({ success: true, data: updated })
+    },
+  )
+
+  // ─── DELETE /api/auth/roles/:id — delete a custom role ────────────────────
+  app.delete<{ Params: { id: string } }>(
+    '/roles/:id',
+    { preHandler: [authenticate, requirePermission('users', 'update')] },
+    async (request, reply) => {
+      const existing = await request.tenantDb.role.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, name: true, slug: true, isSystem: true, _count: { select: { users: true } } },
+      })
+      if (!existing) {
+        return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الدور غير موجود' } })
+      }
+      if (existing.isSystem) {
+        return reply.status(403).send({ success: false, error: { code: 'system_role_readonly', message: 'لا يمكن حذف دور نظامي' } })
+      }
+      if (existing._count.users > 0) {
+        return reply.status(409).send({
+          success: false,
+          error: { code: 'role_in_use', message: `لا يمكن حذف الدور وله ${existing._count.users} مستخدم — أعد تعيين هؤلاء المستخدمين أولاً.` },
+        })
+      }
+
+      const actor = request.user as JWTPayload
+      await request.tenantDb.role.delete({ where: { id: request.params.id } })
+
+      const { auditLog } = await import('../../shared/utils/audit')
+      await auditLog({
+        db: request.tenantDb,
+        actorId: actor.userId,
+        entity: 'role',
+        entityId: existing.id,
+        action: 'delete',
+        before: { name: existing.name, slug: existing.slug },
+        ip: request.ip,
+      })
+
+      return reply.status(204).send()
+    },
+  )
 
   // ─── PATCH /api/auth/me/password — change own password ───────────────────
   const changePasswordSchema = z.object({

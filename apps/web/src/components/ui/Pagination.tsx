@@ -15,12 +15,12 @@ export function Pagination({ page, pages, total, limit, onPage }: PaginationProp
   const to = Math.min(page * limit, total)
 
   return (
-    <div className="flex items-center justify-between pt-2">
+    <nav className="flex items-center justify-between pt-2" aria-label="تصفح الصفحات">
       <span className="text-xs text-gray-500">
         {from}–{to} من {total.toLocaleString('ar-EG')}
       </span>
       <div className="flex items-center gap-1">
-        <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+        <Button variant="ghost" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)} aria-label="الصفحة السابقة">
           <ChevronRight className="w-4 h-4" />
         </Button>
         {Array.from({ length: Math.min(pages, 7) }, (_, i) => {
@@ -41,15 +41,17 @@ export function Pagination({ page, pages, total, limit, onPage }: PaginationProp
               size="sm"
               onClick={() => onPage(p)}
               className="min-w-[32px]"
+              aria-label={`الصفحة ${p}`}
+              aria-current={p === page ? 'page' : undefined}
             >
               {p}
             </Button>
           )
         })}
-        <Button variant="ghost" size="sm" disabled={page >= pages} onClick={() => onPage(page + 1)}>
+        <Button variant="ghost" size="sm" disabled={page >= pages} onClick={() => onPage(page + 1)} aria-label="الصفحة التالية">
           <ChevronLeft className="w-4 h-4" />
         </Button>
       </div>
-    </div>
+    </nav>
   )
 }

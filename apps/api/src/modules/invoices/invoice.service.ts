@@ -267,12 +267,16 @@ export async function createInvoice(
 
   // 6. Atomic transaction
   return db.$transaction(async (tx) => {
-    // Deduct credit from customer balance first
+    // Track post-deduction balance so we can write a ledger entry once the
+    // invoice row exists (entityId = customerId, invoiceId in `after`).
+    let creditBalanceAfter: string | null = null
     if (creditUsed.greaterThan(0) && input.customerId) {
-      await tx.customer.update({
+      const updated = await tx.customer.update({
         where: { id: input.customerId },
         data: { creditBalance: { decrement: creditUsed } },
+        select: { creditBalance: true },
       })
+      creditBalanceAfter = updated.creditBalance.toString()
     }
 
     const invoice = await tx.invoice.create({
@@ -381,15 +385,20 @@ export async function createInvoice(
     await tx.invoice.update({ where: { id: invoice.id }, data: { invoiceNumber } })
 
     // Award loyalty points to customer if enabled
+    let loyaltyEarned = 0
+    let loyaltyBalanceAfter: number | null = null
     if (input.customerId) {
       const settings = await tx.tenantSetting.findFirst()
       if (settings?.loyaltyEnabled && settings.loyaltyPointsPerUnit > 0) {
         const pointsEarned = Math.floor(totalAmount.toNumber() / settings.loyaltyPointsPerUnit)
         if (pointsEarned > 0) {
-          await tx.customer.update({
+          const updated = await tx.customer.update({
             where: { id: input.customerId },
             data: { loyaltyPoints: { increment: pointsEarned } },
+            select: { loyaltyPoints: true },
           })
+          loyaltyEarned = pointsEarned
+          loyaltyBalanceAfter = updated.loyaltyPoints
         }
       }
     }
@@ -410,6 +419,42 @@ export async function createInvoice(
         },
       },
     })
+
+    // Customer-scoped ledger entries — written after invoice creation so we
+    // can reference invoiceId, but inside the same transaction so they roll
+    // back together with the invoice on failure.
+    if (creditBalanceAfter !== null && input.customerId) {
+      await tx.auditLog.create({
+        data: {
+          actorId: cashierId,
+          entity: 'customer',
+          entityId: input.customerId,
+          action: 'credit_used',
+          after: {
+            invoiceId: invoice.id,
+            invoiceNumber,
+            amount: creditUsed.toString(),
+            newBalance: creditBalanceAfter,
+          },
+        },
+      })
+    }
+    if (loyaltyEarned > 0 && input.customerId) {
+      await tx.auditLog.create({
+        data: {
+          actorId: cashierId,
+          entity: 'customer',
+          entityId: input.customerId,
+          action: 'loyalty_earned',
+          after: {
+            invoiceId: invoice.id,
+            invoiceNumber,
+            points: loyaltyEarned,
+            newBalance: loyaltyBalanceAfter,
+          },
+        },
+      })
+    }
 
     return { ...invoice, invoiceNumber }
   })
@@ -515,5 +560,147 @@ export async function returnInvoice(
     })
 
     return returnRecord
+  })
+}
+
+// ─── Cancel ───────────────────────────────────────────────────────────────────
+// Cancels a completed invoice as if it never happened:
+//   - restores stock for every line item
+//   - refunds credit if the customer paid partly with credit (from the
+//     `credit_used` audit entry written at creation time)
+//   - reverses loyalty points if any were earned
+//   - marks the invoice cancelled
+//
+// Refuses if the invoice is already cancelled or has been returned (use the
+// return flow for returned invoices — credit refunds already happened there).
+export async function cancelInvoice(
+  db: TenantPrismaClient,
+  invoiceId: string,
+  actorId: string,
+) {
+  const invoice = await db.invoice.findUnique({
+    where: { id: invoiceId },
+    include: { items: true },
+  })
+  if (!invoice) throw notFound()
+  if (invoice.status === 'cancelled') throw badRequest('already_cancelled')
+  if (invoice.status === 'returned') throw badRequest('invoice_returned')
+
+  return db.$transaction(async (tx) => {
+    // 1. Restore stock + log movements for every item
+    for (const item of invoice.items) {
+      await tx.stock.updateMany({
+        where: { variantId: item.variantId, branchId: invoice.branchId },
+        data: { quantity: { increment: item.quantity }, updatedAt: new Date() },
+      })
+      await tx.stockMovement.create({
+        data: {
+          variantId: item.variantId,
+          branchId: invoice.branchId,
+          userId: actorId,
+          type: 'cancellation',
+          quantity: item.quantity,
+          reference: invoiceId,
+        },
+      })
+    }
+
+    // 2. Refund credit + reverse loyalty by reading the customer audit entries
+    //    we wrote on invoice creation. Older invoices created before that
+    //    instrumentation simply skip these steps.
+    let refundedCredit = '0'
+    let reversedLoyalty = 0
+    if (invoice.customerId) {
+      const customerAudits = await tx.auditLog.findMany({
+        where: {
+          entity: 'customer',
+          entityId: invoice.customerId,
+          action: { in: ['credit_used', 'loyalty_earned'] },
+        },
+      })
+      type AuditAfter = { invoiceId?: string; amount?: string; points?: number }
+      const creditEntry = customerAudits.find(
+        (e) => e.action === 'credit_used' && (e.after as AuditAfter | null)?.invoiceId === invoiceId,
+      )
+      const loyaltyEntry = customerAudits.find(
+        (e) => e.action === 'loyalty_earned' && (e.after as AuditAfter | null)?.invoiceId === invoiceId,
+      )
+
+      if (creditEntry) {
+        const amount = String((creditEntry.after as AuditAfter).amount ?? '0')
+        const updated = await tx.customer.update({
+          where: { id: invoice.customerId },
+          data: { creditBalance: { increment: toDecimal(amount) } },
+          select: { creditBalance: true },
+        })
+        refundedCredit = amount
+        await tx.auditLog.create({
+          data: {
+            actorId,
+            entity: 'customer',
+            entityId: invoice.customerId,
+            action: 'credit_add',
+            after: {
+              invoiceId,
+              invoiceNumber: invoice.invoiceNumber,
+              amount,
+              newBalance: updated.creditBalance.toString(),
+              note: 'استرداد رصيد بسبب إلغاء الفاتورة',
+            },
+          },
+        })
+      }
+      if (loyaltyEntry) {
+        const points = Number((loyaltyEntry.after as AuditAfter).points ?? 0)
+        if (points > 0) {
+          const updated = await tx.customer.update({
+            where: { id: invoice.customerId },
+            data: { loyaltyPoints: { decrement: points } },
+            select: { loyaltyPoints: true },
+          })
+          reversedLoyalty = points
+          await tx.auditLog.create({
+            data: {
+              actorId,
+              entity: 'customer',
+              entityId: invoice.customerId,
+              action: 'loyalty_reversed',
+              after: {
+                invoiceId,
+                invoiceNumber: invoice.invoiceNumber,
+                points,
+                newBalance: updated.loyaltyPoints,
+                note: 'إلغاء نقاط بسبب إلغاء الفاتورة',
+              },
+            },
+          })
+        }
+      }
+    }
+
+    // 3. Mark the invoice cancelled
+    const updated = await tx.invoice.update({
+      where: { id: invoiceId },
+      data: { status: 'cancelled' },
+    })
+
+    // 4. Audit
+    await tx.auditLog.create({
+      data: {
+        actorId,
+        entity: 'invoice',
+        entityId: invoiceId,
+        action: 'cancel',
+        before: { status: invoice.status },
+        after: {
+          status: 'cancelled',
+          itemCount: invoice.items.length,
+          refundedCredit,
+          reversedLoyalty,
+        },
+      },
+    })
+
+    return updated
   })
 }

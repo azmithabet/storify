@@ -1,14 +1,18 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw, Check, Trash2, Download } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer, Pagination } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Pagination, Modal, Alert, DateRangePicker } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
+import type { PaginationMeta } from '@/types/api'
+import { exportRowsToExcel } from '@/lib/export'
+import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
 
 const tabs = [
   { id: 'store', label: 'بيانات المتجر' },
@@ -454,7 +458,13 @@ function PaymentMethodsSettings() {
 
 // ─── Users Settings ───────────────────────────────────────────────────────────
 interface TenantUser { id: string; fullName: string; email: string; role: { id: string; name: string; slug: string }; isActive: boolean; lastLogin?: string }
-interface Role { id: string; name: string; slug: string }
+interface Role {
+  id: string
+  name: string
+  slug: string
+  permissions?: Record<string, string[]>
+  isSystem?: boolean
+}
 
 const userSchema = z.object({
   fullName: z.string().min(1, 'الاسم مطلوب'),
@@ -464,6 +474,400 @@ const userSchema = z.object({
   branchId: z.string().uuid().optional().or(z.literal('')),
 })
 type UserFormData = z.infer<typeof userSchema>
+
+// ─── Permission matrix (read-only) ──────────────────────────────────────────
+// Arabic labels for entity/action keys used in role.permissions JSON.
+// Unknown keys fall back to the raw string so new backend additions still render.
+// Names are prefixed to avoid colliding with the audit-log `entityLabels` /
+// `actionLabels` below, which use different keys and value shapes.
+const permEntityLabels: Record<string, string> = {
+  products: 'المنتجات',
+  customers: 'العملاء',
+  suppliers: 'الموردون',
+  invoices: 'الفواتير',
+  installments: 'الأقساط',
+  expenses: 'المصروفات',
+  purchase_orders: 'أوامر الشراء',
+  stock: 'المخزون',
+  reports: 'التقارير',
+  settings: 'الإعدادات',
+  users: 'المستخدمون',
+  billing: 'الفوترة',
+  eta: 'الضرائب',
+}
+const permActionLabels: Record<string, string> = {
+  read: 'قراءة',
+  create: 'إنشاء',
+  update: 'تعديل',
+  delete: 'حذف',
+  approve: 'اعتماد',
+  adjust: 'تعديل المخزون',
+  transfer: 'تحويل',
+  receive: 'استلام',
+  manage: 'إدارة',
+}
+
+type PermissionsMap = Record<string, string[]>
+
+function CreateRoleModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState('')
+  const [slug, setSlug] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  const reset = () => { setName(''); setSlug(''); setError(null) }
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      await api.post('/auth/roles', { name: name.trim(), slug: slug.trim(), permissions: {} })
+    },
+    onSuccess: () => {
+      toast.success('تم إنشاء الدور')
+      qc.invalidateQueries({ queryKey: ['roles'] })
+      reset()
+      onClose()
+    },
+    onError: (e: unknown) => setError(getApiErrorMessage(e, 'فشل إنشاء الدور')),
+  })
+
+  // Auto-derive a sensible slug suggestion from the name (transliteration is
+  // out of scope — admins can edit before submitting).
+  const handleNameChange = (v: string) => {
+    setName(v)
+    if (slug === '' || slug === suggestSlug(name)) {
+      setSlug(suggestSlug(v))
+    }
+  }
+
+  return (
+    <Modal
+      open={open}
+      onClose={() => { reset(); onClose() }}
+      title="دور جديد"
+      footer={
+        <>
+          <Button variant="secondary" onClick={() => { reset(); onClose() }} disabled={isPending}>إلغاء</Button>
+          <Button loading={isPending} disabled={!name.trim() || !slug.trim()} onClick={() => { setError(null); mutate() }}>
+            <Plus className="w-4 h-4" />إنشاء
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Input
+          label="اسم الدور"
+          placeholder="مثال: مدير فرع"
+          value={name}
+          onChange={(e) => handleNameChange(e.target.value)}
+          autoFocus
+        />
+        <Input
+          label="المعرّف"
+          placeholder="branch_manager"
+          value={slug}
+          onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+          hint="حروف لاتينية صغيرة وأرقام و _ - فقط"
+        />
+        {error && <Alert variant="danger">{error}</Alert>}
+        <p className="text-xs text-gray-500">
+          يُنشأ الدور بدون أي صلاحيات. استخدم زر "تعديل" بعد الإنشاء لتفعيل الصلاحيات.
+        </p>
+      </div>
+    </Modal>
+  )
+}
+
+function suggestSlug(name: string): string {
+  return name.trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_-]/g, '')
+}
+
+function RenameRoleModal({ role, onClose }: { role: Role | null; onClose: () => void }) {
+  const qc = useQueryClient()
+  const [name, setName] = useState('')
+  const [error, setError] = useState<string | null>(null)
+
+  // Re-seed when the target role changes so re-opening on a different row
+  // doesn't show the previous name.
+  useEffect(() => { setName(role?.name ?? ''); setError(null) }, [role?.id])
+
+  const { mutate, isPending } = useMutation({
+    mutationFn: async () => {
+      if (!role) return
+      await api.patch(`/auth/roles/${role.id}`, { name: name.trim() })
+    },
+    onSuccess: () => {
+      toast.success('تم تحديث اسم الدور')
+      qc.invalidateQueries({ queryKey: ['roles'] })
+      onClose()
+    },
+    onError: (e: unknown) => setError(getApiErrorMessage(e, 'فشل التحديث')),
+  })
+
+  const unchanged = !!role && name.trim() === role.name
+
+  return (
+    <Modal
+      open={!!role}
+      onClose={onClose}
+      title={`إعادة تسمية: ${role?.name ?? ''}`}
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose} disabled={isPending}>إلغاء</Button>
+          <Button loading={isPending} disabled={!name.trim() || unchanged} onClick={() => { setError(null); mutate() }}>
+            <Check className="w-4 h-4" />حفظ
+          </Button>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-4">
+        <Input
+          label="اسم الدور"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          autoFocus
+        />
+        <p className="text-xs text-gray-500">
+          المعرّف <span dir="ltr" className="font-mono text-gray-400">{role?.slug}</span> ثابت ولا يمكن تعديله.
+        </p>
+        {error && <Alert variant="danger">{error}</Alert>}
+      </div>
+    </Modal>
+  )
+}
+
+function PermissionMatrix({ roles }: { roles: Role[] }) {
+  const qc = useQueryClient()
+  const [editing, setEditing] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
+  const [renameTarget, setRenameTarget] = useState<Role | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<Role | null>(null)
+  // Per-role draft of permissions while editing. Populated on edit-mode entry.
+  const [drafts, setDrafts] = useState<Record<string, PermissionsMap>>({})
+
+  const { mutate: deleteRole, isPending: isDeleting } = useMutation({
+    mutationFn: async (id: string) => api.delete(`/auth/roles/${id}`),
+    onSuccess: () => {
+      toast.success('تم حذف الدور')
+      qc.invalidateQueries({ queryKey: ['roles'] })
+      setDeleteTarget(null)
+    },
+    onError: (e: unknown) => toast.error(getApiErrorMessage(e, 'فشل حذف الدور')),
+  })
+
+  // Build a union of all (entity → actions) seen across every role so the
+  // matrix surfaces every permission the system knows about. In edit mode we
+  // also include the drafts so newly-checked actions appear immediately.
+  const allByEntity = new Map<string, Set<string>>()
+  const sources: Array<{ permissions?: PermissionsMap }> = editing
+    ? roles.map((r) => ({ permissions: drafts[r.id] ?? r.permissions }))
+    : roles
+  for (const src of sources) {
+    for (const [entity, actions] of Object.entries(src.permissions ?? {})) {
+      if (!allByEntity.has(entity)) allByEntity.set(entity, new Set())
+      for (const a of actions) allByEntity.get(entity)!.add(a)
+    }
+  }
+  const entities = Array.from(allByEntity.keys()).sort((a, b) =>
+    (permEntityLabels[a] ?? a).localeCompare(permEntityLabels[b] ?? b, 'ar'),
+  )
+
+  const currentPerms = (role: Role): PermissionsMap =>
+    (editing ? drafts[role.id] : undefined) ?? role.permissions ?? {}
+  const has = (role: Role, entity: string, action: string) =>
+    !!currentPerms(role)[entity]?.includes(action)
+
+  const toggle = (roleId: string, entity: string, action: string) => {
+    setDrafts((prev) => {
+      const role = roles.find((r) => r.id === roleId)
+      if (!role) return prev
+      const current: PermissionsMap = JSON.parse(
+        JSON.stringify(prev[roleId] ?? role.permissions ?? {}),
+      )
+      const list = current[entity] ?? []
+      if (list.includes(action)) {
+        current[entity] = list.filter((a) => a !== action)
+        if (current[entity].length === 0) delete current[entity]
+      } else {
+        current[entity] = [...list, action]
+      }
+      return { ...prev, [roleId]: current }
+    })
+  }
+
+  const isDirty = (role: Role): boolean => {
+    const draft = drafts[role.id]
+    if (!draft) return false
+    return JSON.stringify(draft) !== JSON.stringify(role.permissions ?? {})
+  }
+  const dirtyRoles = roles.filter(isDirty)
+
+  const enterEdit = () => { setDrafts({}); setEditing(true) }
+  const cancelEdit = () => { setDrafts({}); setEditing(false) }
+
+  const { mutate: save, isPending: isSaving } = useMutation({
+    mutationFn: async () => {
+      // Only PATCH roles whose draft actually differs — keeps audit log tidy.
+      await Promise.all(
+        dirtyRoles.map((r) => api.patch(`/auth/roles/${r.id}`, { permissions: drafts[r.id] })),
+      )
+    },
+    onSuccess: () => {
+      toast.success(`تم حفظ صلاحيات ${dirtyRoles.length} دور`)
+      qc.invalidateQueries({ queryKey: ['roles'] })
+      setDrafts({})
+      setEditing(false)
+    },
+    onError: () => toast.error('فشل حفظ الصلاحيات'),
+  })
+
+  if (roles.length === 0) return null
+
+  return (
+    <div className="bg-gray-800 border border-gray-700 rounded-r-xl overflow-hidden">
+      <div className="px-4 py-3 border-b border-gray-700 flex items-center justify-between gap-3">
+        <h4 className="text-sm font-semibold text-gray-100">مصفوفة الصلاحيات</h4>
+        {editing ? (
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">
+              {dirtyRoles.length > 0 ? `${dirtyRoles.length} دور معدّل` : 'لا تغييرات'}
+            </span>
+            <Button variant="secondary" size="sm" onClick={cancelEdit} disabled={isSaving}>إلغاء</Button>
+            <Button size="sm" loading={isSaving} disabled={dirtyRoles.length === 0} onClick={() => save()}>
+              <Check className="w-3 h-3" />حفظ
+            </Button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setCreateOpen(true)}>
+              <Plus className="w-3 h-3" />دور جديد
+            </Button>
+            <Button variant="outline" size="sm" onClick={enterEdit}>
+              <Edit2 className="w-3 h-3" />تعديل
+            </Button>
+          </div>
+        )}
+      </div>
+      <CreateRoleModal open={createOpen} onClose={() => setCreateOpen(false)} />
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="bg-gray-900">
+            <tr>
+              <th className="text-right px-4 py-2 text-xs uppercase tracking-wider text-gray-500 font-medium whitespace-nowrap">المورد</th>
+              <th className="text-right px-4 py-2 text-xs uppercase tracking-wider text-gray-500 font-medium whitespace-nowrap">الإجراء</th>
+              {roles.map((r) => (
+                <th key={r.id} className="text-center px-3 py-2 text-xs text-gray-300 font-medium whitespace-nowrap">
+                  <div className="flex items-center justify-center gap-1">
+                    <span>{r.name}</span>
+                    {!editing && !r.isSystem && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setRenameTarget(r)}
+                          className="text-gray-500 hover:text-gray-200 transition-colors p-0.5"
+                          aria-label={`إعادة تسمية ${r.name}`}
+                          title="إعادة تسمية"
+                        >
+                          <Edit2 className="w-3 h-3" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setDeleteTarget(r)}
+                          className="text-gray-500 hover:text-danger-400 transition-colors p-0.5"
+                          aria-label={`حذف ${r.name}`}
+                          title="حذف"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </>
+                    )}
+                  </div>
+                  {r.isSystem
+                    ? <span className="block text-[10px] text-gray-500 font-normal">نظامي</span>
+                    : editing && isDirty(r)
+                      ? <span className="block text-[10px] text-warning-400 font-normal">معدّل</span>
+                      : null}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {entities.flatMap((entity) => {
+              const actions = Array.from(allByEntity.get(entity)!).sort()
+              return actions.map((action, idx) => (
+                <tr key={`${entity}-${action}`} className="border-b border-gray-700/50 last:border-0">
+                  {idx === 0 ? (
+                    <td
+                      rowSpan={actions.length}
+                      className="px-4 py-2 text-gray-200 font-medium align-top bg-gray-900/40 whitespace-nowrap"
+                    >
+                      {permEntityLabels[entity] ?? entity}
+                    </td>
+                  ) : null}
+                  <td className="px-4 py-2 text-gray-400 whitespace-nowrap">
+                    {permActionLabels[action] ?? action}
+                  </td>
+                  {roles.map((r) => {
+                    const granted = has(r, entity, action)
+                    if (!editing || r.isSystem) {
+                      return (
+                        <td key={r.id} className="px-3 py-2 text-center">
+                          {granted ? (
+                            <span className="inline-flex w-5 h-5 rounded-full bg-success-500/15 text-success-400 items-center justify-center" aria-label="مسموح">
+                              <Check className="w-3 h-3" />
+                            </span>
+                          ) : (
+                            <span className="text-gray-700" aria-label="غير مسموح">—</span>
+                          )}
+                        </td>
+                      )
+                    }
+                    return (
+                      <td key={r.id} className="px-3 py-2 text-center">
+                        <input
+                          type="checkbox"
+                          checked={granted}
+                          onChange={() => toggle(r.id, entity, action)}
+                          aria-label={`${permEntityLabels[entity] ?? entity} · ${permActionLabels[action] ?? action} · ${r.name}`}
+                          className="w-4 h-4 accent-brand-500 cursor-pointer"
+                        />
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))
+            })}
+          </tbody>
+        </table>
+      </div>
+      {editing && (
+        <p className="px-4 py-2 text-[11px] text-gray-500 border-t border-gray-700">
+          الأدوار النظامية للقراءة فقط. الصلاحيات المُضافة هنا تنعكس فوراً على المستخدمين بعد تسجيل دخولهم التالي.
+        </p>
+      )}
+      <RenameRoleModal role={renameTarget} onClose={() => setRenameTarget(null)} />
+      <Modal
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        title="حذف الدور"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>إلغاء</Button>
+            <Button variant="danger" loading={isDeleting} onClick={() => deleteTarget && deleteRole(deleteTarget.id)}>
+              <Trash2 className="w-4 h-4" />حذف
+            </Button>
+          </>
+        }
+      >
+        <p className="text-gray-300">
+          هل تريد حذف الدور <strong className="text-gray-100">{deleteTarget?.name}</strong>؟
+        </p>
+        <p className="text-xs text-gray-500 mt-2">
+          سيُرفض الحذف إذا كان هناك مستخدمون مُعيّنون على هذا الدور.
+        </p>
+      </Modal>
+    </div>
+  )
+}
 
 function UsersSettings() {
   const qc = useQueryClient()
@@ -477,7 +881,6 @@ function UsersSettings() {
   const { data: roles = [] } = useQuery<Role[]>({
     queryKey: ['roles'],
     queryFn: async () => (await api.get<{ data: Role[] }>('/auth/roles')).data.data,
-    enabled: drawerOpen,
   })
 
   const { data: branches = [] } = useQuery<{ id: string; name: string }[]>({
@@ -496,10 +899,7 @@ function UsersSettings() {
       setDrawerOpen(false)
       reset()
     },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast.error(msg ?? 'حدث خطأ')
-    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
   return (
@@ -526,6 +926,9 @@ function UsersSettings() {
           data={users} keyExtractor={(u) => u.id} emptyMessage="لا يوجد مستخدمون"
         />
       )}
+
+      <PermissionMatrix roles={roles} />
+
 
       <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="مستخدم جديد"
         footer={
@@ -734,12 +1137,12 @@ interface AuditLogEntry {
   createdAt: string
   actor?: { id: string; fullName: string }
 }
-interface AuditMeta { total: number; page: number; limit: number; pages: number }
-
 const entityLabels: Record<string, string> = {
   invoice: 'فاتورة', product: 'منتج', user: 'مستخدم', customer: 'عميل',
   supplier: 'مورد', expense: 'مصروف', stock: 'مخزون', installment: 'قسط',
-  purchase_order: 'طلب شراء', branch: 'فرع',
+  purchase_order: 'طلب شراء', branch: 'فرع', role: 'دور',
+  stock_transfer: 'تحويل مخزون', expense_budget: 'ميزانية',
+  expense_template: 'قالب مصروف',
 }
 
 const actionLabels: Record<string, { label: string; color: string }> = {
@@ -749,25 +1152,127 @@ const actionLabels: Record<string, { label: string; color: string }> = {
   approve: { label: 'موافقة', color: 'text-success-400' },
   reject: { label: 'رفض', color: 'text-warning-400' },
   login: { label: 'دخول', color: 'text-gray-400' },
+  rename: { label: 'إعادة تسمية', color: 'text-brand-400' },
+  permissions_update: { label: 'تحديث صلاحيات', color: 'text-brand-400' },
+  credit_add: { label: 'إضافة رصيد', color: 'text-success-400' },
+  credit_deduct: { label: 'خصم رصيد', color: 'text-warning-400' },
+  credit_used: { label: 'استخدام رصيد', color: 'text-danger-400' },
+  loyalty_earned: { label: 'كسب نقاط ولاء', color: 'text-info-400' },
+  loyalty_reversed: { label: 'عكس نقاط ولاء', color: 'text-warning-400' },
+  cancel: { label: 'إلغاء', color: 'text-danger-400' },
+  receive: { label: 'استلام', color: 'text-success-400' },
+  partial_receive: { label: 'استلام جزئي', color: 'text-warning-400' },
 }
 
 function AuditLogSettings() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const entity = searchParams.get('entity') ?? ''
+  const action = searchParams.get('action') ?? ''
+  const actorId = searchParams.get('actorId') ?? ''
+  const from = searchParams.get('from') ?? ''
+  const to = searchParams.get('to') ?? ''
   const [page, setPage] = useState(1)
-  const [entity, setEntity] = useState('')
-  const [action, setAction] = useState('')
+  const [detail, setDetail] = useState<AuditLogEntry | null>(null)
 
-  const { data, isLoading } = useQuery<{ data: AuditLogEntry[]; meta: AuditMeta }>({
-    queryKey: ['audit-logs', page, entity, action],
+  const setParam = (key: string, value: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set(key, value); else next.delete(key)
+    setSearchParams(next, { replace: true })
+    setPage(1)
+  }
+  const setRange = (v: { from: string; to: string }) => {
+    const next = new URLSearchParams(searchParams)
+    if (v.from) next.set('from', v.from); else next.delete('from')
+    if (v.to) next.set('to', v.to); else next.delete('to')
+    setSearchParams(next, { replace: true })
+    setPage(1)
+  }
+  const hasFilters = entity || action || actorId || from || to
+  const clearFilters = () => { setSearchParams({}, { replace: true }); setPage(1) }
+
+  const { data, isLoading } = useQuery<{ data: AuditLogEntry[]; meta: PaginationMeta }>({
+    queryKey: ['audit-logs', page, entity, action, actorId, from, to],
     queryFn: async () => {
-      const res = await api.get<{ data: AuditLogEntry[]; meta: AuditMeta }>('/auth/audit-logs', {
-        params: { page, limit: 20, ...(entity ? { entity } : {}), ...(action ? { action } : {}) },
+      const res = await api.get<{ data: AuditLogEntry[]; meta: PaginationMeta }>('/auth/audit-logs', {
+        params: {
+          page, limit: 20,
+          ...(entity ? { entity } : {}),
+          ...(action ? { action } : {}),
+          ...(actorId ? { actorId } : {}),
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+        },
       })
       return res.data
     },
   })
 
+  // Actor list — drives the dropdown. Single fetch, cached forever (user list
+  // rarely churns and refreshes on settings revisit anyway).
+  const { data: users = [] } = useQuery<TenantUser[]>({
+    queryKey: ['tenant-users'],
+    queryFn: async () => (await api.get<{ data: TenantUser[] }>('/auth/users')).data.data,
+  })
+
   const logs = data?.data ?? []
   const meta = data?.meta
+
+  // Soft cap so an unfiltered export of a long-lived tenant doesn't try to pull
+  // hundreds of thousands of rows. 2000 = 20 pages × 100/page.
+  const EXPORT_CAP = 2000
+  const PAGE_SIZE = 100
+  const [exporting, setExporting] = useState(false)
+
+  const handleExport = async () => {
+    setExporting(true)
+    try {
+      const filters = {
+        ...(entity ? { entity } : {}),
+        ...(action ? { action } : {}),
+        ...(actorId ? { actorId } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+      }
+      const collected: AuditLogEntry[] = []
+      let p = 1
+      let totalPages = 1
+      while (p <= totalPages && collected.length < EXPORT_CAP) {
+        const res = await api.get<{ data: AuditLogEntry[]; meta: PaginationMeta }>('/auth/audit-logs', {
+          params: { page: p, limit: PAGE_SIZE, ...filters },
+        })
+        collected.push(...res.data.data)
+        totalPages = res.data.meta.pages
+        p += 1
+      }
+      const truncated = collected.length >= EXPORT_CAP && totalPages > p - 1
+
+      exportRowsToExcel(
+        collected,
+        [
+          { header: 'التاريخ', accessor: (l) => new Date(l.createdAt).toLocaleString('ar-EG'), width: 22 },
+          { header: 'الإجراء', accessor: (l) => actionLabels[l.action]?.label ?? l.action, width: 18 },
+          { header: 'الكيان', accessor: (l) => entityLabels[l.entity] ?? l.entity, width: 14 },
+          { header: 'بواسطة', accessor: (l) => l.actor?.fullName ?? '', width: 22 },
+          { header: 'معرّف الكيان', accessor: (l) => l.entityId ?? '', width: 36 },
+          { header: 'IP', accessor: (l) => l.ip ?? '', width: 16 },
+          { header: 'قبل', accessor: (l) => l.before !== undefined ? JSON.stringify(l.before) : '', width: 40 },
+          { header: 'بعد', accessor: (l) => l.after !== undefined ? JSON.stringify(l.after) : '', width: 40 },
+        ],
+        `audit-logs-${new Date().toISOString().slice(0, 10)}.xlsx`,
+        'سجل التدقيق',
+      )
+
+      if (truncated) {
+        toast(`تم تصدير ${EXPORT_CAP} سجل (الحد الأقصى). استخدم الفلاتر لتضييق النتائج.`, { icon: '⚠️' })
+      } else {
+        toast.success(`تم تصدير ${collected.length} سجل`)
+      }
+    } catch {
+      toast.error('فشل التصدير')
+    } finally {
+      setExporting(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -775,17 +1280,47 @@ function AuditLogSettings() {
         <h3 className="text-lg font-semibold text-gray-100 flex items-center gap-2">
           <Shield className="w-5 h-5 text-brand-400" />سجل التدقيق
         </h3>
+        <div className="flex items-center gap-2">
+          {hasFilters && (
+            <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+              مسح الفلاتر ×
+            </button>
+          )}
+          <Button variant="outline" size="sm" loading={exporting} onClick={handleExport} disabled={logs.length === 0}>
+            <Download className="w-3 h-3" />تصدير
+          </Button>
+        </div>
       </div>
 
-      <div className="flex gap-3">
-        <select value={entity} onChange={(e) => { setEntity(e.target.value); setPage(1) }} className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+      <div className="flex flex-wrap items-center gap-3">
+        <select
+          value={entity}
+          onChange={(e) => setParam('entity', e.target.value)}
+          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+        >
           <option value="">كل الكيانات</option>
           {Object.entries(entityLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
         </select>
-        <select value={action} onChange={(e) => { setAction(e.target.value); setPage(1) }} className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+        <select
+          value={action}
+          onChange={(e) => setParam('action', e.target.value)}
+          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+        >
           <option value="">كل الإجراءات</option>
           {Object.entries(actionLabels).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
+        <select
+          value={actorId}
+          onChange={(e) => setParam('actorId', e.target.value)}
+          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
+        >
+          <option value="">كل المستخدمين</option>
+          {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
+        </select>
+        <DateRangePicker
+          value={{ from, to }}
+          onChange={(v) => setRange(v)}
+        />
       </div>
 
       {isLoading ? (
@@ -796,8 +1331,13 @@ function AuditLogSettings() {
         <div className="flex flex-col divide-y divide-gray-700">
           {logs.map((log) => {
             const act = actionLabels[log.action] ?? { label: log.action, color: 'text-gray-400' }
+            const hasDiff = log.before !== undefined || log.after !== undefined
             return (
-              <div key={log.id} className="py-3 flex items-start justify-between gap-4">
+              <button
+                key={log.id}
+                onClick={() => setDetail(log)}
+                className="py-3 flex items-start justify-between gap-4 text-right hover:bg-gray-700/30 -mx-2 px-2 rounded transition-colors"
+              >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className={cn('text-sm font-medium', act.color)}>{act.label}</span>
@@ -807,7 +1347,8 @@ function AuditLogSettings() {
                   </div>
                   <p className="text-xs text-gray-600 mt-0.5">{new Date(log.createdAt).toLocaleString('ar-EG')}</p>
                 </div>
-              </div>
+                {hasDiff && <span className="text-[10px] text-gray-600 self-center">تفاصيل ←</span>}
+              </button>
             )
           })}
         </div>
@@ -815,6 +1356,63 @@ function AuditLogSettings() {
       {meta && meta.pages > 1 && (
         <Pagination page={meta.page} pages={meta.pages} total={meta.total} limit={meta.limit} onPage={setPage} />
       )}
+
+      <Drawer
+        open={!!detail}
+        onClose={() => setDetail(null)}
+        title="تفاصيل السجل"
+        width="w-[560px]"
+      >
+        {detail && (
+          <div className="flex flex-col gap-5 text-sm">
+            <div className="grid grid-cols-2 gap-3">
+              <div><span className="text-gray-500 text-xs block mb-1">الإجراء</span>
+                <span className={cn('font-medium', actionLabels[detail.action]?.color ?? 'text-gray-300')}>
+                  {actionLabels[detail.action]?.label ?? detail.action}
+                </span>
+              </div>
+              <div><span className="text-gray-500 text-xs block mb-1">الكيان</span>
+                <span className="text-gray-200">{entityLabels[detail.entity] ?? detail.entity}</span>
+              </div>
+              <div><span className="text-gray-500 text-xs block mb-1">بواسطة</span>
+                <span className="text-gray-200">{detail.actor?.fullName ?? '—'}</span>
+              </div>
+              <div><span className="text-gray-500 text-xs block mb-1">التاريخ</span>
+                <span className="text-gray-200 font-mono text-xs">{new Date(detail.createdAt).toLocaleString('ar-EG')}</span>
+              </div>
+              {detail.entityId && (
+                <div className="col-span-2">
+                  <span className="text-gray-500 text-xs block mb-1">معرّف الكيان</span>
+                  <span className="text-gray-300 font-mono text-xs break-all" dir="ltr">{detail.entityId}</span>
+                </div>
+              )}
+              {detail.ip && (
+                <div className="col-span-2">
+                  <span className="text-gray-500 text-xs block mb-1">عنوان IP</span>
+                  <span className="text-gray-300 font-mono text-xs" dir="ltr">{detail.ip}</span>
+                </div>
+              )}
+            </div>
+
+            {detail.before !== undefined && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1.5">قبل</p>
+                <pre dir="ltr" className="bg-gray-900 border border-danger-500/20 rounded-md p-3 text-xs text-danger-300 overflow-auto max-h-64 font-mono whitespace-pre-wrap break-words">
+                  {JSON.stringify(detail.before, null, 2)}
+                </pre>
+              </div>
+            )}
+            {detail.after !== undefined && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1.5">بعد</p>
+                <pre dir="ltr" className="bg-gray-900 border border-success-500/20 rounded-md p-3 text-xs text-success-300 overflow-auto max-h-64 font-mono whitespace-pre-wrap break-words">
+                  {JSON.stringify(detail.after, null, 2)}
+                </pre>
+              </div>
+            )}
+          </div>
+        )}
+      </Drawer>
     </div>
   )
 }
@@ -842,10 +1440,7 @@ function ChangePasswordSettings() {
       toast.success('تم تغيير كلمة المرور بنجاح')
       reset()
     },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast.error(msg ?? 'حدث خطأ')
-    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
   return (
@@ -1012,10 +1607,7 @@ function CouponsSettings() {
       qc.invalidateQueries({ queryKey: ['coupons'] })
       setDrawerOpen(false)
     },
-    onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { error?: { message?: string } } } })?.response?.data?.error?.message
-      toast.error(msg ?? 'حدث خطأ')
-    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
   })
 
   const { mutate: toggle } = useMutation({
@@ -1152,8 +1744,7 @@ function EtaSettings() {
       qc.invalidateQueries({ queryKey: ['eta-invoices'] })
     },
     onError: (e: unknown) => {
-      const code = (e as { response?: { data?: { message?: string } } })?.response?.data?.message
-      toast.error(code === 'invoice_already_accepted' ? 'الفاتورة مقبولة بالفعل' : 'فشلت إعادة الإرسال')
+      toast.error(getApiErrorCode(e) === 'invoice_already_accepted' ? 'الفاتورة مقبولة بالفعل' : 'فشلت إعادة الإرسال')
     },
   })
 

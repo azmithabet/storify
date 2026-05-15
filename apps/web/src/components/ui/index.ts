@@ -10,5 +10,20 @@ export { Skeleton, SkeletonTable } from './Skeleton'
 export { Modal } from './Modal'
 export { Drawer } from './Drawer'
 export { Table } from './Table'
+export type { TableSelection } from './Table'
+export { BulkActionBar } from './BulkActionBar'
 export { Alert } from './Alert'
 export { Pagination } from './Pagination'
+export { DateRangePicker } from './DateRangePicker'
+export type { DateRangeValue } from './DateRangePicker'
+export { Kbd } from './Kbd'
+export {
+  ChartCard,
+  LineChartView,
+  AreaChartView,
+  BarChartView,
+  DonutChartView,
+  chartPalette,
+  chartTheme,
+} from './Chart'
+export type { ChartSeries, DonutDatum } from './Chart'

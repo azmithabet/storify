@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from './Button'
@@ -50,7 +51,13 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
     return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
 
-  return (
+  // Portal to <body> so the drawer escapes any `transform`/`filter`/`perspective`
+  // ancestor that would otherwise become its containing block. (AppShell's
+  // <main> uses `animate-fade-in-up` which is transform-based — without this
+  // portal the drawer renders constrained to the main content area.)
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <>
       <div
         className={cn(
@@ -87,6 +94,7 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
           <div className="px-6 py-4 border-t border-gray-700 flex gap-3">{footer}</div>
         )}
       </div>
-    </>
+    </>,
+    document.body,
   )
 }

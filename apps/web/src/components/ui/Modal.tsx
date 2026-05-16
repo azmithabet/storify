@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from './Button'
@@ -59,8 +60,11 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
   }, [open, onClose])
 
   if (!open) return null
+  if (typeof document === 'undefined') return null
 
-  return (
+  // Portal to <body> — same reason as Drawer: AppShell's animated <main>
+  // creates a transform containing block, which traps `position: fixed`.
+  return createPortal(
     <div
       className="fixed inset-0 z-modal flex items-center justify-center p-4"
       role="dialog"
@@ -92,6 +96,7 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
           <div className="px-6 py-4 border-t border-gray-700 flex gap-3 justify-end">{footer}</div>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

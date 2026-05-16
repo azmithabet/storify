@@ -268,6 +268,7 @@ const contractSchema = z.object({
   installmentsCount: z.coerce.number().int().min(1).max(120),
   interestRate: z.coerce.number().min(0).max(100).default(0),
   firstDueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'اختر تاريخاً صحيحاً'),
+  paymentDay: z.coerce.number().int().min(1).max(28, 'أقصى يوم هو 28'),
   guarantorName: z.string().optional(),
   guarantorPhone: z.string().optional(),
   notes: z.string().optional(),
@@ -353,7 +354,7 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
 
   const { register, handleSubmit, control, watch, setValue, formState: { errors } } = useForm<ContractForm>({
     resolver: zodResolver(contractSchema),
-    defaultValues: { installmentsCount: 12, interestRate: 0, downPayment: 0, items: [{ variantId: '', variantLabel: '', quantity: 1, unitPrice: 0 }] },
+    defaultValues: { installmentsCount: 12, interestRate: 0, downPayment: 0, paymentDay: 1, items: [{ variantId: '', variantLabel: '', quantity: 1, unitPrice: 0 }] },
   })
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
@@ -379,6 +380,7 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
         installmentsCount: data.installmentsCount,
         interestRate: data.interestRate,
         firstDueDate: data.firstDueDate,
+        paymentDay: data.paymentDay,
         guarantorName: data.guarantorName || undefined,
         guarantorPhone: data.guarantorPhone || undefined,
         notes: data.notes || undefined,
@@ -466,7 +468,28 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
         </div>
       </div>
 
-      <Input label="تاريخ أول قسط" type="date" error={errors.firstDueDate?.message} {...register('firstDueDate')} />
+      <div className="grid grid-cols-2 gap-3">
+        <Input
+          label="تاريخ أول قسط"
+          type="date"
+          error={errors.firstDueDate?.message}
+          {...register('firstDueDate', {
+            onChange: (e) => {
+              const day = new Date(e.target.value).getUTCDate()
+              if (day >= 1 && day <= 28) setValue('paymentDay', day)
+            },
+          })}
+        />
+        <Input
+          label="يوم الدفع كل شهر"
+          type="number"
+          min={1}
+          max={28}
+          hint="من 1 إلى 28"
+          error={errors.paymentDay?.message}
+          {...register('paymentDay')}
+        />
+      </div>
 
       <div className="grid grid-cols-2 gap-3">
         <Input label="اسم الضامن (اختياري)" {...register('guarantorName')} />

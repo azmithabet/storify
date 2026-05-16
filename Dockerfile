@@ -37,8 +37,8 @@ COPY packages/database/package.json ./packages/database/
 COPY apps/api/package.json ./apps/api/
 # No apps/web in production — only its built dist is needed
 
-# Install production deps only
-RUN pnpm install --frozen-lockfile --prod
+# Install all deps (tsx + prisma CLI are devDeps needed at runtime)
+RUN pnpm install --frozen-lockfile
 
 # Copy Prisma generated clients (gitignored, so must come from builder)
 COPY --from=builder /app/packages/database/src ./packages/database/src

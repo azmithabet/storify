@@ -1,4 +1,5 @@
 import Fastify from 'fastify'
+import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
 import { config } from './config/env'
 import { masterDb } from './config/database'
@@ -26,6 +27,7 @@ import { authenticate } from './shared/middleware/auth.middleware'
 import { startEtaWorker } from './jobs/eta-submission.job'
 import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
 import { startReminderWorker, scheduleReminders } from './jobs/installment-reminders.job'
+import { startTrialExpiryWorker, scheduleTrialExpiry } from './jobs/trial-expiry.job'
 
 const app = Fastify({
   logger: {
@@ -38,6 +40,11 @@ const app = Fastify({
 })
 
 // ─── Global plugins ───────────────────────────────────────────────────────────
+app.register(cors, {
+  origin: config.FRONTEND_URL,
+  credentials: true,
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Subdomain'],
+})
 app.register(sentryPlugin)
 app.register(jwtPlugin)
 app.register(cookiePlugin)
@@ -167,6 +174,8 @@ const start = async () => {
     await scheduleDunning()
     startReminderWorker()
     await scheduleReminders()
+    startTrialExpiryWorker()
+    await scheduleTrialExpiry()
   } catch (err) {
     app.log.error(err)
     process.exit(1)

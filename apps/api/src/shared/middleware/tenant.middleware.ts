@@ -4,6 +4,10 @@ import { redis } from '../../config/redis'
 
 const SYSTEM_HOSTS = new Set(['admin', 'www', 'api', 'localhost', '127.0.0.1'])
 const CACHE_TTL_SECONDS = 300 // 5 minutes
+const SUB_CACHE_TTL_SECONDS = 30 // short TTL so status changes propagate quickly
+
+// Auth + billing routes work regardless of subscription status
+const SUBSCRIPTION_EXEMPT_PREFIXES = ['/api/auth/', '/api/billing/']
 
 export async function tenantMiddleware(
   request: FastifyRequest,
@@ -47,4 +51,32 @@ export async function tenantMiddleware(
 
   request.tenant = tenant
   request.tenantDb = getTenantDb(tenant.schemaName)
+
+  // ─── Subscription enforcement ─────────────────────────────────────────────
+  const isExempt = SUBSCRIPTION_EXEMPT_PREFIXES.some((p) => request.url.startsWith(p))
+  if (!isExempt) {
+    const subCacheKey = `sub:status:${tenant.id}`
+    let subStatus = await redis.get(subCacheKey)
+
+    if (!subStatus) {
+      const sub = await masterDb.subscription.findFirst({
+        where: { tenantId: tenant.id },
+        orderBy: { createdAt: 'desc' },
+        select: { status: true },
+      })
+      subStatus = sub?.status ?? 'NONE'
+      await redis.setex(subCacheKey, SUB_CACHE_TTL_SECONDS, subStatus)
+    }
+
+    if (subStatus === 'SUSPENDED' || subStatus === 'CANCELLED') {
+      return reply.status(402).send({
+        success: false,
+        error: {
+          code: 'subscription_inactive',
+          message: 'الاشتراك معلق أو ملغى. يرجى تجديد الاشتراك للمتابعة.',
+          subscriptionStatus: subStatus,
+        },
+      })
+    }
+  }
 }

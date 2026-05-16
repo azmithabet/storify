@@ -144,7 +144,7 @@ export async function requestPasswordReset(
     },
   })
 
-  await sendPasswordResetEmail({ to: user.email, subdomain, rawToken })
+  await sendPasswordResetEmail({ to: user.email, rawToken })
 }
 
 export async function resetPassword(

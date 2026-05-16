@@ -557,13 +557,9 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
       _count: true,
     }),
     db.installmentPayment.aggregate({
-      where: {
-        paidDate: { gte: start, lte: end },
-        status: 'paid',
-        ...(branchId ? { contract: { branchId } } : {}),
-      },
+      where: { paidDate: { gte: start, lte: end }, status: 'paid' },
       _sum: { amountPaid: true },
-      _count: true,
+      _count: { id: true },
     }),
   ])
 
@@ -578,11 +574,13 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
     methodId: r.paymentMethodId,
     methodName: pmMap[r.paymentMethodId] ?? 'غير محدد',
     total: Number(r._sum.totalAmount ?? 0),
-    count: r._count,
+    count: r._count as number,
   }))
 
-  const instBreakdown = instPayments._count > 0
-    ? [{ methodId: null, methodName: 'أقساط', total: Number(instPayments._sum.amountPaid ?? 0), count: instPayments._count }]
+  const instCount = instPayments._count?.id ?? 0
+  const instTotal = Number(instPayments._sum?.amountPaid ?? 0)
+  const instBreakdown = instCount > 0
+    ? [{ methodId: null, methodName: 'أقساط', total: instTotal, count: instCount }]
     : []
 
   return {
@@ -590,7 +588,7 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
     pos: {
       byMethod: posBreakdown,
       total: Number(posTotals._sum.totalAmount ?? 0),
-      count: posTotals._count,
+      count: posTotals._count as number,
     },
     installments: {
       byMethod: instBreakdown,

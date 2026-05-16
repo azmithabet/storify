@@ -2,8 +2,95 @@ import { config } from '../../config/env'
 
 interface SendPasswordResetOptions {
   to: string
-  subdomain: string
   rawToken: string
+}
+
+// ─── Billing / subscription email templates ───────────────────────────────────
+
+function billingEmailHtml(template: string, data: Record<string, string>): { subject: string; html: string } {
+  const name = data.tenantName ?? 'عميلنا'
+
+  const wrap = (title: string, body: string) => `
+    <div dir="rtl" style="font-family:Arial,'Segoe UI',sans-serif;max-width:560px;margin:auto;color:#111;background:#fff;padding:32px">
+      <p style="font-size:20px;font-weight:700;margin:0 0 20px">${title}</p>
+      <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">عزيزنا ${name},</p>
+      ${body}
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0"/>
+      <p style="font-size:11px;color:#9ca3af;margin:0;text-align:center">Storify — منصة إدارة المبيعات</p>
+    </div>`
+
+  switch (template) {
+    case 'payment_succeeded':
+      return {
+        subject: 'تم الدفع بنجاح — Storify',
+        html: wrap('تم تجديد اشتراكك بنجاح ✓', `
+          <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:20px 0">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+              <span style="color:#6b7280;font-size:13px">المبلغ المدفوع</span>
+              <strong style="font-family:monospace;color:#16a34a">${data.amount ?? ''}</strong>
+            </div>
+            <div style="display:flex;justify-content:space-between">
+              <span style="color:#6b7280;font-size:13px">تجديد الاشتراك القادم</span>
+              <strong style="font-family:monospace;color:#111">${data.period ?? ''}</strong>
+            </div>
+          </div>
+          <p style="font-size:14px;color:#374151;margin:0">شكراً لثقتكم بـ Storify.</p>`),
+      }
+
+    case 'payment_failed':
+      return {
+        subject: 'فشل الدفع — Storify',
+        html: wrap('فشلت عملية الدفع', `
+          <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:20px 0">
+            <p style="margin:0;color:#dc2626;font-size:14px;font-weight:600">تعذّر تجديد اشتراككم تلقائياً.</p>
+          </div>
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:16px 0">
+            يرجى تحديث بيانات الدفع في أقرب وقت لتجنّب تعليق الخدمة.
+          </p>`),
+      }
+
+    case 'subscription_suspended':
+      return {
+        subject: 'تم تعليق اشتراكك — Storify',
+        html: wrap('تم تعليق حسابك مؤقتاً', `
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:20px 0">
+            <p style="margin:0;color:#c2410c;font-size:14px;font-weight:600">تعذّرت محاولات الدفع المتعددة.</p>
+          </div>
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:16px 0">
+            تم تعليق حسابكم مؤقتاً. لإعادة التفعيل يرجى تجديد بيانات بطاقتكم وإتمام الدفع من بوابة الاشتراك.
+          </p>`),
+      }
+
+    case 'subscription_cancelled':
+      return {
+        subject: 'تم إلغاء اشتراكك — Storify',
+        html: wrap('تم إلغاء اشتراكك', `
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
+            نأسف لإبلاغكم بأن اشتراككم في Storify قد تم إلغاؤه بسبب تكرار فشل الدفع.
+          </p>
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:0">
+            لإعادة تفعيل الخدمة يرجى التواصل مع فريق الدعم.
+          </p>`),
+      }
+
+    case 'trial_expired':
+      return {
+        subject: 'انتهت فترة تجربتك — Storify',
+        html: wrap('انتهت فترة التجربة المجانية', `
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
+            نشكركم على تجربة Storify. لقد انتهت فترة التجربة المجانية البالغة 14 يومًا.
+          </p>
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
+            لمتابعة الاستخدام يرجى اختيار خطة اشتراك وإتمام الدفع.
+          </p>`),
+      }
+
+    default:
+      return {
+        subject: `Storify — ${template}`,
+        html: `<pre dir="ltr" style="font-size:12px;font-family:monospace">${JSON.stringify(data, null, 2)}</pre>`,
+      }
+  }
 }
 
 export async function sendEmail({ to, template, data }: {
@@ -13,13 +100,14 @@ export async function sendEmail({ to, template, data }: {
     console.log(`[DEV] Email template=${template} to=${to}`, data)
     return
   }
+  const { subject, html } = billingEmailHtml(template, data)
   const { Resend } = await import('resend')
   const resend = new Resend(config.RESEND_API_KEY)
   await resend.emails.send({
     from: config.EMAIL_FROM ?? 'noreply@storify.app',
     to,
-    subject: `Storify — ${template}`,
-    html: `<pre>${JSON.stringify(data, null, 2)}</pre>`,
+    subject,
+    html,
   })
 }
 
@@ -185,8 +273,8 @@ export async function sendInstallmentReminderEmail(data: InstallmentReminderData
   })
 }
 
-export async function sendPasswordResetEmail({ to, subdomain, rawToken }: SendPasswordResetOptions) {
-  const resetUrl = `http://${subdomain}.localhost:5173/reset?token=${rawToken}`
+export async function sendPasswordResetEmail({ to, rawToken }: SendPasswordResetOptions) {
+  const resetUrl = `${config.FRONTEND_URL}/reset?token=${rawToken}`
 
   if (!config.RESEND_API_KEY) {
     // Dev mode: log the reset link so the Done-when verify step can see it

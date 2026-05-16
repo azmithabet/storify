@@ -3,8 +3,9 @@
 // Datasource URL is overridden at runtime: postgresql://...?schema=tenant_<subdomain>
 
 generator tenantClient {
-  provider = "prisma-client-js"
-  output   = "../src/generated/tenant"
+  provider      = "prisma-client-js"
+  output        = "../src/generated/tenant"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {

@@ -175,7 +175,8 @@ app.register(async function tenantScoped(sub) {
 
 // ─── Serve React frontend in production ──────────────────────────────────────
 if (config.NODE_ENV === 'production') {
-  const webDist = join(process.cwd(), 'apps/web/dist')
+  // __dirname is /app/apps/api/src; go up 3 levels to workspace root then into web dist
+  const webDist = join(__dirname, '../../../apps/web/dist')
   app.register(fastifyStatic, { root: webDist, prefix: '/', wildcard: false })
   app.setNotFoundHandler(async (request, reply) => {
     if (request.url.startsWith('/api')) {

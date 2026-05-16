@@ -44,6 +44,10 @@ RUN pnpm install --frozen-lockfile
 COPY --from=builder /app/packages/database/src ./packages/database/src
 COPY --from=builder /app/packages/database/prisma ./packages/database/prisma
 
+# Copy tenant SQL migrations — runTenantMigrations() reads these at runtime
+# when a new tenant registers (path: __dirname/../migrations/tenant/*.sql)
+COPY --from=builder /app/packages/database/migrations ./packages/database/migrations
+
 # Copy API source (tsx runs it directly — no compile step needed)
 COPY --from=builder /app/apps/api/src ./apps/api/src
 COPY --from=builder /app/apps/api/tsconfig.json ./apps/api/

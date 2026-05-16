@@ -237,7 +237,7 @@ function BudgetPanel({ categories }: { categories: Category[] }) {
                       {formatNumber(spent, { maximumFractionDigits: 0 })} / {formatNumber(amount, { maximumFractionDigits: 0 })} ج
                     </span>
                     <span className={cn('font-mono num', overBudget ? 'text-danger-400 font-semibold' : pct >= 80 ? 'text-warning-400' : 'text-gray-500')}>
-                      {pct.toFixed(0)}%
+                      {formatNumber(pct, { maximumFractionDigits: 0 })}%
                     </span>
                   </div>
                   {overBudget && (

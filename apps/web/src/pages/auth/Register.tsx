@@ -9,6 +9,7 @@ import { Eye, EyeOff } from 'lucide-react'
 import { Button, Input, Alert, Select } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
+import { formatNumber } from '@/lib/format'
 
 interface Plan {
   id: string
@@ -105,7 +106,7 @@ export default function Register() {
               <option value="">اختر الباقة</option>
               {plans?.map((p) => (
                 <option key={p.id} value={p.slug}>
-                  {p.name} — {p.priceMonthly} ج.م / شهر
+                  {p.name} — {formatNumber(p.priceMonthly)} ج.م / شهر
                 </option>
               ))}
             </Select>

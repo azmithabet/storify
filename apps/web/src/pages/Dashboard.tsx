@@ -200,7 +200,7 @@ export default function Dashboard() {
               style={{ width: `${targetProgress}%` }}
             />
           </div>
-          <p className="text-xs text-gray-500 mt-1">{targetProgress.toFixed(1)}% من الهدف</p>
+          <p className="text-xs text-gray-500 mt-1">{formatNumber(targetProgress, { maximumFractionDigits: 1 })}% من الهدف</p>
         </div>
       )}
 
@@ -227,7 +227,7 @@ export default function Dashboard() {
                   {salesTrend.map((d) => (
                     <div key={d.date} className="text-center">
                       <p className="text-xs text-gray-500">{formatDate(d.date, { weekday: 'narrow' })}</p>
-                      <p className="text-xs font-mono text-gray-300">{d.revenue > 0 ? (d.revenue / 1000).toFixed(1) + 'k' : '—'}</p>
+                      <p className="text-xs font-mono text-gray-300">{d.revenue > 0 ? formatNumber(d.revenue / 1000, { maximumFractionDigits: 1 }) + 'k' : '—'}</p>
                     </div>
                   ))}
                 </div>

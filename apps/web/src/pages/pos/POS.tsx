@@ -8,7 +8,7 @@ import { Button, Input, Badge, Money, Modal, Kbd } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import { printReceipt } from '@/lib/print'
-import { formatNumber, formatDate } from '@/lib/format'
+import { formatNumber, formatMoney, formatDate } from '@/lib/format'
 import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
 
 interface Variant {
@@ -289,7 +289,7 @@ export default function POS() {
       const res = await api.get<{ data: AppliedCoupon }>('/coupons/validate', { params: { code: couponInput.trim().toUpperCase() } })
       const c = res.data.data
       if (c.minAmount && discountedSubtotal < Number(c.minAmount)) {
-        toast.error(`الحد الأدنى للطلب ${Number(c.minAmount).toFixed(0)} ج`)
+        toast.error(`الحد الأدنى للطلب ${formatNumber(Number(c.minAmount), { maximumFractionDigits: 0 })} ج`)
       } else {
         setAppliedCoupon({ ...c, discountValue: Number(c.discountValue) })
         toast.success('تم تطبيق الكوبون')
@@ -567,7 +567,7 @@ export default function POS() {
                 {(customer.creditBalance ?? 0) > 0 && (
                   <div className="flex items-center gap-2 bg-success-500/10 border border-success-500/30 rounded-md px-3 py-2">
                     <div className="flex-1">
-                      <p className="text-xs text-success-400">رصيد متاح: {Number(customer.creditBalance).toFixed(2)} ج</p>
+                      <p className="text-xs text-success-400">رصيد متاح: {formatMoney(Number(customer.creditBalance))} ج</p>
                       {useCredit && (
                         <input
                           type="number"
@@ -623,7 +623,7 @@ export default function POS() {
                   >
                     <span>{pm.name}</span>
                     {pmFee > 0 && (
-                      <span className="text-xs text-warning-500 num">{pmFee.toFixed(2)} رسوم</span>
+                      <span className="text-xs text-warning-500 num">{formatMoney(pmFee)} رسوم</span>
                     )}
                   </button>
                 )
@@ -687,7 +687,7 @@ export default function POS() {
               </div>
               {selectedCurrency && (
                 <p className="text-xs text-gray-500 mt-1.5">
-                  سعر الصرف: 1 {selectedCurrency.code} = {Number(selectedCurrency.rateToBase).toFixed(4)} (أساسي)
+                  سعر الصرف: 1 {selectedCurrency.code} = {formatNumber(Number(selectedCurrency.rateToBase), { maximumFractionDigits: 4 })} (أساسي)
                 </p>
               )}
             </div>
@@ -728,8 +728,8 @@ export default function POS() {
                   />
                   {splitAmountNum > 0 && (
                     <p className="text-xs text-gray-500">
-                      {selectedPM.name}: {(Math.max(0, total - appliedCredit) - splitAmountNum).toFixed(2)} ج
-                      {' + '}{splitPM.name}: {splitAmountNum.toFixed(2)} ج
+                      {selectedPM.name}: {formatMoney(Math.max(0, total - appliedCredit) - splitAmountNum)} ج
+                      {' + '}{splitPM.name}: {formatMoney(splitAmountNum)} ج
                     </p>
                   )}
                 </div>
@@ -780,7 +780,7 @@ export default function POS() {
             {couponDiscount > 0 && (
               <div className="flex justify-between text-sm text-success-400">
                 <span>خصم الكوبون ({appliedCoupon?.code})</span>
-                <span className="font-mono">-{couponDiscount.toFixed(2)} ج</span>
+                <span className="font-mono">-{formatMoney(couponDiscount)} ج</span>
               </div>
             )}
             {fee > 0 && (
@@ -797,14 +797,14 @@ export default function POS() {
                     feeBearer === 'customer' ? 'text-warning-500' : 'text-gray-500',
                   )}
                 >
-                  {fee.toFixed(2)} ج
+                  {formatMoney(fee)} ج
                 </span>
               </div>
             )}
             {appliedCredit > 0 && (
               <div className="flex justify-between text-sm text-success-400">
                 <span>رصيد العميل المستخدم</span>
-                <span className="font-mono">-{appliedCredit.toFixed(2)} ج</span>
+                <span className="font-mono">-{formatMoney(appliedCredit)} ج</span>
               </div>
             )}
             <div className="border-t border-gray-700 pt-3 flex justify-between font-semibold">
@@ -915,7 +915,7 @@ export default function POS() {
               return (
                 <div className={cn('mt-3 flex items-center justify-between text-sm font-semibold rounded-md px-3 py-2', diff === 0 ? 'bg-success-500/10 text-success-400' : diff > 0 ? 'bg-warning-500/10 text-warning-400' : 'bg-danger-500/10 text-danger-400')}>
                   <span>{diff === 0 ? 'مطابق تماماً' : diff > 0 ? 'فائض' : 'عجز'}</span>
-                  <span className="font-mono">{diff >= 0 ? '+' : ''}{diff.toFixed(2)} ج</span>
+                  <span className="font-mono">{diff >= 0 ? '+' : ''}{formatMoney(Math.abs(diff))} ج</span>
                 </div>
               )
             })()}
@@ -929,7 +929,7 @@ export default function POS() {
                 const win = window.open('', '_blank', 'width=500,height=600')
                 if (!win) return
                 const pmRows = (eodByPM ?? []).map((pm) =>
-                  `<tr><td>${pm.paymentMethodName}</td><td>${pm.invoiceCount}</td><td>${pm.totalRevenue.toFixed(2)} ج</td></tr>`
+                  `<tr><td>${pm.paymentMethodName}</td><td>${pm.invoiceCount}</td><td>${formatMoney(pm.totalRevenue)} ج</td></tr>`
                 ).join('')
                 win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إغلاق اليوم</title><style>
                   *{box-sizing:border-box;margin:0;padding:0}body{font-family:monospace;font-size:13px;padding:16px}
@@ -939,10 +939,10 @@ export default function POS() {
                 </style></head><body>
                   <h2>ملخص إغلاق يوم ${formatDate(new Date())}</h2>
                   <div class="section"><table><thead><tr><th>البيان</th><th>القيمة</th></tr></thead><tbody>
-                    <tr><td>إجمالي المبيعات</td><td class="total">${(eodDashboard?.revenue ?? 0).toFixed(2)} ج</td></tr>
+                    <tr><td>إجمالي المبيعات</td><td class="total">${formatMoney(eodDashboard?.revenue ?? 0)} ج</td></tr>
                     <tr><td>عدد الفواتير</td><td>${eodDashboard?.invoiceCount ?? 0}</td></tr>
-                    <tr><td>رسوم الدفع (على التاجر)</td><td>${(eodDashboard?.feeExpenses ?? 0).toFixed(2)} ج</td></tr>
-                    ${actualCash ? `<tr><td>الجرد الفعلي للدرج</td><td>${parseFloat(actualCash).toFixed(2)} ج</td></tr>` : ''}
+                    <tr><td>رسوم الدفع (على التاجر)</td><td>${formatMoney(eodDashboard?.feeExpenses ?? 0)} ج</td></tr>
+                    ${actualCash ? `<tr><td>الجرد الفعلي للدرج</td><td>${formatMoney(parseFloat(actualCash))} ج</td></tr>` : ''}
                   </tbody></table></div>
                   ${pmRows ? `<div class="section"><p><strong>تفصيل طرق الدفع:</strong></p><table><thead><tr><th>الطريقة</th><th>العدد</th><th>الإجمالي</th></tr></thead><tbody>${pmRows}</tbody></table></div>` : ''}
                   <div style="margin-top:40px;border-top:1px dashed #999;padding-top:12px;display:flex;justify-content:space-between">
@@ -986,24 +986,24 @@ export default function POS() {
                     <span className="text-gray-200">{item.productName}</span>
                     <span className="text-gray-500 mr-1 text-xs">× {item.quantity}</span>
                   </div>
-                  <span className="font-mono text-gray-300">{item.lineTotal.toFixed(2)} ج</span>
+                  <span className="font-mono text-gray-300">{formatMoney(item.lineTotal)} ج</span>
                 </div>
               ))}
             </div>
 
             <div className="flex flex-col gap-1 text-sm">
               <div className="flex justify-between text-gray-400">
-                <span>المجموع الفرعي</span><span>{completedInvoice.subtotal.toFixed(2)} ج</span>
+                <span>المجموع الفرعي</span><span>{formatMoney(completedInvoice.subtotal)} ج</span>
               </div>
               {completedInvoice.couponDiscount && completedInvoice.couponDiscount > 0 && (
                 <div className="flex justify-between text-success-400">
                   <span>خصم ({completedInvoice.couponCode})</span>
-                  <span>-{completedInvoice.couponDiscount.toFixed(2)} ج</span>
+                  <span>-{formatMoney(completedInvoice.couponDiscount)} ج</span>
                 </div>
               )}
               {completedInvoice.feeAmount > 0 && (
                 <div className="flex justify-between text-warning-400">
-                  <span>رسوم الدفع (على العميل)</span><span>{completedInvoice.feeAmount.toFixed(2)} ج</span>
+                  <span>رسوم الدفع (على العميل)</span><span>{formatMoney(completedInvoice.feeAmount)} ج</span>
                 </div>
               )}
               <div className="flex justify-between font-semibold text-gray-100 border-t border-gray-700 pt-2 mt-1">

@@ -59,8 +59,8 @@ function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString
 
 // ─── Number formatters ───────────────────────────────────────────────────────
 function formatCurrency(v: number) {
-  if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M ج`
-  if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(1)}K ج`
+  if (Math.abs(v) >= 1_000_000) return `${formatNumber(v / 1_000_000, { maximumFractionDigits: 1 })}M ج`
+  if (Math.abs(v) >= 1_000) return `${formatNumber(v / 1_000, { maximumFractionDigits: 1 })}K ج`
   return `${formatNumber(v)} ج`
 }
 
@@ -467,7 +467,7 @@ export default function Reports() {
                     <div>
                       <span className="text-sm text-gray-300">{row.label}</span>
                       {row.margin !== undefined && (
-                        <span className="text-xs text-gray-500 mr-2">({row.margin.toFixed(1)}%)</span>
+                        <span className="text-xs text-gray-500 mr-2">({formatNumber(row.margin, { maximumFractionDigits: 1 })}%)</span>
                       )}
                     </div>
                     <span className={`font-mono ${row.cls}`}>{formatNumber(row.value)} ج</span>

@@ -192,21 +192,21 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
             <div className="bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2">
               <p className="text-[10px] uppercase tracking-wider text-gray-500">مشتريات</p>
               <p className="font-mono text-sm text-danger-400 mt-0.5 num">
-                {summary.totalPurchases.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج
+                {formatMoney(summary.totalPurchases)} ج
               </p>
               <p className="text-[10px] text-gray-600">{summary.countPurchases} حركة</p>
             </div>
             <div className="bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2">
               <p className="text-[10px] uppercase tracking-wider text-gray-500">دفعات</p>
               <p className="font-mono text-sm text-success-400 mt-0.5 num">
-                {summary.totalPayments.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج
+                {formatMoney(summary.totalPayments)} ج
               </p>
               <p className="text-[10px] text-gray-600">{summary.countPayments} حركة</p>
             </div>
             <div className="bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2">
               <p className="text-[10px] uppercase tracking-wider text-gray-500">مرتجعات</p>
               <p className="font-mono text-sm text-warning-400 mt-0.5 num">
-                {summary.totalReturns.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج
+                {formatMoney(summary.totalReturns)} ج
               </p>
               <p className="text-[10px] text-gray-600">{summary.countReturns} حركة</p>
             </div>

@@ -712,7 +712,7 @@ export default function Installments() {
       <Drawer
         open={!!detailContract}
         onClose={() => setDetailContract(null)}
-        title={`عقد ${detailContract?.contractNumber ?? ''}`}
+        title={`عقد ${detailContract?.contractNumber || (detailContract ? `#${detailContract.id.slice(-6).toUpperCase()}` : '')}`}
         width="w-[480px]"
         footer={
           <Button variant="ghost" onClick={() => detailContract && printContract(detailContract)}>
@@ -768,8 +768,8 @@ export default function Installments() {
       >
         <p className="text-gray-300">
           {confirmAction?.type === 'approve'
-            ? `هل تريد الموافقة على عقد ${confirmAction.contract.contractNumber}؟ سيتم خصم المخزون عند الاعتماد.`
-            : `هل تريد رفض عقد ${confirmAction?.contract.contractNumber}؟`}
+            ? `هل تريد الموافقة على عقد ${confirmAction.contract.contractNumber || `#${confirmAction.contract.id.slice(-6).toUpperCase()}`}؟ سيتم خصم المخزون عند الاعتماد.`
+            : `هل تريد رفض عقد ${confirmAction?.contract.contractNumber || `#${confirmAction?.contract.id.slice(-6).toUpperCase()}`}؟`}
         </p>
       </Modal>
       <BulkActionBar count={selection.count} onClear={selection.clear}>

@@ -14,6 +14,7 @@ import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
 import { formatNumber, formatMoney, formatDate } from '@/lib/format'
 import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
+import { cn } from '@/lib/cn'
 
 interface Payment {
   id: string
@@ -690,16 +691,23 @@ export default function Installments() {
                 ? <span className="text-gray-500 text-xs">{formatDate(c.nextDueDate)}</span>
                 : <span className="text-gray-600">—</span>
               },
-              { key: 'actions', header: '', render: (c) => c.status === 'pending_approval' && canApprove ? (
-                <div className="flex gap-1">
-                  <Button variant="ghost" size="sm" className="text-success-500" onClick={() => setConfirmAction({ contract: c, type: 'approve' })}>
-                    <Check className="w-3 h-3" />
+              { key: 'actions', header: '', render: (c) => (
+                <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                  <Button variant="outline" size="sm" onClick={() => openDetail(c)}>
+                    عرض جدول الأقساط
                   </Button>
-                  <Button variant="ghost" size="sm" className="text-danger-500" onClick={() => setConfirmAction({ contract: c, type: 'reject' })}>
-                    <X className="w-3 h-3" />
-                  </Button>
+                  {c.status === 'pending_approval' && canApprove && (
+                    <>
+                      <Button variant="ghost" size="sm" className="text-success-500" onClick={() => setConfirmAction({ contract: c, type: 'approve' })}>
+                        <Check className="w-3 h-3" />
+                      </Button>
+                      <Button variant="ghost" size="sm" className="text-danger-500" onClick={() => setConfirmAction({ contract: c, type: 'reject' })}>
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </>
+                  )}
                 </div>
-              ) : null },
+              )},
             ]}
             data={data} keyExtractor={(c) => c.id} emptyMessage="لا توجد عقود أقساط"
           />

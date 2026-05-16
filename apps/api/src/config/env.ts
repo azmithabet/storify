@@ -7,7 +7,7 @@ dotenv.config({ path: path.resolve(__dirname, '../../../../.env') })
 const envSchema = z.object({
   // App
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-  API_PORT: z.coerce.number().default(3000),
+  API_PORT: z.coerce.number().default(parseInt(process.env.PORT || '3000', 10)),
   API_HOST: z.string().default('0.0.0.0'),
   FRONTEND_URL: z.string().url(),
   APP_BASE_DOMAIN: z.string().optional(), // e.g. talabia.app — enables per-tenant subdomain URLs

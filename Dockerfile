@@ -54,5 +54,5 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# Run migrations then start server
-CMD ["sh", "-c", "pnpm --filter @storify/database exec prisma migrate deploy --schema=prisma/schema.prisma && exec pnpm --filter @storify/api exec tsx apps/api/src/index.ts"]
+# Run migrations then start server (run tsx from workspace root so path resolves correctly)
+CMD ["sh", "-c", "pnpm --filter @storify/database exec prisma migrate deploy --schema=prisma/schema.prisma && exec node_modules/.bin/tsx apps/api/src/index.ts"]

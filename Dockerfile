@@ -27,7 +27,7 @@ RUN pnpm --filter @storify/web build
 
 # ─── Production image ─────────────────────────────────────────────────────────
 FROM node:20-alpine AS runner
-RUN corepack enable && corepack prepare pnpm@10 --activate
+RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10 --activate
 
 WORKDIR /app
 

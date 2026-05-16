@@ -54,7 +54,5 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 ENV NODE_ENV=production
 EXPOSE 3000
 
-COPY scripts ./scripts
-
-# Runs DB migrations then starts the server
-CMD ["sh", "scripts/deploy.sh"]
+# Run migrations then start server (inline to avoid cached scripts/ layer issues)
+CMD ["sh", "-c", "cd packages/database && ../../node_modules/.bin/prisma migrate deploy --schema=prisma/schema.prisma && cd ../.. && exec node_modules/.bin/tsx apps/api/src/index.ts"]

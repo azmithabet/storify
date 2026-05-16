@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { StatCard, Badge, Alert, Skeleton, Money } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
+import { formatNumber, formatDate, formatTime } from '@/lib/format'
 import { invoiceStatusMap, getStatus } from '@/constants/status'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -47,8 +48,13 @@ function Sparkline({ data }: { data: SalesDay[] }) {
 
   const area = `M${pad},${H - pad} L${points.split(' ').map((p) => p).join(' L')} L${W - pad},${H - pad} Z`
 
+  const trend = values[values.length - 1] >= values[0] ? 'صاعد' : 'هابط'
   return (
-    <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="opacity-70">
+    <svg
+      width={W} height={H} viewBox={`0 0 ${W} ${H}`} className="opacity-70"
+      role="img"
+      aria-label={`مخطط المبيعات خلال ${data.length} أيام — اتجاه ${trend}`}
+    >
       <defs>
         <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor="#6366f1" stopOpacity="0.3" />
@@ -150,7 +156,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <StatCard
             label="مبيعات اليوم"
-            value={`${(data?.today.revenue ?? 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج`}
+            value={`${formatNumber(data?.today.revenue ?? 0, { maximumFractionDigits: 0 })} ج`}
             accentColor="bg-brand-500"
             icon={<TrendingUp className="w-4 h-4" />}
             onClick={() => navigate(`/invoices?from=${fmt(today)}&to=${fmt(today)}`)}
@@ -185,7 +191,7 @@ export default function Dashboard() {
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-gray-300 font-medium">تقدم هدف اليوم</p>
             <p className="text-xs font-mono text-gray-400">
-              {todayRevenue.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} / {dailyTarget.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج
+              {formatNumber(todayRevenue, { maximumFractionDigits: 0 })} / {formatNumber(dailyTarget, { maximumFractionDigits: 0 })} ج
             </p>
           </div>
           <div className="w-full bg-gray-700 rounded-full h-3 overflow-hidden">
@@ -220,7 +226,7 @@ export default function Dashboard() {
                 <div className="flex justify-between mt-2">
                   {salesTrend.map((d) => (
                     <div key={d.date} className="text-center">
-                      <p className="text-xs text-gray-500">{new Date(d.date).toLocaleDateString('ar-EG', { weekday: 'narrow' })}</p>
+                      <p className="text-xs text-gray-500">{formatDate(d.date, { weekday: 'narrow' })}</p>
                       <p className="text-xs font-mono text-gray-300">{d.revenue > 0 ? (d.revenue / 1000).toFixed(1) + 'k' : '—'}</p>
                     </div>
                   ))}
@@ -308,7 +314,7 @@ export default function Dashboard() {
                       <div className="flex items-center gap-3">
                         <Badge variant={s.variant}>{s.label}</Badge>
                         <Money value={inv.totalAmount} />
-                        <span className="text-xs text-gray-600">{new Date(inv.createdAt).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })}</span>
+                        <span className="text-xs text-gray-600">{formatTime(inv.createdAt)}</span>
                       </div>
                     </div>
                   )

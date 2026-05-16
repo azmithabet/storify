@@ -20,7 +20,13 @@ export function AppShell({ children, title }: AppShellProps) {
   }, [location.pathname])
 
   return (
-    <div className="min-h-screen bg-app">
+    <div className="min-h-dvh bg-app">
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:right-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-brand-600 focus:text-white focus:rounded-md focus:text-sm focus:font-medium"
+      >
+        تخطي إلى المحتوى الرئيسي
+      </a>
       <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
       {/* Mobile backdrop — only visible when drawer is open on small screens */}
@@ -32,9 +38,9 @@ export function AppShell({ children, title }: AppShellProps) {
         />
       )}
 
-      <div className="lg:mr-60 flex flex-col min-h-screen">
+      <div className="lg:mr-60 flex flex-col min-h-dvh">
         <TopBar title={title} onMenuClick={() => setSidebarOpen(true)} />
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 animate-fade-in-up">{children}</main>
+        <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 animate-fade-in-up">{children}</main>
       </div>
     </div>
   )

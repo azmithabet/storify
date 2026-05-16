@@ -6,12 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, Money, SkeletonTable, Button, Modal, Drawer, Input, Pagination, BulkActionBar } from '@/components/ui'
+import { Table, Badge, Money, SkeletonTable, Button, Modal, Drawer, Input, Select, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth.store'
 import type { PaginationMeta } from '@/types/api'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatNumber, formatMoney, formatDate } from '@/lib/format'
 import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
 
 interface Payment {
@@ -58,7 +59,7 @@ function dayRelative(dateIso: string): string {
   if (diffDays === -1) return 'أمس'
   if (diffDays < 0 && diffDays >= -60) return `متأخر ${-diffDays} يوم`
   if (diffDays > 0 && diffDays <= 60) return `بعد ${diffDays} يوم`
-  return new Date(dateIso).toLocaleDateString('ar-EG')
+  return formatDate(dateIso)
 }
 
 // ─── Payment-schedule timeline ────────────────────────────────────────────────
@@ -104,11 +105,11 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
         <div className="grid grid-cols-3 gap-3 pt-1">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-gray-500">مدفوع</p>
-            <p className="text-sm font-mono text-success-400 num">{paidTotal.toLocaleString('ar-EG')} ج</p>
+            <p className="text-sm font-mono text-success-400 num">{formatNumber(paidTotal)} ج</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-gray-500">متبقي</p>
-            <p className="text-sm font-mono text-gray-200 num">{remainingTotal.toLocaleString('ar-EG')} ج</p>
+            <p className="text-sm font-mono text-gray-200 num">{formatNumber(remainingTotal)} ج</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-gray-500">القسط التالي</p>
@@ -141,12 +142,12 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
                 <div>
                   <p className="text-sm font-mono text-gray-200">
                     <span className="text-gray-500 ml-2">#{idx + 1}</span>
-                    {new Date(p.dueDate).toLocaleDateString('ar-EG')}
+                    {formatDate(p.dueDate)}
                   </p>
                   <p className={`text-xs mt-0.5 ${isPaid ? 'text-success-400' : isOverdue ? 'text-danger-400' : 'text-gray-500'}`}>
                     {isPaid
                       ? p.paidDate
-                        ? `مدفوع · ${new Date(p.paidDate).toLocaleDateString('ar-EG')}`
+                        ? `مدفوع · ${formatDate(p.paidDate)}`
                         : 'مدفوع'
                       : dayRelative(p.dueDate)}
                   </p>
@@ -314,36 +315,28 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-4">
         <div className="col-span-2">
-          <label className="text-sm text-gray-400 block mb-1">العميل</label>
-          <select {...register('customerId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select label="العميل" error={errors.customerId?.message} {...register('customerId')}>
             <option value="">اختر العميل...</option>
             {customers.map((c) => <option key={c.id} value={c.id}>{c.fullName}{c.phone ? ` — ${c.phone}` : ''}</option>)}
-          </select>
-          {errors.customerId && <p className="text-danger-500 text-xs mt-1">{errors.customerId.message}</p>}
+          </Select>
         </div>
         <div>
-          <label className="text-sm text-gray-400 block mb-1">الفرع</label>
-          <select {...register('branchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select label="الفرع" error={errors.branchId?.message} {...register('branchId')}>
             <option value="">اختر...</option>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          {errors.branchId && <p className="text-danger-500 text-xs mt-1">{errors.branchId.message}</p>}
+          </Select>
         </div>
         <div>
-          <label className="text-sm text-gray-400 block mb-1">طريقة الدفع</label>
-          <select {...register('paymentMethodId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select label="طريقة الدفع" error={errors.paymentMethodId?.message} {...register('paymentMethodId')}>
             <option value="">اختر...</option>
             {paymentMethods.map((pm) => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
-          </select>
-          {errors.paymentMethodId && <p className="text-danger-500 text-xs mt-1">{errors.paymentMethodId.message}</p>}
+          </Select>
         </div>
         <div>
-          <label className="text-sm text-gray-400 block mb-1">العملة</label>
-          <select {...register('currencyId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select label="العملة" error={errors.currencyId?.message} {...register('currencyId')}>
             <option value="">اختر...</option>
             {currencies.map((c) => <option key={c.id} value={c.id}>{c.code} — {c.name}</option>)}
-          </select>
-          {errors.currencyId && <p className="text-danger-500 text-xs mt-1">{errors.currencyId.message}</p>}
+          </Select>
         </div>
       </div>
 
@@ -412,11 +405,11 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
 const LIMIT = 20
 
 function printContract(c: InstallmentContract) {
-  const fmt = (n: number) => n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const fmt = (n: number) => formatMoney(n)
   const paymentRows = (c.payments ?? []).map((p, i) => `
     <tr>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${i + 1}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb">${new Date(p.dueDate).toLocaleDateString('ar-EG')}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb">${formatDate(p.dueDate)}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(p.amount))} ج</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${p.status === 'paid' ? '✓ مدفوع' : p.status === 'overdue' ? '⚠ متأخر' : '—'}</td>
     </tr>`).join('')
@@ -441,7 +434,7 @@ function printContract(c: InstallmentContract) {
       <div><h1>عقد بيع بالتقسيط</h1><p style="color:#6b7280;font-size:12px">Storify POS</p></div>
       <div style="text-align:left">
         <p style="font-size:16px;font-weight:700;font-family:monospace">${c.contractNumber}</p>
-        <p style="font-size:12px;color:#6b7280">${new Date().toLocaleDateString('ar-EG')}</p>
+        <p style="font-size:12px;color:#6b7280">${formatDate(new Date())}</p>
       </div>
     </div>
     <div class="meta">
@@ -556,15 +549,14 @@ export default function Installments() {
           <div className="flex-1 max-w-xs">
             <Input placeholder="بحث بالعميل أو رقم العقد..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} startIcon={<Search className="w-4 h-4" />} />
           </div>
-          <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-            className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}>
             <option value="">كل الحالات</option>
             <option value="pending_approval">انتظار موافقة</option>
             <option value="active">نشط</option>
             <option value="overdue">متأخر</option>
             <option value="completed">مكتمل</option>
             <option value="cancelled">ملغي</option>
-          </select>
+          </Select>
           <div className="flex-1" />
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4" />عقد جديد
@@ -592,7 +584,7 @@ export default function Installments() {
                 return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{c.status}</span>
               }},
               { key: 'nextDueDate', header: 'الاستحقاق القادم', render: (c) => c.nextDueDate
-                ? <span className="text-gray-500 text-xs">{new Date(c.nextDueDate).toLocaleDateString('ar-EG')}</span>
+                ? <span className="text-gray-500 text-xs">{formatDate(c.nextDueDate)}</span>
                 : <span className="text-gray-600">—</span>
               },
               { key: 'actions', header: '', render: (c) => c.status === 'pending_approval' && canApprove ? (

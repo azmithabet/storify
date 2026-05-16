@@ -1,4 +1,4 @@
-import { useEffect, useId, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from './Button'
@@ -12,12 +12,40 @@ interface DrawerProps {
   footer?: ReactNode
 }
 
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export function Drawer({ open, onClose, title, children, width = 'w-96', footer }: DrawerProps) {
   const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const prevFocusRef = useRef<HTMLElement | null>(null)
 
+  // Save caller focus → move into drawer → restore on close
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    prevFocusRef.current = document.activeElement as HTMLElement
+    const panel = panelRef.current
+    const first = panel?.querySelector<HTMLElement>(FOCUSABLE)
+    ;(first ?? panel)?.focus()
+    return () => { prevFocusRef.current?.focus() }
+  }, [open])
+
+  // Escape + Tab trap
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab') return
+      const panel = panelRef.current
+      if (!panel) return
+      const nodes = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (nodes.length === 0) return
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+      if (e.shiftKey ? document.activeElement === first : document.activeElement === last) {
+        e.preventDefault()
+        ;(e.shiftKey ? last : first).focus()
+      }
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
@@ -33,9 +61,11 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
         aria-hidden="true"
       />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={cn(
           'fixed top-0 left-0 z-modal h-full bg-gray-800 border-r border-gray-700 shadow-xl',
-          'flex flex-col transition-transform duration-slow',
+          'flex flex-col transition-transform duration-slow focus:outline-none',
           width,
           open ? 'translate-x-0' : '-translate-x-full',
         )}

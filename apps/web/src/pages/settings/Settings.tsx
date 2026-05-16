@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw, Check, Trash2, Download } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw, Check, Trash2, Download, Eye, EyeOff } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer, Pagination, Modal, Alert, DateRangePicker } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Pagination, Modal, Alert, DateRangePicker, Select } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import type { PaginationMeta } from '@/types/api'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatDate, formatDateTime } from '@/lib/format'
 import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
 
 const tabs = [
@@ -125,26 +126,20 @@ function StoreSettings() {
       <h3 className="text-lg font-semibold text-gray-100">إعدادات المتجر</h3>
 
       <div className="flex flex-col gap-4">
-        <div>
-          <label className="text-sm text-gray-400 block mb-1">العملة الافتراضية</label>
-          <select {...register('currencyDefault')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-            <option value="EGP">EGP — جنيه مصري</option>
-            <option value="USD">USD — دولار</option>
-            <option value="EUR">EUR — يورو</option>
-            <option value="SAR">SAR — ريال سعودي</option>
-            <option value="AED">AED — درهم إماراتي</option>
-          </select>
-        </div>
+        <Select label="العملة الافتراضية" {...register('currencyDefault')}>
+          <option value="EGP">EGP — جنيه مصري</option>
+          <option value="USD">USD — دولار</option>
+          <option value="EUR">EUR — يورو</option>
+          <option value="SAR">SAR — ريال سعودي</option>
+          <option value="AED">AED — درهم إماراتي</option>
+        </Select>
 
-        <div>
-          <label className="text-sm text-gray-400 block mb-1">المنطقة الزمنية</label>
-          <select {...register('timezone')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-            <option value="Africa/Cairo">Africa/Cairo (GMT+2)</option>
-            <option value="Asia/Riyadh">Asia/Riyadh (GMT+3)</option>
-            <option value="Asia/Dubai">Asia/Dubai (GMT+4)</option>
-            <option value="Europe/London">Europe/London (GMT+0)</option>
-          </select>
-        </div>
+        <Select label="المنطقة الزمنية" {...register('timezone')}>
+          <option value="Africa/Cairo">Africa/Cairo (GMT+2)</option>
+          <option value="Asia/Riyadh">Asia/Riyadh (GMT+3)</option>
+          <option value="Asia/Dubai">Asia/Dubai (GMT+4)</option>
+          <option value="Europe/London">Europe/London (GMT+0)</option>
+        </Select>
 
         <div className="flex items-center justify-between bg-gray-800 border border-gray-700 rounded-md px-4 py-3">
           <div>
@@ -417,39 +412,30 @@ function PaymentMethodsSettings() {
       >
         <form className="flex flex-col gap-5">
           <Input label="الاسم" error={errors.name?.message} {...register('name')} />
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">النوع</label>
-            <select {...register('type')} disabled={!!editing} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 disabled:opacity-50">
-              <option value="cash">نقدي</option>
-              <option value="card">بطاقة بنكية</option>
-              <option value="ewallet">محفظة إلكترونية</option>
-              <option value="bnpl">تقسيط (BNPL)</option>
-              <option value="bank_transfer">تحويل بنكي</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">نوع الرسوم</label>
-            <select {...register('feeType')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="none">بدون رسوم</option>
-              <option value="percentage">نسبة مئوية</option>
-              <option value="fixed">مبلغ ثابت</option>
-              <option value="both">نسبة + مبلغ ثابت</option>
-            </select>
-          </div>
+          <Select label="النوع" disabled={!!editing} {...register('type')}>
+            <option value="cash">نقدي</option>
+            <option value="card">بطاقة بنكية</option>
+            <option value="ewallet">محفظة إلكترونية</option>
+            <option value="bnpl">تقسيط (BNPL)</option>
+            <option value="bank_transfer">تحويل بنكي</option>
+          </Select>
+          <Select label="نوع الرسوم" {...register('feeType')}>
+            <option value="none">بدون رسوم</option>
+            <option value="percentage">نسبة مئوية</option>
+            <option value="fixed">مبلغ ثابت</option>
+            <option value="both">نسبة + مبلغ ثابت</option>
+          </Select>
           {(feeType === 'percentage' || feeType === 'both') && (
             <Input label="نسبة الرسوم (%)" type="number" step="0.01" {...register('feePercentage')} />
           )}
           {(feeType === 'fixed' || feeType === 'both') && (
             <Input label="مبلغ الرسوم الثابت (ج)" type="number" step="0.01" {...register('feeFixed')} />
           )}
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">من يتحمل الرسوم</label>
-            <select {...register('feeBearer')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="merchant">المتجر</option>
-              <option value="customer">العميل</option>
-              <option value="negotiable">قابل للتفاوض</option>
-            </select>
-          </div>
+          <Select label="من يتحمل الرسوم" {...register('feeBearer')}>
+            <option value="merchant">المتجر</option>
+            <option value="customer">العميل</option>
+            <option value="negotiable">قابل للتفاوض</option>
+          </Select>
         </form>
       </Drawer>
     </div>
@@ -872,6 +858,7 @@ function PermissionMatrix({ roles }: { roles: Role[] }) {
 function UsersSettings() {
   const qc = useQueryClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [showPwd, setShowPwd] = useState(false)
 
   const { data: users = [], isLoading } = useQuery<TenantUser[]>({
     queryKey: ['tenant-users'],
@@ -919,7 +906,7 @@ function UsersSettings() {
             { key: 'role', header: 'الدور', render: (u) => <Badge variant="gray">{u.role?.name ?? u.role?.slug ?? '—'}</Badge> },
             { key: 'isActive', header: 'الحالة', render: (u) => <Badge variant={u.isActive ? 'success' : 'gray'} dot>{u.isActive ? 'نشط' : 'معطّل'}</Badge> },
             { key: 'lastLogin', header: 'آخر دخول', render: (u) => u.lastLogin
-              ? <span className="text-gray-500 text-xs">{new Date(u.lastLogin).toLocaleDateString('ar-EG')}</span>
+              ? <span className="text-gray-500 text-xs">{formatDate(u.lastLogin)}</span>
               : <span className="text-gray-600">—</span>
             },
           ]}
@@ -941,22 +928,26 @@ function UsersSettings() {
         <form className="flex flex-col gap-5">
           <Input label="الاسم الكامل" error={errors.fullName?.message} {...register('fullName')} />
           <Input label="البريد الإلكتروني" type="email" error={errors.email?.message} {...register('email')} />
-          <Input label="كلمة المرور" type="password" error={errors.password?.message} {...register('password')} />
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الدور</label>
-            <select {...register('roleId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">اختر الدور</option>
-              {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
-            </select>
-            {errors.roleId && <p className="text-danger-500 text-xs mt-1">{errors.roleId.message}</p>}
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الفرع (اختياري)</label>
-            <select {...register('branchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">كل الفروع</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-          </div>
+          <Input
+            label="كلمة المرور"
+            type={showPwd ? 'text' : 'password'}
+            autoComplete="new-password"
+            error={errors.password?.message}
+            endIcon={
+              <button type="button" onClick={() => setShowPwd((v) => !v)} className="text-gray-400 hover:text-gray-200 transition-colors" aria-label={showPwd ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}>
+                {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            }
+            {...register('password')}
+          />
+          <Select label="الدور" error={errors.roleId?.message} {...register('roleId')}>
+            <option value="">اختر الدور</option>
+            {roles.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
+          </Select>
+          <Select label="الفرع (اختياري)" {...register('branchId')}>
+            <option value="">كل الفروع</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </Select>
         </form>
       </Drawer>
     </div>
@@ -1249,7 +1240,7 @@ function AuditLogSettings() {
       exportRowsToExcel(
         collected,
         [
-          { header: 'التاريخ', accessor: (l) => new Date(l.createdAt).toLocaleString('ar-EG'), width: 22 },
+          { header: 'التاريخ', accessor: (l) => formatDateTime(l.createdAt), width: 22 },
           { header: 'الإجراء', accessor: (l) => actionLabels[l.action]?.label ?? l.action, width: 18 },
           { header: 'الكيان', accessor: (l) => entityLabels[l.entity] ?? l.entity, width: 14 },
           { header: 'بواسطة', accessor: (l) => l.actor?.fullName ?? '', width: 22 },
@@ -1293,30 +1284,27 @@ function AuditLogSettings() {
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <select
+        <Select
           value={entity}
           onChange={(e) => setParam('entity', e.target.value)}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
         >
           <option value="">كل الكيانات</option>
           {Object.entries(entityLabels).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-        <select
+        </Select>
+        <Select
           value={action}
           onChange={(e) => setParam('action', e.target.value)}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
         >
           <option value="">كل الإجراءات</option>
           {Object.entries(actionLabels).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-        </select>
-        <select
+        </Select>
+        <Select
           value={actorId}
           onChange={(e) => setParam('actorId', e.target.value)}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
         >
           <option value="">كل المستخدمين</option>
           {users.map((u) => <option key={u.id} value={u.id}>{u.fullName}</option>)}
-        </select>
+        </Select>
         <DateRangePicker
           value={{ from, to }}
           onChange={(v) => setRange(v)}
@@ -1345,7 +1333,7 @@ function AuditLogSettings() {
                     {log.actor && <span className="text-xs text-gray-500">بواسطة {log.actor.fullName}</span>}
                     {log.ip && <span className="text-xs text-gray-600 font-mono">{log.ip}</span>}
                   </div>
-                  <p className="text-xs text-gray-600 mt-0.5">{new Date(log.createdAt).toLocaleString('ar-EG')}</p>
+                  <p className="text-xs text-gray-600 mt-0.5">{formatDateTime(log.createdAt)}</p>
                 </div>
                 {hasDiff && <span className="text-[10px] text-gray-600 self-center">تفاصيل ←</span>}
               </button>
@@ -1378,7 +1366,7 @@ function AuditLogSettings() {
                 <span className="text-gray-200">{detail.actor?.fullName ?? '—'}</span>
               </div>
               <div><span className="text-gray-500 text-xs block mb-1">التاريخ</span>
-                <span className="text-gray-200 font-mono text-xs">{new Date(detail.createdAt).toLocaleString('ar-EG')}</span>
+                <span className="text-gray-200 font-mono text-xs">{formatDateTime(detail.createdAt)}</span>
               </div>
               {detail.entityId && (
                 <div className="col-span-2">
@@ -1430,6 +1418,9 @@ const pwSchema = z.object({
 type PwFormData = z.infer<typeof pwSchema>
 
 function ChangePasswordSettings() {
+  const [showCurrent, setShowCurrent] = useState(false)
+  const [showNew, setShowNew] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const { register, handleSubmit, reset, formState: { errors } } = useForm<PwFormData>({ resolver: zodResolver(pwSchema) })
 
   const { mutate: changePassword, isPending } = useMutation({
@@ -1447,9 +1438,42 @@ function ChangePasswordSettings() {
     <div className="flex flex-col gap-6 max-w-md">
       <h3 className="text-lg font-semibold text-gray-100">تغيير كلمة المرور</h3>
       <form className="flex flex-col gap-5" onSubmit={handleSubmit((d) => changePassword(d))}>
-        <Input label="كلمة المرور الحالية" type="password" error={errors.currentPassword?.message} {...register('currentPassword')} />
-        <Input label="كلمة المرور الجديدة" type="password" error={errors.newPassword?.message} {...register('newPassword')} />
-        <Input label="تأكيد كلمة المرور الجديدة" type="password" error={errors.confirmPassword?.message} {...register('confirmPassword')} />
+        <Input
+          label="كلمة المرور الحالية"
+          type={showCurrent ? 'text' : 'password'}
+          autoComplete="current-password"
+          error={errors.currentPassword?.message}
+          endIcon={
+            <button type="button" onClick={() => setShowCurrent((v) => !v)} className="text-gray-400 hover:text-gray-200 transition-colors" aria-label={showCurrent ? 'إخفاء' : 'إظهار'}>
+              {showCurrent ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          }
+          {...register('currentPassword')}
+        />
+        <Input
+          label="كلمة المرور الجديدة"
+          type={showNew ? 'text' : 'password'}
+          autoComplete="new-password"
+          error={errors.newPassword?.message}
+          endIcon={
+            <button type="button" onClick={() => setShowNew((v) => !v)} className="text-gray-400 hover:text-gray-200 transition-colors" aria-label={showNew ? 'إخفاء' : 'إظهار'}>
+              {showNew ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          }
+          {...register('newPassword')}
+        />
+        <Input
+          label="تأكيد كلمة المرور الجديدة"
+          type={showConfirm ? 'text' : 'password'}
+          autoComplete="new-password"
+          error={errors.confirmPassword?.message}
+          endIcon={
+            <button type="button" onClick={() => setShowConfirm((v) => !v)} className="text-gray-400 hover:text-gray-200 transition-colors" aria-label={showConfirm ? 'إخفاء' : 'إظهار'}>
+              {showConfirm ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+            </button>
+          }
+          {...register('confirmPassword')}
+        />
         <Button loading={isPending} type="submit" className="w-fit">تغيير كلمة المرور</Button>
       </form>
     </div>
@@ -1648,7 +1672,7 @@ function CouponsSettings() {
               </span>
             )},
             { key: 'expiresAt', header: 'الانتهاء', render: (c) => c.expiresAt
-              ? <span className={cn('text-xs font-mono', new Date(c.expiresAt) < new Date() ? 'text-danger-400' : 'text-gray-400')}>{new Date(c.expiresAt).toLocaleDateString('ar-EG')}</span>
+              ? <span className={cn('text-xs font-mono', new Date(c.expiresAt) < new Date() ? 'text-danger-400' : 'text-gray-400')}>{formatDate(c.expiresAt)}</span>
               : <span className="text-gray-600">—</span>
             },
             { key: 'isActive', header: 'الحالة', render: (c) => <Badge variant={c.isActive ? 'success' : 'gray'} dot>{c.isActive ? 'نشط' : 'معطّل'}</Badge> },
@@ -1676,13 +1700,10 @@ function CouponsSettings() {
       >
         <form className="flex flex-col gap-5">
           <Input label="كود الخصم" placeholder="مثال: SUMMER20" error={errors.code?.message} {...register('code')} disabled={!!editing} />
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">نوع الخصم</label>
-            <select {...register('discountType')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="percentage">نسبة مئوية (%)</option>
-              <option value="fixed">مبلغ ثابت (ج)</option>
-            </select>
-          </div>
+          <Select label="نوع الخصم" {...register('discountType')}>
+            <option value="percentage">نسبة مئوية (%)</option>
+            <option value="fixed">مبلغ ثابت (ج)</option>
+          </Select>
           <Input
             label={discountType === 'percentage' ? 'قيمة الخصم (%)' : 'قيمة الخصم (ج)'}
             type="number" step="0.01"
@@ -1755,17 +1776,16 @@ function EtaSettings() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-100">حالة إرسال الإيصالات الإلكترونية (ETA)</h3>
-        <select
+        <Select
           value={statusFilter}
           onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
         >
           <option value="">الكل</option>
           <option value="failed">فشل</option>
           <option value="pending">معلق</option>
           <option value="accepted">مقبول</option>
           <option value="not_required">غير مطلوب</option>
-        </select>
+        </Select>
       </div>
 
       {isLoading ? (
@@ -1783,7 +1803,7 @@ function EtaSettings() {
                     <span className="font-mono text-gray-100 text-sm">{inv.invoiceNumber}</span>
                     <Badge variant={s.variant}>{s.label}</Badge>
                   </div>
-                  <p className="text-xs text-gray-500">{inv.customer?.fullName ?? 'نقدي'} · {new Date(inv.createdAt).toLocaleDateString('ar-EG')}</p>
+                  <p className="text-xs text-gray-500">{inv.customer?.fullName ?? 'نقدي'} · {formatDate(inv.createdAt)}</p>
                   {inv.etaError && (
                     <p className="text-xs text-danger-400 mt-1 bg-danger-500/10 rounded px-2 py-1 font-mono break-all">{inv.etaError}</p>
                   )}
@@ -1854,7 +1874,7 @@ function PrintTemplateSettings() {
     const preview = template
       .replace('{{storeName}}', 'Storify')
       .replace('{{invoiceNumber}}', 'INV-20260101-ABCDEF')
-      .replace('{{date}}', new Date().toLocaleString('ar-EG'))
+      .replace('{{date}}', formatDateTime(new Date()))
       .replace('{{customerName}}', 'عميل تجريبي')
       .replace('{{subtotal}}', '500.00 ج')
       .replace('{{total}}', '500.00 ج')

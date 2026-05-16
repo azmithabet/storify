@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { formatNumber } from '@/lib/format'
 
 interface BulkActionBarProps {
   count: number
@@ -29,7 +30,7 @@ export function BulkActionBar({ count, onClear, children }: BulkActionBarProps) 
         <X className="w-4 h-4" />
       </button>
       <span className="text-sm text-gray-300">
-        <span className="font-mono text-brand-400 font-semibold num">{count.toLocaleString('ar-EG')}</span>{' '}
+        <span className="font-mono text-brand-400 font-semibold num">{formatNumber(count)}</span>{' '}
         محدد
       </span>
       <div className="w-px h-5 bg-gray-700" />

@@ -6,10 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Pagination, BulkActionBar } from '@/components/ui'
+import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Select, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
 import { downloadFromApi } from '@/lib/download'
 import { cn } from '@/lib/cn'
+import { formatMoney, formatDate } from '@/lib/format'
 import type { PaginationMeta } from '@/types/api'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
@@ -143,13 +144,13 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
                   <div>
                     <p className={cn('text-sm font-medium', tm.color)}>{tm.label}</p>
                     <p className="text-xs text-gray-500">
-                      {t.user?.fullName ?? '—'} · {new Date(t.createdAt).toLocaleDateString('ar-EG')}
+                      {t.user?.fullName ?? '—'} · {formatDate(t.createdAt)}
                       {t.branch && ` · ${t.branch.name}`}
                     </p>
                     {t.note && <p className="text-xs text-gray-600 mt-0.5">{t.note}</p>}
                   </div>
                   <span className={cn('font-mono font-semibold text-sm', amountColor)}>
-                    {sign}{Number(t.amount).toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج
+                    {sign}{formatMoney(Number(t.amount))} ج
                   </span>
                 </div>
               )
@@ -185,14 +186,10 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
             </div>
           </div>
           <Input label="المبلغ (ج)" type="number" step="0.01" error={errors.amount?.message} {...register('amount')} />
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الفرع</label>
-            <select {...register('branchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">اختر الفرع...</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            {errors.branchId && <p className="text-danger-500 text-xs mt-1">{errors.branchId.message}</p>}
-          </div>
+          <Select label="الفرع" error={errors.branchId?.message} {...register('branchId')}>
+            <option value="">اختر الفرع...</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </Select>
           <Input label="مرجع (رقم شيك / تحويل)" {...register('reference')} />
           <div>
             <label className="text-sm text-gray-400 block mb-1">ملاحظة (اختياري)</label>

@@ -6,13 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input, Pagination, BulkActionBar } from '@/components/ui'
+import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input, Select, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
 import type { PaginationMeta } from '@/types/api'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatNumber, formatDate } from '@/lib/format'
 
 interface Expense {
   id: string
@@ -121,18 +122,15 @@ function BudgetUpsertModal({
       }
     >
       <div className="flex flex-col gap-4">
-        <div>
-          <label className="text-sm text-gray-400 block mb-1">الفئة</label>
-          <select
-            value={categoryId}
-            onChange={(e) => setCategoryId(e.target.value)}
-            disabled={!!existing}
-            className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 disabled:opacity-60"
-          >
-            <option value="">— اختر فئة —</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
+        <Select
+          label="الفئة"
+          value={categoryId}
+          onChange={(e) => setCategoryId(e.target.value)}
+          disabled={!!existing}
+        >
+          <option value="">— اختر فئة —</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </Select>
         <div>
           <label className="text-sm text-gray-400 block mb-1">الفترة</label>
           <div className="flex gap-2">
@@ -236,7 +234,7 @@ function BudgetPanel({ categories }: { categories: Category[] }) {
                   </div>
                   <div className="flex items-center justify-between text-xs">
                     <span className={cn('font-mono num', overBudget ? 'text-danger-400 font-semibold' : 'text-gray-300')}>
-                      {spent.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} / {amount.toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج
+                      {formatNumber(spent, { maximumFractionDigits: 0 })} / {formatNumber(amount, { maximumFractionDigits: 0 })} ج
                     </span>
                     <span className={cn('font-mono num', overBudget ? 'text-danger-400 font-semibold' : pct >= 80 ? 'text-warning-400' : 'text-gray-500')}>
                       {pct.toFixed(0)}%
@@ -244,7 +242,7 @@ function BudgetPanel({ categories }: { categories: Category[] }) {
                   </div>
                   {overBudget && (
                     <p className="text-[10px] text-danger-400">
-                      تجاوزت الميزانية بـ {(spent - amount).toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج
+                      تجاوزت الميزانية بـ {formatNumber(spent - amount, { maximumFractionDigits: 0 })} ج
                     </p>
                   )}
                 </div>
@@ -340,14 +338,10 @@ function TemplateUpsertDrawer({
           {errors.description && <p className="text-xs text-danger-400 mt-1">{errors.description.message}</p>}
         </div>
         <Input label="المبلغ (ج)" type="number" step="0.01" error={errors.amount?.message} {...register('amount')} />
-        <div>
-          <label className="text-sm text-gray-400 block mb-1">الفئة</label>
-          <select {...register('categoryId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-            <option value="">— اختر فئة —</option>
-            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          {errors.categoryId && <p className="text-xs text-danger-400 mt-1">{errors.categoryId.message}</p>}
-        </div>
+        <Select label="الفئة" error={errors.categoryId?.message} {...register('categoryId')}>
+          <option value="">— اختر فئة —</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </Select>
         <Input label="طريقة الدفع (اختياري)" placeholder="نقدي / تحويل بنكي / ..." {...register('paymentMethod')} />
       </form>
     </Drawer>
@@ -428,14 +422,14 @@ function TemplatesPanel({ categories }: { categories: Category[] }) {
                   <p className="text-xs text-gray-400 truncate">{t.description}</p>
                   <div className="flex items-center justify-between">
                     <span className="text-base font-mono font-bold text-brand-400 num">
-                      {Number(t.amount).toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ج
+                      {formatNumber(Number(t.amount), { maximumFractionDigits: 2 })} ج
                     </span>
                     <Button size="sm" loading={isBusy} onClick={() => instantiate(t.id)}>
                       <Copy className="w-3 h-3" />استخدام
                     </Button>
                   </div>
                   {t.lastUsedAt && (
-                    <p className="text-[10px] text-gray-600">آخر استخدام: {new Date(t.lastUsedAt).toLocaleDateString('ar-EG')}</p>
+                    <p className="text-[10px] text-gray-600">آخر استخدام: {formatDate(t.lastUsedAt)}</p>
                   )}
                 </div>
               )
@@ -475,7 +469,7 @@ export default function Expenses() {
         { header: 'المبلغ', accessor: 'amount', width: 14 },
         { header: 'تاريخ المصروف', accessor: 'expenseDate', width: 14 },
         { header: 'الحالة', accessor: (e) => statusMap[e.status].label, width: 12 },
-        { header: 'أُنشئ', accessor: (e) => new Date(e.createdAt).toLocaleDateString('ar-EG'), width: 14 },
+        { header: 'أُنشئ', accessor: (e) => formatDate(e.createdAt), width: 14 },
       ],
       `expenses-${selected.length}.xlsx`,
       'المصروفات',
@@ -580,23 +574,15 @@ export default function Expenses() {
         }
       >
         <form className="flex flex-col gap-5">
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الفرع</label>
-            <select {...register('branchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">اختر الفرع</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            {errors.branchId && <p className="text-danger-500 text-xs mt-1">{errors.branchId.message}</p>}
-          </div>
+          <Select label="الفرع" error={errors.branchId?.message} {...register('branchId')}>
+            <option value="">اختر الفرع</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </Select>
 
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الفئة</label>
-            <select {...register('categoryId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">اختر الفئة</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-            {errors.categoryId && <p className="text-danger-500 text-xs mt-1">{errors.categoryId.message}</p>}
-          </div>
+          <Select label="الفئة" error={errors.categoryId?.message} {...register('categoryId')}>
+            <option value="">اختر الفئة</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
 
           <Input label="الوصف" error={errors.description?.message} {...register('description')} />
           <Input label="المبلغ (ج)" type="number" step="0.01" error={errors.amount?.message} {...register('amount')} />

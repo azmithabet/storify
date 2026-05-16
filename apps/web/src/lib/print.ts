@@ -7,8 +7,10 @@
  * module independent of page-specific extensions to Invoice/PurchaseOrder/etc.
  */
 
+import { formatMoney, formatDate, formatDateTime } from './format'
+
 function fmt2(n: number): string {
-  return n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return formatMoney(n)
 }
 
 function openPrintWindow(html: string, width: number, height: number, closeDelayMs = 250): void {
@@ -52,7 +54,7 @@ export function printReceipt(inv: ReceiptInvoice): void {
     <div class="center"><h2>Storify</h2><p style="font-size:11px">نقطة البيع</p></div>
     <div class="dashed"></div>
     <p>رقم الفاتورة: <b>${inv.invoiceNumber}</b></p>
-    <p>التاريخ: ${new Date(inv.createdAt).toLocaleString('ar-EG')}</p>
+    <p>التاريخ: ${formatDateTime(inv.createdAt)}</p>
     ${inv.customerName ? `<p>العميل: ${inv.customerName}</p>` : ''}
     <p>الدفع: ${inv.paymentMethodName}</p>
     <div class="dashed"></div>
@@ -121,7 +123,7 @@ export function printInvoice(inv: InvoiceForPrint): void {
       </div>
       <div style="text-align:left">
         <p style="font-size:18px;font-weight:700;font-family:monospace">${inv.invoiceNumber}</p>
-        <p style="font-size:12px;color:#6b7280">${new Date(inv.createdAt).toLocaleString('ar-EG')}</p>
+        <p style="font-size:12px;color:#6b7280">${formatDateTime(inv.createdAt)}</p>
       </div>
     </div>
     <div class="meta">
@@ -225,7 +227,7 @@ export function printPurchaseOrder(po: PurchaseOrderForPrint, statusLabel: strin
       <div><span>المورد</span>${po.supplier?.name ?? '—'}</div>
       <div><span>الفرع</span>${po.branch?.name ?? '—'}</div>
       <div><span>أنشأه</span>${po.createdBy?.fullName ?? '—'}</div>
-      <div><span>تاريخ الإنشاء</span>${new Date(po.createdAt).toLocaleDateString('ar-EG')}</div>
+      <div><span>تاريخ الإنشاء</span>${formatDate(po.createdAt)}</div>
       ${po.approvedBy ? `<div><span>وافق عليه</span>${po.approvedBy.fullName}</div>` : ''}
     </div>
     <table>

@@ -24,11 +24,16 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
   })
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
+    const clickHandler = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) onClose()
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const keyHandler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('mousedown', clickHandler)
+    document.addEventListener('keydown', keyHandler)
+    return () => {
+      document.removeEventListener('mousedown', clickHandler)
+      document.removeEventListener('keydown', keyHandler)
+    }
   }, [onClose])
 
   const items: { label: string; count: number; icon: React.ReactNode; path: string }[] = [
@@ -113,6 +118,8 @@ export function TopBar({ title, onMenuClick }: { title?: string; onMenuClick?: (
             open ? 'bg-gray-700 text-gray-100' : 'text-gray-400 hover:text-gray-100 hover:bg-gray-800',
           )}
           aria-label="الإشعارات"
+          aria-expanded={open}
+          aria-haspopup="true"
         >
           <Bell className="w-4 h-4" />
           {totalAlerts > 0 && (

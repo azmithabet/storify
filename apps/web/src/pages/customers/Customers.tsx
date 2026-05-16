@@ -9,6 +9,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import { Input, Table, Money, SkeletonTable, Button, Drawer, Pagination, Modal, Badge, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
 import { downloadFromApi } from '@/lib/download'
+import { formatNumber, formatMoney, formatDate, formatDateTime } from '@/lib/format'
 import { getApiErrorCode } from '@/lib/api-error'
 import type { PaginationMeta } from '@/types/api'
 import { invoiceStatusMap, getStatus } from '@/constants/status'
@@ -204,7 +205,7 @@ function CustomerDetailDrawer({ customer }: { customer: Customer }) {
                   <div>
                     <p className="text-sm font-mono text-gray-100">{inv.invoiceNumber}</p>
                     <p className="text-xs text-gray-500">
-                      {new Date(inv.createdAt).toLocaleDateString('ar-EG')}
+                      {formatDate(inv.createdAt)}
                       {inv.paymentMethod && ` · ${inv.paymentMethod.name}`}
                     </p>
                   </div>
@@ -252,7 +253,7 @@ function CustomerLedger({ ledger }: { ledger?: CreditLedger }) {
     if (s === undefined || s === null) return ''
     const n = Number(s)
     if (Number.isNaN(n)) return String(s)
-    return n.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return formatMoney(n)
   }
 
   return (
@@ -265,7 +266,7 @@ function CustomerLedger({ ledger }: { ledger?: CreditLedger }) {
         </div>
         <div className="bg-gray-750 border border-gray-700 rounded-md p-3">
           <p className="text-[10px] uppercase tracking-wider text-gray-500 mb-1">نقاط الولاء</p>
-          <p className="font-mono text-base font-bold text-yellow-400 num">{ledger.balance.loyaltyPoints.toLocaleString('ar-EG')}</p>
+          <p className="font-mono text-base font-bold text-yellow-400 num">{formatNumber(ledger.balance.loyaltyPoints)}</p>
         </div>
       </div>
 
@@ -289,7 +290,7 @@ function CustomerLedger({ ledger }: { ledger?: CreditLedger }) {
                     )}
                   </div>
                   <p className="text-xs text-gray-600 mt-0.5">
-                    {new Date(e.createdAt).toLocaleString('ar-EG')}
+                    {formatDateTime(e.createdAt)}
                     {e.actor && ` · ${e.actor.fullName}`}
                   </p>
                   {after.note && (

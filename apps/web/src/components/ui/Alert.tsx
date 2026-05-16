@@ -13,10 +13,10 @@ interface AlertProps {
 }
 
 const config: Record<AlertVariant, { icon: typeof Info; classes: string }> = {
-  success: { icon: CheckCircle2, classes: 'bg-success-50 border-success-500 text-success-700' },
-  warning: { icon: AlertTriangle, classes: 'bg-warning-50 border-warning-500 text-warning-700' },
-  danger: { icon: AlertCircle, classes: 'bg-danger-50 border-danger-500 text-danger-700' },
-  info: { icon: Info, classes: 'bg-info-50 border-info-500 text-info-700' },
+  success: { icon: CheckCircle2, classes: 'bg-success-700/15 border-success-500/60 text-success-500' },
+  warning: { icon: AlertTriangle, classes: 'bg-warning-700/15 border-warning-500/60 text-warning-500' },
+  danger: { icon: AlertCircle, classes: 'bg-danger-700/15 border-danger-500/60 text-danger-500' },
+  info: { icon: Info, classes: 'bg-info-700/15 border-info-500/60 text-info-500' },
 }
 
 export function Alert({ variant, title, children, onDismiss, className }: AlertProps) {

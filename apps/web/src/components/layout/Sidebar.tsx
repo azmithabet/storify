@@ -1,3 +1,4 @@
+import { useState, useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   ShoppingCart,
@@ -53,7 +54,26 @@ interface SidebarProps {
 }
 
 export function Sidebar({ open, onClose }: SidebarProps) {
+  const asideRef = useRef<HTMLElement>(null)
   const { user, logout, hasPermission } = useAuthStore()
+
+  // Track large-screen breakpoint so we never aria-hide a visible sidebar
+  const [isLg, setIsLg] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)')
+    const handler = (e: MediaQueryListEvent) => setIsLg(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
+
+  const isVisible = open || isLg
+
+  // Set inert imperatively (not a React prop in React 18 types)
+  useEffect(() => {
+    const el = asideRef.current
+    if (!el) return
+    el.inert = !isVisible
+  }, [isVisible])
 
   const visibleItems = navItems.filter(
     (item) => !item.permission || hasPermission(item.permission.resource, item.permission.action),
@@ -69,6 +89,8 @@ export function Sidebar({ open, onClose }: SidebarProps) {
 
   return (
     <aside
+      ref={asideRef}
+      aria-hidden={!isVisible}
       className={cn(
         'fixed top-0 right-0 h-full w-60 bg-gray-900 border-l border-gray-800 flex flex-col z-40',
         'transition-transform duration-slow lg:translate-x-0',
@@ -89,7 +111,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
             onClick={onClose}
             className={({ isActive }) =>
               cn(
-                'flex items-center gap-3 px-4 py-2.5 text-sm transition-all duration-fast mx-2 rounded-r-md',
+                'flex items-center gap-3 px-4 py-3 text-sm transition-all duration-fast mx-2 rounded-r-md',
                 isActive
                   ? 'bg-brand-600/20 text-brand-400 border-r-2 border-brand-500'
                   : 'text-gray-400 hover:bg-gray-800 hover:text-gray-100',

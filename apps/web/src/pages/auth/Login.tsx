@@ -1,9 +1,11 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
+import { Eye, EyeOff } from 'lucide-react'
 import { Button, Input, Alert } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -18,6 +20,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function Login() {
+  const [showPwd, setShowPwd] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const { setAuth } = useAuthStore()
@@ -46,7 +49,7 @@ export default function Login() {
   })
 
   return (
-    <div className="min-h-screen bg-app flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-app flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="font-display text-4xl font-bold text-brand-400 mb-2">Storify</h1>
@@ -64,6 +67,7 @@ export default function Login() {
             <Input
               label="اسم المتجر (Subdomain)"
               placeholder="my-store"
+              autoComplete="organization"
               error={errors.subdomain?.message}
               {...register('subdomain')}
             />
@@ -71,14 +75,26 @@ export default function Login() {
               label="البريد الإلكتروني"
               type="email"
               placeholder="owner@store.com"
+              autoComplete="email"
               error={errors.email?.message}
               {...register('email')}
             />
             <Input
               label="كلمة المرور"
-              type="password"
+              type={showPwd ? 'text' : 'password'}
               placeholder="••••••••"
+              autoComplete="current-password"
               error={errors.password?.message}
+              endIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPwd((v) => !v)}
+                  className="text-gray-400 hover:text-gray-200 transition-colors"
+                  aria-label={showPwd ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                >
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              }
               {...register('password')}
             />
 

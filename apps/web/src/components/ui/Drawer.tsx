@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { Button } from './Button'
 
 interface DrawerProps {
   open: boolean
@@ -71,7 +70,10 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          'fixed top-0 left-0 z-modal h-full bg-gray-800 border-r border-gray-700 shadow-xl',
+          // h-screen (not h-full) because the portal target is <body> whose
+          // own height is auto — h-full would collapse the panel and let
+          // content push the header/footer off-screen.
+          'fixed top-0 left-0 z-modal h-screen max-h-screen bg-gray-800 border-r border-gray-700 shadow-xl',
           'flex flex-col transition-transform duration-slow focus:outline-none',
           width,
           open ? 'translate-x-0' : '-translate-x-full',
@@ -82,16 +84,23 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
         aria-hidden={!open}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+          // shrink-0 so the header is pinned even when content overflows.
+          <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-700">
             <h2 id={titleId} className="text-lg font-semibold text-gray-100">{title}</h2>
-            <Button variant="ghost" size="sm" onClick={onClose} aria-label="إغلاق">
-              <X className="w-4 h-4" />
-            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="إغلاق"
+              className="shrink-0 w-9 h-9 rounded-md bg-gray-700/60 hover:bg-gray-600 text-gray-200 hover:text-white flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto p-6">{children}</div>
+        {/* min-h-0 lets this scroll inside a flex column instead of growing the panel. */}
+        <div className="flex-1 min-h-0 overflow-y-auto p-6">{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-700 flex gap-3">{footer}</div>
+          <div className="shrink-0 px-6 py-4 border-t border-gray-700 flex gap-3">{footer}</div>
         )}
       </div>
     </>,

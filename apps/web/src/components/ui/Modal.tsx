@@ -2,7 +2,6 @@ import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
-import { Button } from './Button'
 
 interface ModalProps {
   open: boolean
@@ -76,24 +75,32 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
         ref={panelRef}
         tabIndex={-1}
         className={cn(
-          'relative w-full bg-gray-800 rounded-r-xl shadow-xl border border-gray-700 animate-fade-in-up focus:outline-none',
+          // max-h cap + flex column so long modal bodies scroll inside
+          // instead of pushing the footer off the screen.
+          'relative w-full max-h-[calc(100vh-2rem)] bg-gray-800 rounded-r-xl shadow-xl border border-gray-700 animate-fade-in-up focus:outline-none',
+          'flex flex-col',
           sizeClasses[size],
           className,
         )}
       >
         {title && (
-          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
+          <div className="shrink-0 flex items-center justify-between px-6 py-4 border-b border-gray-700">
             <h2 id={titleId} className="text-lg font-semibold text-gray-100">
               {title}
             </h2>
-            <Button variant="ghost" size="sm" onClick={onClose} aria-label="إغلاق">
-              <X className="w-4 h-4" />
-            </Button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="إغلاق"
+              className="shrink-0 w-9 h-9 rounded-md bg-gray-700/60 hover:bg-gray-600 text-gray-200 hover:text-white flex items-center justify-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
         )}
-        <div className="p-6">{children}</div>
+        <div className="flex-1 min-h-0 overflow-y-auto p-6">{children}</div>
         {footer && (
-          <div className="px-6 py-4 border-t border-gray-700 flex gap-3 justify-end">{footer}</div>
+          <div className="shrink-0 px-6 py-4 border-t border-gray-700 flex gap-3 justify-end">{footer}</div>
         )}
       </div>
     </div>,

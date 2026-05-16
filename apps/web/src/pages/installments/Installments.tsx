@@ -646,7 +646,7 @@ export default function Installments() {
 
   const { mutate: recordPayment, isPending: isRecording } = useMutation({
     mutationFn: async ({ contractId, paymentId }: { contractId: string; paymentId: string }) =>
-      api.post(`/installments/${contractId}/payments/${paymentId}/pay`, { paidDate: new Date().toISOString().slice(0, 10) }),
+      api.post(`/installments/${contractId}/payments/${paymentId}`, { paidDate: new Date().toISOString().slice(0, 10) }),
     onSuccess: () => {
       toast.success('تم تسجيل الدفعة')
       qc.invalidateQueries({ queryKey: ['installments'] })

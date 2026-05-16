@@ -54,7 +54,8 @@ COPY --from=builder /app/apps/web/dist ./apps/web/dist
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# Run migrations then start server
+# Run migrations + seed plans then start server
 # - prisma runs from packages/database context (exec resolves bin from that package)
+# - db:seed is idempotent (upsert on slug); safe to re-run on every deploy
 # - tsx: use src/index.ts (relative to apps/api), pnpm exec sets cwd to the package
-CMD ["sh", "-c", "pnpm --filter @storify/database exec prisma migrate deploy --schema=prisma/schema.prisma && exec env API_PORT=${PORT:-3000} pnpm --filter @storify/api exec tsx src/index.ts"]
+CMD ["sh", "-c", "pnpm --filter @storify/database exec prisma migrate deploy --schema=prisma/schema.prisma && pnpm --filter @storify/database db:seed && exec env API_PORT=${PORT:-3000} pnpm --filter @storify/api exec tsx src/index.ts"]

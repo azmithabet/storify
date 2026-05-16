@@ -19,7 +19,7 @@ import { cn } from '@/lib/cn'
 interface Payment {
   id: string
   dueDate: string
-  amount: number
+  amountPaid: number
   status: 'pending' | 'paid' | 'overdue'
   paidDate?: string
 }
@@ -79,8 +79,8 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
   }
 
   const paidCount = payments.filter((p) => p.status === 'paid').length
-  const paidTotal = payments.filter((p) => p.status === 'paid').reduce((s, p) => s + Number(p.amount), 0)
-  const remainingTotal = payments.filter((p) => p.status !== 'paid').reduce((s, p) => s + Number(p.amount), 0)
+  const paidTotal = payments.filter((p) => p.status === 'paid').reduce((s, p) => s + Number(p.amountPaid), 0)
+  const remainingTotal = payments.filter((p) => p.status !== 'paid').reduce((s, p) => s + Number(p.amountPaid), 0)
   const nextDue = payments.find((p) => p.status !== 'paid')
   const progressPct = payments.length > 0 ? (paidCount / payments.length) * 100 : 0
 
@@ -172,7 +172,7 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
                   >
                     <td className="px-3 py-2.5 text-gray-500 font-mono text-xs">{idx + 1}</td>
                     <td className="px-3 py-2.5 font-mono text-gray-300 text-xs">{formatDate(p.dueDate)}</td>
-                    <td className="px-3 py-2.5 font-mono text-gray-100 text-sm">{formatMoney(Number(p.amount))} ج</td>
+                    <td className="px-3 py-2.5 font-mono text-gray-100 text-sm">{formatMoney(Number(p.amountPaid))} ج</td>
                     <td className="px-3 py-2.5">
                       {isPaid
                         ? <Badge variant="success" dot>مدفوع</Badge>
@@ -234,7 +234,7 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <Money value={p.amount} />
+                    <Money value={p.amountPaid} />
                     {!isPaid && contract.status === 'active' && (
                       <Button size="sm" loading={isRecording} onClick={() => onRecord(p.id)}>
                         <Check className="w-3 h-3" />تسجيل
@@ -517,7 +517,7 @@ function printContract(c: InstallmentContract) {
     <tr>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${i + 1}</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb">${formatDate(p.dueDate)}</td>
-      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(p.amount))} ج</td>
+      <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:left">${fmt(Number(p.amountPaid))} ج</td>
       <td style="padding:7px 10px;border-bottom:1px solid #e5e7eb;text-align:center">${p.status === 'paid' ? '✓ مدفوع' : p.status === 'overdue' ? '⚠ متأخر' : '—'}</td>
     </tr>`).join('')
 

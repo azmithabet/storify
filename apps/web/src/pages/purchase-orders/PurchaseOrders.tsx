@@ -96,7 +96,7 @@ function ReceiveModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
   })
 
   return (
-    <Modal open={!!po} onClose={onClose} title={`استلام أمر الشراء: ${po.id.slice(0, 8).toUpperCase()}`}
+    <Modal open={!!po} onClose={onClose} title={`استلام أمر الشراء: ${(po?.id ?? '').slice(0, 8).toUpperCase()}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
@@ -176,7 +176,7 @@ function PaymentModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
   })
   if (!po) return null
   return (
-    <Modal open={!!po} onClose={onClose} title={`تسجيل دفعة: ${po.id.slice(0, 8).toUpperCase()}`}
+    <Modal open={!!po} onClose={onClose} title={`تسجيل دفعة: ${(po?.id ?? '').slice(0, 8).toUpperCase()}`}
       footer={
         <>
           <Button variant="secondary" onClick={onClose}>إلغاء</Button>
@@ -582,7 +582,7 @@ export default function PurchaseOrders() {
       </Drawer>
 
       {/* PO Detail Drawer */}
-      <Drawer open={!!detailPO} onClose={() => setDetailPO(null)} title={`أمر شراء #${detailPO?.id.slice(0, 8).toUpperCase() ?? ''}`} width="w-[520px]">
+      <Drawer open={!!detailPO} onClose={() => setDetailPO(null)} title={`أمر شراء #${(detailPO?.id ?? '').slice(0, 8).toUpperCase()}`} width="w-[520px]">
         {detailPO && (
           <div className="flex flex-col gap-6">
             {/* ── Action buttons at the TOP so they're always visible ── */}

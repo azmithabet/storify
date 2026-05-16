@@ -57,4 +57,4 @@ EXPOSE 3000
 # Run migrations then start server
 # - prisma runs from packages/database context (exec resolves bin from that package)
 # - tsx: use src/index.ts (relative to apps/api), pnpm exec sets cwd to the package
-CMD ["sh", "-c", "pnpm --filter @storify/database exec prisma migrate deploy --schema=prisma/schema.prisma && exec pnpm --filter @storify/api exec tsx src/index.ts"]
+CMD ["sh", "-c", "pnpm --filter @storify/database exec prisma migrate deploy --schema=prisma/schema.prisma && exec env API_PORT=${PORT:-3000} pnpm --filter @storify/api exec tsx src/index.ts"]

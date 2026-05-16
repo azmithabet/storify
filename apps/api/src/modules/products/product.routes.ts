@@ -21,7 +21,6 @@ import {
   addVariant,
   updateVariant,
   findByBarcode,
-  searchVariants,
 } from './product.service'
 
 export async function productRoutes(app: FastifyInstance) {
@@ -36,21 +35,6 @@ export async function productRoutes(app: FastifyInstance) {
     async (request, reply) => {
       const variant = await findByBarcode(request.tenantDb, request.params.code)
       return reply.send({ success: true, data: variant })
-    },
-  )
-
-  // ─── GET /api/products/search?q=&limit= ─────────────────────────────────────
-  // Variant typeahead used by POS, Stock, Installments, PurchaseOrders.
-  // Registered BEFORE /:id so the literal "search" segment doesn't get
-  // matched as a UUID by the dynamic route.
-  app.get(
-    '/search',
-    { preHandler: requirePermission('products', 'read') },
-    async (request, reply) => {
-      const q = (request.query as Record<string, string>).q ?? ''
-      const limit = Number((request.query as Record<string, string>).limit ?? '8')
-      const variants = await searchVariants(request.tenantDb, q, limit)
-      return reply.send({ success: true, data: variants })
     },
   )
 

@@ -553,7 +553,7 @@ export default function POS() {
         </div>
 
         {/* RIGHT: Totals + Payment */}
-        <div className="w-full lg:w-80 lg:flex-shrink-0 flex flex-col gap-4">
+        <div className="w-full lg:w-80 lg:flex-shrink-0 flex flex-col gap-4 min-h-0 lg:overflow-y-auto lg:pb-2">
           <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-4">
             {customer ? (
               <div className="flex flex-col gap-2">
@@ -618,7 +618,7 @@ export default function POS() {
             </button>
             {pmSectionOpen && (
               <div className="px-4 pb-4 flex flex-col gap-3 border-t border-gray-700/60">
-                <div className="flex flex-col gap-2 pt-3">
+                <div className="flex flex-col gap-2 pt-3 max-h-52 overflow-y-auto">
                   {paymentMethods.map((pm) => {
                     const pmFee = calculateFee(subtotal, pm)
                     return (
@@ -725,7 +725,7 @@ export default function POS() {
               </button>
               {splitSectionOpen && (
                 <div className="px-4 pb-4 flex flex-col gap-2 border-t border-gray-700/60 pt-3">
-                  <div className="flex flex-col gap-1.5">
+                  <div className="flex flex-col gap-1.5 max-h-44 overflow-y-auto">
                     {paymentMethods.filter((pm) => pm.id !== selectedPM.id).map((pm) => (
                       <button
                         key={pm.id}

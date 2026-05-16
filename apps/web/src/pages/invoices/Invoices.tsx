@@ -4,13 +4,14 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Search, Eye, RotateCcw, Printer, Download, Ban } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination, Modal, DateRangePicker, BulkActionBar } from '@/components/ui'
+import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination, Modal, DateRangePicker, BulkActionBar, Select } from '@/components/ui'
 import { api } from '@/api/client'
 import { printInvoice } from '@/lib/print'
 import type { PaginationMeta } from '@/types/api'
 import { invoiceStatusMap, getStatus } from '@/constants/status'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatDate, formatDateTime } from '@/lib/format'
 import { getApiErrorMessage } from '@/lib/api-error'
 
 interface InvoiceItem {
@@ -185,7 +186,7 @@ export default function Invoices() {
         { header: 'الضريبة', accessor: 'taxTotal', width: 12 },
         { header: 'رسوم الدفع', accessor: 'feeAmount', width: 12 },
         { header: 'الإجمالي', accessor: 'totalAmount', width: 14 },
-        { header: 'التاريخ', accessor: (i) => new Date(i.createdAt).toLocaleString('ar-EG'), width: 22 },
+        { header: 'التاريخ', accessor: (i) => formatDateTime(i.createdAt), width: 22 },
       ],
       `invoices-${selected.length}.xlsx`,
       'الفواتير',
@@ -217,14 +218,13 @@ export default function Invoices() {
           <div className="flex-1 max-w-xs">
             <Input placeholder="بحث برقم الفاتورة..." value={search} onChange={(e) => { setSearch(e.target.value); resetPage() }} startIcon={<Search className="w-4 h-4" />} />
           </div>
-          <select value={status} onChange={(e) => { setStatus(e.target.value); resetPage() }}
-            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select value={status} onChange={(e) => { setStatus(e.target.value); resetPage() }}>
             <option value="">كل الحالات</option>
             <option value="completed">مكتملة</option>
             <option value="pending">معلقة</option>
             <option value="returned">مرتجعة</option>
             <option value="cancelled">ملغاة</option>
-          </select>
+          </Select>
           <DateRangePicker
             value={{ from, to }}
             onChange={(v) => { setRange({ from: v.from, to: v.to }); resetPage() }}
@@ -256,7 +256,7 @@ export default function Invoices() {
                   const s = getStatus(invoiceStatusMap, i.status)
                   return <Badge variant={s.variant} dot>{s.label}</Badge>
                 }},
-                { key: 'createdAt', header: 'التاريخ', render: (i) => <span className="text-gray-500 text-xs">{new Date(i.createdAt).toLocaleDateString('ar-EG')}</span> },
+                { key: 'createdAt', header: 'التاريخ', render: (i) => <span className="text-gray-500 text-xs">{formatDate(i.createdAt)}</span> },
                 { key: 'actions', header: '', render: (i) => (
                   <Button variant="ghost" size="sm" onClick={() => openDetail(i)}><Eye className="w-3 h-3" /></Button>
                 )},
@@ -297,7 +297,7 @@ export default function Invoices() {
               <div><span className="text-gray-500">العميل</span><p className="text-gray-100 font-medium">{detailInvoice.customer?.fullName ?? 'نقدي'}</p></div>
               <div><span className="text-gray-500">الكاشير</span><p className="text-gray-100">{detailInvoice.cashier?.fullName ?? '—'}</p></div>
               <div><span className="text-gray-500">طريقة الدفع</span><p className="text-gray-100">{detailInvoice.paymentMethod?.name ?? '—'}</p></div>
-              <div><span className="text-gray-500">التاريخ</span><p className="text-gray-100 font-mono text-xs">{new Date(detailInvoice.createdAt).toLocaleString('ar-EG')}</p></div>
+              <div><span className="text-gray-500">التاريخ</span><p className="text-gray-100 font-mono text-xs">{formatDateTime(detailInvoice.createdAt)}</p></div>
             </div>
 
             <div>

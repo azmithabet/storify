@@ -1,52 +1,51 @@
-import { forwardRef, type InputHTMLAttributes, type ReactNode } from 'react'
+import { forwardRef, type ReactNode, type SelectHTMLAttributes } from 'react'
+import { ChevronDown } from 'lucide-react'
 import { cn } from '@/lib/cn'
 
-interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
+interface SelectProps extends SelectHTMLAttributes<HTMLSelectElement> {
   label?: string
   error?: string
   hint?: string
-  startIcon?: ReactNode
-  endIcon?: ReactNode
+  children: ReactNode
 }
 
-export const Input = forwardRef<HTMLInputElement, InputProps>(
-  ({ label, error, hint, startIcon, endIcon, className, id, ...props }, ref) => {
-    const inputId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
+export const Select = forwardRef<HTMLSelectElement, SelectProps>(
+  ({ label, error, hint, className, id, children, ...props }, ref) => {
+    const selectId = id ?? label?.toLowerCase().replace(/\s+/g, '-')
     return (
       <div className="flex flex-col gap-1.5 w-full">
         {label && (
-          <label htmlFor={inputId} className="text-sm font-medium text-gray-300">
+          <label htmlFor={selectId} className="text-sm font-medium text-gray-300">
             {label}
           </label>
         )}
         <div className="relative flex items-center">
-          {startIcon && (
-            <span className="absolute right-3 text-gray-400 pointer-events-none">{startIcon}</span>
-          )}
-          <input
+          <select
             ref={ref}
-            id={inputId}
+            id={selectId}
             className={cn(
-              'w-full rounded-r-md border-[1.5px] bg-gray-800 px-3 py-2 text-sm text-gray-100',
-              'placeholder:text-gray-500 transition-all duration-fast',
+              'w-full appearance-none rounded-r-md border-[1.5px] bg-gray-800 px-3 py-3 text-sm text-gray-100',
+              'transition-all duration-fast',
               'border-gray-600 hover:border-gray-500',
               'focus:outline-none focus:border-brand-500 focus:shadow-[0_0_0_3px_rgb(99_102_241/0.12)]',
               'disabled:bg-gray-900 disabled:border-gray-700 disabled:cursor-not-allowed disabled:opacity-60',
               error && 'border-danger-500 focus:border-danger-500 focus:shadow-[0_0_0_3px_rgb(239_68_68/0.12)]',
-              startIcon && 'pr-10',
-              endIcon && 'pl-10',
+              'pl-8',
               className,
             )}
             aria-invalid={!!error}
-            aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
+            aria-describedby={error ? `${selectId}-error` : hint ? `${selectId}-hint` : undefined}
             {...props}
+          >
+            {children}
+          </select>
+          <ChevronDown
+            className="pointer-events-none absolute left-2.5 w-4 h-4 text-gray-400"
+            aria-hidden="true"
           />
-          {endIcon && (
-            <span className="absolute left-3 text-gray-400">{endIcon}</span>
-          )}
         </div>
         {error && (
-          <p id={`${inputId}-error`} className="text-xs text-danger-500 flex items-center gap-1">
+          <p id={`${selectId}-error`} className="text-xs text-danger-500 flex items-center gap-1">
             <svg className="w-3 h-3 shrink-0" fill="currentColor" viewBox="0 0 20 20">
               <path
                 fillRule="evenodd"
@@ -58,7 +57,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           </p>
         )}
         {hint && !error && (
-          <p id={`${inputId}-hint`} className="text-xs text-gray-500">
+          <p id={`${selectId}-hint`} className="text-xs text-gray-500">
             {hint}
           </p>
         )}
@@ -66,4 +65,4 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     )
   },
 )
-Input.displayName = 'Input'
+Select.displayName = 'Select'

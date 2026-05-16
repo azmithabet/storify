@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from 'react'
+import { useEffect, useId, useRef, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { Button } from './Button'
@@ -20,10 +20,40 @@ const sizeClasses = {
   xl: 'max-w-2xl',
 }
 
+const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export function Modal({ open, onClose, title, children, footer, size = 'md', className }: ModalProps) {
+  const titleId = useId()
+  const panelRef = useRef<HTMLDivElement>(null)
+  const prevFocusRef = useRef<HTMLElement | null>(null)
+
+  // Save caller focus → move into modal → restore on close
   useEffect(() => {
     if (!open) return
-    const handler = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    prevFocusRef.current = document.activeElement as HTMLElement
+    const panel = panelRef.current
+    const first = panel?.querySelector<HTMLElement>(FOCUSABLE)
+    ;(first ?? panel)?.focus()
+    return () => { prevFocusRef.current?.focus() }
+  }, [open])
+
+  // Escape + Tab trap (combined so a single removeEventListener cleans both)
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') { onClose(); return }
+      if (e.key !== 'Tab') return
+      const panel = panelRef.current
+      if (!panel) return
+      const nodes = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE))
+      if (nodes.length === 0) return
+      const first = nodes[0]
+      const last = nodes[nodes.length - 1]
+      if (e.shiftKey ? document.activeElement === first : document.activeElement === last) {
+        e.preventDefault()
+        ;(e.shiftKey ? last : first).focus()
+      }
+    }
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
   }, [open, onClose])
@@ -35,19 +65,21 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
       className="fixed inset-0 z-modal flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
-      aria-labelledby={title ? 'modal-title' : undefined}
+      aria-labelledby={title ? titleId : undefined}
     >
       <div className="absolute inset-0 bg-gray-900/80 backdrop-blur-sm" onClick={onClose} />
       <div
+        ref={panelRef}
+        tabIndex={-1}
         className={cn(
-          'relative w-full bg-gray-800 rounded-r-xl shadow-xl border border-gray-700 animate-fade-in-up',
+          'relative w-full bg-gray-800 rounded-r-xl shadow-xl border border-gray-700 animate-fade-in-up focus:outline-none',
           sizeClasses[size],
           className,
         )}
       >
         {title && (
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-700">
-            <h2 id="modal-title" className="text-lg font-semibold text-gray-100">
+            <h2 id={titleId} className="text-lg font-semibold text-gray-100">
               {title}
             </h2>
             <Button variant="ghost" size="sm" onClick={onClose} aria-label="إغلاق">

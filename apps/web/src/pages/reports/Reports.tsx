@@ -5,11 +5,12 @@ import { AppShell } from '@/components/layout/AppShell'
 import {
   StatCard, Button, SkeletonTable, Table, Money, Badge,
   ChartCard, AreaChartView, BarChartView, DonutChartView,
-  chartPalette, DateRangePicker,
+  chartPalette, DateRangePicker, Select,
 } from '@/components/ui'
 import { api } from '@/api/client'
 import { downloadFromApi } from '@/lib/download'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatNumber } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth.store'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -42,10 +43,7 @@ function monthStart() { const d = new Date(); d.setDate(1); return d.toISOString
 function formatCurrency(v: number) {
   if (Math.abs(v) >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M ج`
   if (Math.abs(v) >= 1_000) return `${(v / 1_000).toFixed(1)}K ج`
-  return `${v.toLocaleString('ar-EG')} ج`
-}
-function formatNumber(v: number) {
-  return v.toLocaleString('ar-EG')
+  return `${formatNumber(v)} ج`
 }
 
 // ─── Filter bar ───────────────────────────────────────────────────────────────
@@ -80,14 +78,13 @@ function FilterBar({
         onChange={(v) => onChange({ from: v.from, to: v.to })}
       />
       {isSuperAdmin && branches.length > 1 && (
-        <select
+        <Select
           value={filters.branchId}
           onChange={(e) => onChange({ branchId: e.target.value })}
-          className="bg-gray-700 border border-gray-600 rounded px-2 py-1 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
         >
           <option value="">كل الفروع</option>
           {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-        </select>
+        </Select>
       )}
       {showGroupBy && (
         <div className="flex gap-1">
@@ -224,8 +221,8 @@ export default function Reports() {
           <>
             <FilterBar filters={filters} onChange={patchFilters} showGroupBy branches={branches} isSuperAdmin={isSuperAdmin} />
             <div className="grid grid-cols-3 gap-4">
-              <StatCard label="إجمالي المبيعات" value={`${(salesSummary?.totalRevenue ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-brand-500" />
-              <StatCard label="إجمالي الرسوم" value={`${(salesSummary?.feeTotal ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-warning-500" />
+              <StatCard label="إجمالي المبيعات" value={`${formatNumber(salesSummary?.totalRevenue ?? 0)} ج`} accentColor="bg-brand-500" />
+              <StatCard label="إجمالي الرسوم" value={`${formatNumber(salesSummary?.feeTotal ?? 0)} ج`} accentColor="bg-warning-500" />
               <StatCard label="عدد الفواتير" value={salesSummary?.invoiceCount ?? 0} accentColor="bg-success-500" />
             </div>
             <div className="flex justify-between items-center">
@@ -280,7 +277,7 @@ export default function Reports() {
             <div className="grid grid-cols-3 gap-4">
               <StatCard label="إجمالي الأصناف" value={stockSummary?.totalVariants ?? 0} accentColor="bg-brand-500" />
               <StatCard label="مخزون منخفض" value={stockSummary?.lowStockCount ?? 0} accentColor="bg-warning-500" />
-              <StatCard label="قيمة المخزون" value={`${(stockSummary?.totalStockValue ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-success-500" />
+              <StatCard label="قيمة المخزون" value={`${formatNumber(stockSummary?.totalStockValue ?? 0)} ج`} accentColor="bg-success-500" />
             </div>
             <div className="flex justify-end">
               <Button variant="ghost" size="sm" onClick={() => downloadExcel('/reports/stock', stockParams, 'stock-report.xlsx')}>
@@ -376,7 +373,7 @@ export default function Reports() {
             <div className="grid grid-cols-3 gap-4">
               <StatCard label="عقود نشطة" value={installSummary?.active ?? 0} accentColor="bg-success-500" />
               <StatCard label="متأخرة" value={installSummary?.overdue ?? 0} accentColor="bg-danger-500" />
-              <StatCard label="إجمالي المستحقات" value={`${(installSummary?.totalReceivables ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-brand-500" />
+              <StatCard label="إجمالي المستحقات" value={`${formatNumber(installSummary?.totalReceivables ?? 0)} ج`} accentColor="bg-brand-500" />
             </div>
             {installLoading ? <SkeletonTable rows={4} cols={3} /> : (
               <>
@@ -447,7 +444,7 @@ export default function Reports() {
                         <span className="text-xs text-gray-500 mr-2">({row.margin.toFixed(1)}%)</span>
                       )}
                     </div>
-                    <span className={`font-mono ${row.cls}`}>{row.value.toLocaleString('ar-EG')} ج</span>
+                    <span className={`font-mono ${row.cls}`}>{formatNumber(row.value)} ج</span>
                   </div>
                 ))}
               </div>
@@ -481,9 +478,9 @@ export default function Reports() {
             {feesLoading ? <SkeletonTable rows={5} cols={4} /> : (
               <>
                 <div className="grid grid-cols-3 gap-4">
-                  <StatCard label="إجمالي الرسوم" value={`${(feesData?.summary.totalFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-brand-500" />
-                  <StatCard label="رسوم على التاجر" value={`${(feesData?.summary.totalMerchantFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-danger-500" />
-                  <StatCard label="رسوم على العميل" value={`${(feesData?.summary.totalCustomerFees ?? 0).toLocaleString('ar-EG')} ج`} accentColor="bg-success-500" />
+                  <StatCard label="إجمالي الرسوم" value={`${formatNumber(feesData?.summary.totalFees ?? 0)} ج`} accentColor="bg-brand-500" />
+                  <StatCard label="رسوم على التاجر" value={`${formatNumber(feesData?.summary.totalMerchantFees ?? 0)} ج`} accentColor="bg-danger-500" />
+                  <StatCard label="رسوم على العميل" value={`${formatNumber(feesData?.summary.totalCustomerFees ?? 0)} ج`} accentColor="bg-success-500" />
                 </div>
                 {feesData && feesData.byPaymentMethod.length > 0 && (
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -576,7 +573,7 @@ export default function Reports() {
                   { key: 'rank', header: '#', render: (r) => <span className="font-mono text-gray-500">{(topData ?? []).indexOf(r) + 1}</span> },
                   { key: 'product', header: 'المنتج', render: (r) => <span className="font-medium text-gray-100">{r.productName}</span> },
                   { key: 'sku', header: 'SKU', render: (r) => <span className="font-mono text-gray-500 text-xs">{r.variantSku}</span> },
-                  { key: 'qty', header: 'الكمية المباعة', render: (r) => <span className="font-mono text-brand-400">{r.totalQty.toLocaleString('ar-EG')}</span> },
+                  { key: 'qty', header: 'الكمية المباعة', render: (r) => <span className="font-mono text-brand-400">{formatNumber(r.totalQty)}</span> },
                   { key: 'revenue', header: 'الإيرادات', render: (r) => <Money value={r.totalRevenue} /> },
                 ]}
                 data={topData ?? []}

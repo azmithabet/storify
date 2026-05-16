@@ -12,12 +12,12 @@ interface BadgeProps {
 }
 
 const variantClasses: Record<BadgeVariant, string> = {
-  brand: 'bg-brand-100 text-brand-800',
-  success: 'bg-success-50 text-success-700',
-  warning: 'bg-warning-50 text-warning-700',
-  danger: 'bg-danger-50 text-danger-700',
-  info: 'bg-info-50 text-info-700',
-  gray: 'bg-gray-100 text-gray-700',
+  brand: 'bg-brand-900/40 text-brand-300',
+  success: 'bg-success-700/20 text-success-500',
+  warning: 'bg-warning-700/20 text-warning-500',
+  danger: 'bg-danger-700/20 text-danger-500',
+  info: 'bg-info-700/20 text-info-500',
+  gray: 'bg-gray-700/50 text-gray-300',
 }
 
 const dotClasses: Record<BadgeVariant, string> = {

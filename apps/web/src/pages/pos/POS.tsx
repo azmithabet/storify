@@ -8,6 +8,7 @@ import { Button, Input, Badge, Money, Modal, Kbd } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import { printReceipt } from '@/lib/print'
+import { formatNumber, formatDate } from '@/lib/format'
 import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
 
 interface Variant {
@@ -92,6 +93,7 @@ export default function POS() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<Variant[]>([])
+  const [searchIndex, setSearchIndex] = useState(-1)
   const [barcode, setBarcode] = useState('')
   const [selectedPM, setSelectedPM] = useState<PaymentMethod | null>(null)
   const [feeBearer, setFeeBearer] = useState<'merchant' | 'customer'>('merchant')
@@ -202,6 +204,8 @@ export default function POS() {
     const t = setTimeout(() => doSearch(search), 250)
     return () => clearTimeout(t)
   }, [search, doSearch])
+
+  useEffect(() => { setSearchIndex(-1) }, [searchResults])
 
   useEffect(() => { searchRef.current?.focus() }, [])
 
@@ -397,7 +401,7 @@ export default function POS() {
             : `${offlineQueue.length} فاتورة معلقة — سيتم إرسالها تلقائياً`}
         </div>
       )}
-      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100vh-8rem)]">
+      <div className="flex flex-col lg:flex-row gap-4 lg:gap-6 lg:h-[calc(100dvh-8rem)]">
         {/* LEFT: Search + Cart */}
         <div className="flex-1 flex flex-col gap-4 min-w-0 min-h-0">
           <div className="flex flex-col sm:flex-row gap-2">
@@ -409,14 +413,48 @@ export default function POS() {
               onChange={(e) => setSearch(e.target.value)}
               startIcon={<Search className="w-4 h-4" />}
               endIcon={<Kbd>Ctrl K</Kbd>}
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded={searchResults.length > 0}
+              aria-controls={searchResults.length > 0 ? 'pos-search-listbox' : undefined}
+              aria-activedescendant={searchIndex >= 0 ? `pos-result-${searchIndex}` : undefined}
+              onKeyDown={(e) => {
+                if (searchResults.length === 0) return
+                if (e.key === 'ArrowDown') {
+                  e.preventDefault()
+                  setSearchIndex((i) => Math.min(i + 1, searchResults.length - 1))
+                } else if (e.key === 'ArrowUp') {
+                  e.preventDefault()
+                  setSearchIndex((i) => Math.max(i - 1, 0))
+                } else if (e.key === 'Enter' && searchIndex >= 0) {
+                  e.preventDefault()
+                  addToCart(searchResults[searchIndex])
+                  setSearch('')
+                  setSearchResults([])
+                } else if (e.key === 'Escape') {
+                  setSearch('')
+                  setSearchResults([])
+                }
+              }}
             />
             {searchResults.length > 0 && (
-              <div className="absolute z-50 top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-r-lg shadow-lg overflow-hidden">
-                {searchResults.map((v) => (
+              <div
+                id="pos-search-listbox"
+                role="listbox"
+                aria-label="نتائج البحث"
+                className="absolute z-50 top-full mt-1 w-full bg-gray-800 border border-gray-700 rounded-r-lg shadow-lg overflow-hidden"
+              >
+                {searchResults.map((v, idx) => (
                   <button
                     key={v.id}
-                    onClick={() => addToCart(v)}
-                    className="w-full text-right px-4 py-3 hover:bg-gray-700 flex items-center justify-between border-b border-gray-700/50 last:border-0 transition-colors"
+                    id={`pos-result-${idx}`}
+                    role="option"
+                    aria-selected={idx === searchIndex}
+                    onClick={() => { addToCart(v); setSearch(''); setSearchResults([]) }}
+                    className={cn(
+                      'w-full text-right px-4 py-3 flex items-center justify-between border-b border-gray-700/50 last:border-0 transition-colors',
+                      idx === searchIndex ? 'bg-gray-700' : 'hover:bg-gray-700',
+                    )}
                   >
                     <div>
                       <p className="text-sm font-medium text-gray-100">{v.product.name}</p>
@@ -473,20 +511,22 @@ export default function POS() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center justify-center gap-2">
+                        <div className="flex items-center justify-center gap-1">
                           <button
                             onClick={() => updateQty(item.variantId, -1)}
-                            className="w-7 h-7 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center"
+                            className="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center"
+                            aria-label="تقليل الكمية"
                           >
-                            <Minus className="w-3 h-3" />
+                            <Minus className="w-4 h-4" />
                           </button>
                           <span className="w-8 text-center font-mono">{item.quantity}</span>
                           <button
                             onClick={() => updateQty(item.variantId, 1)}
-                            className="w-7 h-7 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center disabled:opacity-40"
+                            className="w-11 h-11 rounded-full bg-gray-700 hover:bg-gray-600 flex items-center justify-center disabled:opacity-40"
                             disabled={item.quantity >= item.availableStock}
+                            aria-label="زيادة الكمية"
                           >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-4 h-4" />
                           </button>
                         </div>
                       </td>
@@ -496,8 +536,8 @@ export default function POS() {
                       <td className="px-4 py-3">
                         <button
                           onClick={() => removeItem(item.variantId)}
-                          className="text-gray-500 hover:text-danger-500 transition-colors"
-                          aria-label="إزالة"
+                          className="w-11 h-11 flex items-center justify-center rounded-md text-gray-500 hover:text-danger-500 hover:bg-gray-700 transition-colors"
+                          aria-label="إزالة من السلة"
                         >
                           <X className="w-4 h-4" />
                         </button>
@@ -828,7 +868,7 @@ export default function POS() {
           <div className="grid grid-cols-3 gap-3">
             <div className="bg-gray-900 rounded-lg p-3 text-center">
               <p className="text-xs text-gray-500 mb-1">إجمالي المبيعات</p>
-              <p className="text-lg font-mono font-bold text-gray-100">{(eodDashboard?.revenue ?? 0).toLocaleString('ar-EG', { maximumFractionDigits: 0 })} ج</p>
+              <p className="text-lg font-mono font-bold text-gray-100">{formatNumber(eodDashboard?.revenue ?? 0, { maximumFractionDigits: 0 })} ج</p>
             </div>
             <div className="bg-gray-900 rounded-lg p-3 text-center">
               <p className="text-xs text-gray-500 mb-1">عدد الفواتير</p>
@@ -836,7 +876,7 @@ export default function POS() {
             </div>
             <div className="bg-gray-900 rounded-lg p-3 text-center">
               <p className="text-xs text-gray-500 mb-1">رسوم الدفع</p>
-              <p className="text-lg font-mono font-bold text-warning-400">{(eodDashboard?.feeExpenses ?? 0).toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ج</p>
+              <p className="text-lg font-mono font-bold text-warning-400">{formatNumber(eodDashboard?.feeExpenses ?? 0, { maximumFractionDigits: 2 })} ج</p>
             </div>
           </div>
 
@@ -848,7 +888,7 @@ export default function POS() {
                   <div key={pm.paymentMethodName} className="flex items-center justify-between text-sm py-1 border-b border-gray-800 last:border-0">
                     <span className="text-gray-300">{pm.paymentMethodName}</span>
                     <div className="text-left">
-                      <span className="font-mono text-gray-100">{pm.totalRevenue.toLocaleString('ar-EG', { maximumFractionDigits: 2 })} ج</span>
+                      <span className="font-mono text-gray-100">{formatNumber(pm.totalRevenue, { maximumFractionDigits: 2 })} ج</span>
                       <span className="text-gray-500 text-xs mr-2">× {pm.invoiceCount}</span>
                     </div>
                   </div>
@@ -897,7 +937,7 @@ export default function POS() {
                   th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f5f5f5}
                   .total{font-weight:bold;font-size:15px}.section{margin-bottom:16px}
                 </style></head><body>
-                  <h2>ملخص إغلاق يوم ${new Date().toLocaleDateString('ar-EG')}</h2>
+                  <h2>ملخص إغلاق يوم ${formatDate(new Date())}</h2>
                   <div class="section"><table><thead><tr><th>البيان</th><th>القيمة</th></tr></thead><tbody>
                     <tr><td>إجمالي المبيعات</td><td class="total">${(eodDashboard?.revenue ?? 0).toFixed(2)} ج</td></tr>
                     <tr><td>عدد الفواتير</td><td>${eodDashboard?.invoiceCount ?? 0}</td></tr>

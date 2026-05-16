@@ -1,4 +1,5 @@
 import { cn } from '@/lib/cn'
+import { formatMoney } from '@/lib/format'
 
 interface MoneyProps {
   value: number | string
@@ -15,15 +16,13 @@ const sizeClasses = {
 }
 
 export function Money({ value, currency = 'ج.م', className, size = 'base' }: MoneyProps) {
-  const formatted = typeof value === 'number'
-    ? value.toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
-    : value
+  const formatted = typeof value === 'number' ? formatMoney(value) : value
 
   return (
     <span
       dir="ltr"
       className={cn(
-        'inline-block font-mono text-brand-700 tabular-nums',
+        'inline-block font-mono text-brand-300 tabular-nums',
         sizeClasses[size],
         className,
       )}

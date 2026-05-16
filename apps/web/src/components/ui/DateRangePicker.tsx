@@ -119,7 +119,7 @@ export function DateRangePicker({
         onClick={() => setOpen((v) => !v)}
         className={cn(
           'flex items-center gap-2 bg-gray-700 border border-gray-600 rounded text-gray-100 focus:outline-none focus:border-brand-500 transition-colors',
-          compact ? 'px-2 py-1 text-xs' : 'px-3 py-1.5 text-sm',
+          compact ? 'px-2 py-1 text-xs' : 'px-3 py-2.5 text-sm min-h-[44px]',
         )}
       >
         <CalendarIcon className={compact ? 'w-3 h-3' : 'w-4 h-4'} />

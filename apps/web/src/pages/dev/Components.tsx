@@ -19,7 +19,7 @@ const sampleData = [
 
 export default function ComponentsShowcase() {
   return (
-    <div className="min-h-screen bg-app p-8 flex flex-col gap-12 max-w-5xl mx-auto">
+    <div className="min-h-dvh bg-app p-8 flex flex-col gap-12 max-w-5xl mx-auto">
       <h1 className="font-display text-4xl font-bold text-brand-400">مكتبة المكونات — Storify</h1>
 
       {/* Buttons */}

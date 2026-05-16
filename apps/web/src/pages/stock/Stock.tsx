@@ -7,12 +7,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, SkeletonTable, Button, Modal, Input, Drawer, Pagination, DateRangePicker, BulkActionBar } from '@/components/ui'
+import { Table, Badge, SkeletonTable, Button, Modal, Input, Select, Drawer, Pagination, DateRangePicker, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
 import type { PaginationMeta } from '@/types/api'
 import { getApiErrorCode } from '@/lib/api-error'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatDate, formatDateTime } from '@/lib/format'
 import { useAuthStore } from '@/stores/auth.store'
 import { cn } from '@/lib/cn'
 
@@ -97,18 +98,14 @@ function AdjustModal({ entry, onClose }: { entry: StockEntry; onClose: () => voi
         <span className="text-gray-100 font-mono font-semibold">{entry.quantity}</span>
       </div>
       <Input label="التعديل (+ إضافة / - خصم)" type="number" placeholder="مثال: 10 أو -5" error={errors.quantity?.message} {...register('quantity')} />
-      <div>
-        <label className="text-sm text-gray-400 block mb-1">سبب التعديل</label>
-        <select {...register('reason')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-          <option value="">اختر السبب</option>
-          <option value="purchase">استلام مشتريات</option>
-          <option value="damage">تلف أو فقدان</option>
-          <option value="return">مرتجع من عميل</option>
-          <option value="correction">تصحيح جرد</option>
-          <option value="other">أخرى</option>
-        </select>
-        {errors.reason && <p className="text-danger-500 text-xs mt-1">{errors.reason.message}</p>}
-      </div>
+      <Select label="سبب التعديل" error={errors.reason?.message} {...register('reason')}>
+        <option value="">اختر السبب</option>
+        <option value="purchase">استلام مشتريات</option>
+        <option value="damage">تلف أو فقدان</option>
+        <option value="return">مرتجع من عميل</option>
+        <option value="correction">تصحيح جرد</option>
+        <option value="other">أخرى</option>
+      </Select>
       <div>
         <label className="text-sm text-gray-400 block mb-1">ملاحظة (اختياري)</label>
         <textarea {...register('note')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
@@ -216,20 +213,16 @@ function CreateTransferDrawer({ branches, onClose }: { branches: Branch[]; onClo
     <div className="flex flex-col gap-5">
       <div className="grid grid-cols-2 gap-4">
         <div>
-          <label className="text-sm text-gray-400 block mb-1">من فرع</label>
-          <select {...register('fromBranchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select label="من فرع" error={errors.fromBranchId?.message} {...register('fromBranchId')}>
             <option value="">اختر...</option>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          {errors.fromBranchId && <p className="text-danger-500 text-xs mt-1">{errors.fromBranchId.message}</p>}
+          </Select>
         </div>
         <div>
-          <label className="text-sm text-gray-400 block mb-1">إلى فرع</label>
-          <select {...register('toBranchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+          <Select label="إلى فرع" error={errors.toBranchId?.message} {...register('toBranchId')}>
             <option value="">اختر...</option>
             {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </select>
-          {errors.toBranchId && <p className="text-danger-500 text-xs mt-1">{errors.toBranchId.message}</p>}
+          </Select>
         </div>
       </div>
 
@@ -447,7 +440,7 @@ function MovementsTab() {
         { header: 'النوع', accessor: (m) => movTypeMap[m.type]?.label ?? m.type, width: 14 },
         { header: 'الكمية', accessor: 'quantity', width: 10 },
         { header: 'المستخدم', accessor: (m) => m.user?.fullName ?? '', width: 22 },
-        { header: 'التاريخ', accessor: (m) => new Date(m.createdAt).toLocaleString('ar-EG'), width: 22 },
+        { header: 'التاريخ', accessor: (m) => formatDateTime(m.createdAt), width: 22 },
       ],
       `stock-movements-${selected.length}.xlsx`,
       'حركات المخزون',
@@ -457,8 +450,7 @@ function MovementsTab() {
   return (
     <>
       <div className="flex items-center gap-3 flex-wrap">
-        <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+        <Select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}>
           <option value="">كل الحركات</option>
           <option value="in">دخول</option>
           <option value="sale">بيع</option>
@@ -467,7 +459,7 @@ function MovementsTab() {
           <option value="manual_adjustment">تعديل يدوي</option>
           <option value="correction">تصحيح</option>
           <option value="cancellation">إلغاء فاتورة</option>
-        </select>
+        </Select>
         <DateRangePicker
           value={{ from, to }}
           onChange={(v) => { setFrom(v.from); setTo(v.to); setPage(1) }}
@@ -503,7 +495,7 @@ function MovementsTab() {
               )},
               { key: 'user', header: 'المستخدم', render: (m) => <span className="text-gray-500 text-sm">{m.user?.fullName ?? '—'}</span> },
               { key: 'createdAt', header: 'التاريخ', render: (m) => (
-                <span className="text-gray-500 text-xs">{new Date(m.createdAt).toLocaleString('ar-EG')}</span>
+                <span className="text-gray-500 text-xs">{formatDateTime(m.createdAt)}</span>
               )},
             ]}
             data={items} keyExtractor={(m) => m.id} emptyMessage="لا توجد حركات مخزون"
@@ -573,13 +565,12 @@ function TransfersTab() {
   return (
     <>
       <div className="flex items-center gap-4">
-        <select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}
-          className="bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+        <Select value={statusFilter} onChange={(e) => { setStatusFilter(e.target.value); setPage(1) }}>
           <option value="">كل التحويلات</option>
           <option value="pending">انتظار</option>
           <option value="completed">مكتمل</option>
           <option value="rejected">مرفوض</option>
-        </select>
+        </Select>
         <div className="flex-1" />
         <Button onClick={() => setCreateOpen(true)}>
           <Plus className="w-4 h-4" />طلب تحويل
@@ -598,7 +589,7 @@ function TransfersTab() {
                 const s = transferStatusMap[t.status]
                 return s ? <Badge variant={s.variant} dot>{s.label}</Badge> : <span>{t.status}</span>
               }},
-              { key: 'createdAt', header: 'التاريخ', render: (t) => <span className="text-gray-500 text-xs">{new Date(t.createdAt).toLocaleDateString('ar-EG')}</span> },
+              { key: 'createdAt', header: 'التاريخ', render: (t) => <span className="text-gray-500 text-xs">{formatDate(t.createdAt)}</span> },
               { key: 'actions', header: '', render: (t) => (
                 <div className="flex items-center gap-1">
                   <Button variant="ghost" size="sm" onClick={() => openDetail(t)}>تفاصيل</Button>

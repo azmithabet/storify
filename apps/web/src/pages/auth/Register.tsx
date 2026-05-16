@@ -1,10 +1,12 @@
+import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { Button, Input, Alert } from '@/components/ui'
+import { Eye, EyeOff } from 'lucide-react'
+import { Button, Input, Alert, Select } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
 
@@ -30,6 +32,7 @@ const schema = z.object({
 type FormData = z.infer<typeof schema>
 
 export default function Register() {
+  const [showPwd, setShowPwd] = useState(false)
   const navigate = useNavigate()
   const { data: plans } = useQuery<Plan[]>({
     queryKey: ['plans'],
@@ -61,7 +64,7 @@ export default function Register() {
   })
 
   return (
-    <div className="min-h-screen bg-app flex items-center justify-center p-4">
+    <div className="min-h-dvh bg-app flex items-center justify-center p-4">
       <div className="w-full max-w-lg">
         <div className="text-center mb-8">
           <h1 className="font-display text-4xl font-bold text-brand-400 mb-2">Storify</h1>
@@ -80,6 +83,7 @@ export default function Register() {
               <Input
                 label="اسم المتجر"
                 placeholder="متجري الإلكتروني"
+                autoComplete="organization"
                 error={errors.name?.message}
                 {...register('name')}
               />
@@ -87,33 +91,30 @@ export default function Register() {
                 label="Subdomain"
                 placeholder="my-store"
                 hint="my-store.storify.com"
+                autoComplete="off"
                 error={errors.subdomain?.message}
                 {...register('subdomain')}
               />
             </div>
 
-            <div>
-              <label className="text-sm font-medium text-gray-300 block mb-1.5">الباقة</label>
-              <select
-                {...register('planSlug')}
-                className="w-full rounded-r-md border-[1.5px] border-gray-600 bg-gray-800 px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
-              >
-                <option value="">اختر الباقة</option>
-                {plans?.map((p) => (
-                  <option key={p.id} value={p.slug}>
-                    {p.name} — {p.priceMonthly} ج.م / شهر
-                  </option>
-                ))}
-              </select>
-              {errors.planSlug && (
-                <p className="text-xs text-danger-500 mt-1">{errors.planSlug.message}</p>
-              )}
-            </div>
+            <Select
+              label="الباقة"
+              error={errors.planSlug?.message}
+              {...register('planSlug')}
+            >
+              <option value="">اختر الباقة</option>
+              {plans?.map((p) => (
+                <option key={p.id} value={p.slug}>
+                  {p.name} — {p.priceMonthly} ج.م / شهر
+                </option>
+              ))}
+            </Select>
 
             <div className="grid grid-cols-2 gap-4">
               <Input
                 label="اسمك"
                 placeholder="محمد أحمد"
+                autoComplete="name"
                 error={errors.ownerName?.message}
                 {...register('ownerName')}
               />
@@ -121,6 +122,7 @@ export default function Register() {
                 label="البريد الإلكتروني"
                 type="email"
                 placeholder="owner@store.com"
+                autoComplete="email"
                 error={errors.ownerEmail?.message}
                 {...register('ownerEmail')}
               />
@@ -128,9 +130,20 @@ export default function Register() {
 
             <Input
               label="كلمة المرور"
-              type="password"
+              type={showPwd ? 'text' : 'password'}
               placeholder="••••••••"
+              autoComplete="new-password"
               error={errors.ownerPassword?.message}
+              endIcon={
+                <button
+                  type="button"
+                  onClick={() => setShowPwd((v) => !v)}
+                  className="text-gray-400 hover:text-gray-200 transition-colors"
+                  aria-label={showPwd ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور'}
+                >
+                  {showPwd ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              }
               {...register('ownerPassword')}
             />
 

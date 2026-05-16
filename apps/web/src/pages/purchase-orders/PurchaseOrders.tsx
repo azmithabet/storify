@@ -6,13 +6,14 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, Money, SkeletonTable, Button, Drawer, Modal, Input, Pagination, BulkActionBar } from '@/components/ui'
+import { Table, Badge, Money, SkeletonTable, Button, Drawer, Modal, Input, Select, Pagination, BulkActionBar } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorCode } from '@/lib/api-error'
 import { purchaseOrderStatusMap, getStatus } from '@/constants/status'
 import { printPurchaseOrder } from '@/lib/print'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatNumber, formatDate } from '@/lib/format'
 
 interface Supplier { id: string; name: string }
 interface Branch { id: string; name: string; isMain: boolean }
@@ -187,15 +188,12 @@ function PaymentModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
     >
       <div className="flex flex-col gap-4">
         <Input label="المبلغ المدفوع (ج)" type="number" step="0.01" error={errors.amount?.message} {...register('amount')} />
-        <div>
-          <label className="text-sm text-gray-400 block mb-1">طريقة الدفع (اختياري)</label>
-          <select {...register('paymentMethod')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-            <option value="">اختر</option>
-            <option value="cash">نقدي</option>
-            <option value="bank_transfer">تحويل بنكي</option>
-            <option value="check">شيك</option>
-          </select>
-        </div>
+        <Select label="طريقة الدفع (اختياري)" {...register('paymentMethod')}>
+          <option value="">اختر</option>
+          <option value="cash">نقدي</option>
+          <option value="bank_transfer">تحويل بنكي</option>
+          <option value="check">شيك</option>
+        </Select>
       </div>
     </Modal>
   )
@@ -308,7 +306,7 @@ export default function PurchaseOrders() {
         { header: 'الأصناف', accessor: (p) => p._count?.items ?? 0, width: 10 },
         { header: 'الإجمالي', accessor: 'totalAmount', width: 14 },
         { header: 'التاريخ المتوقع', accessor: (p) => p.expectedDate ?? '', width: 14 },
-        { header: 'أُنشئ', accessor: (p) => new Date(p.createdAt).toLocaleDateString('ar-EG'), width: 14 },
+        { header: 'أُنشئ', accessor: (p) => formatDate(p.createdAt), width: 14 },
       ],
       `purchase-orders-${selected.length}.xlsx`,
       'أوامر الشراء',
@@ -490,35 +488,24 @@ export default function PurchaseOrders() {
         }
       >
         <form className="flex flex-col gap-5">
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">المورد</label>
-            <select {...register('supplierId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">اختر المورد</option>
-              {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            {errors.supplierId && <p className="text-danger-500 text-xs mt-1">{errors.supplierId.message}</p>}
-          </div>
+          <Select label="المورد" error={errors.supplierId?.message} {...register('supplierId')}>
+            <option value="">اختر المورد</option>
+            {suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </Select>
 
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الفرع</label>
-            <select {...register('branchId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">اختر الفرع</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-            </select>
-            {errors.branchId && <p className="text-danger-500 text-xs mt-1">{errors.branchId.message}</p>}
-          </div>
+          <Select label="الفرع" error={errors.branchId?.message} {...register('branchId')}>
+            <option value="">اختر الفرع</option>
+            {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+          </Select>
 
           <div className="grid grid-cols-2 gap-4">
             <Input label="تاريخ التسليم المتوقع" type="date" {...register('expectedDate')} />
-            <div>
-              <label className="text-sm text-gray-400 block mb-1">طريقة الدفع</label>
-              <select {...register('paymentType')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-                <option value="">اختر</option>
-                <option value="cash">نقدي</option>
-                <option value="credit">آجل</option>
-                <option value="bank_transfer">تحويل بنكي</option>
-              </select>
-            </div>
+            <Select label="طريقة الدفع" {...register('paymentType')}>
+              <option value="">اختر</option>
+              <option value="cash">نقدي</option>
+              <option value="credit">آجل</option>
+              <option value="bank_transfer">تحويل بنكي</option>
+            </Select>
           </div>
 
           <div>
@@ -556,7 +543,7 @@ export default function PurchaseOrders() {
 
             <div className="flex justify-between text-sm mt-3 bg-gray-750 rounded-md px-3 py-2 border border-gray-700">
               <span className="text-gray-400">الإجمالي التقديري</span>
-              <span className="font-semibold text-gray-100">{totalCost.toLocaleString('ar-EG')} ج</span>
+              <span className="font-semibold text-gray-100">{formatNumber(totalCost)} ج</span>
             </div>
           </div>
         </form>

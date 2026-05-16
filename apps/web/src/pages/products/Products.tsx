@@ -6,12 +6,13 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer, Modal, Money, SkeletonTable, Pagination, BulkActionBar } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Modal, Money, SkeletonTable, Pagination, BulkActionBar, Select } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import type { PaginationMeta } from '@/types/api'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatDate } from '@/lib/format'
 import { printBarcodeLabels } from '@/lib/print'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -409,31 +410,22 @@ function CreateProductDrawer({ open, onClose, categories, taxRates, onSuccess }:
         </div>
 
         <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الوحدة</label>
-            <select {...register('unit')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="piece">قطعة</option>
-              <option value="kg">كيلوجرام</option>
-              <option value="liter">لتر</option>
-              <option value="box">صندوق</option>
-            </select>
-          </div>
-          <div>
-            <label className="text-sm text-gray-400 block mb-1">الفئة (اختياري)</label>
-            <select {...register('categoryId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-              <option value="">بدون فئة</option>
-              {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
+          <Select label="الوحدة" {...register('unit')}>
+            <option value="piece">قطعة</option>
+            <option value="kg">كيلوجرام</option>
+            <option value="liter">لتر</option>
+            <option value="box">صندوق</option>
+          </Select>
+          <Select label="الفئة (اختياري)" {...register('categoryId')}>
+            <option value="">بدون فئة</option>
+            {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
         </div>
 
-        <div>
-          <label className="text-sm text-gray-400 block mb-1">معدل الضريبة (اختياري)</label>
-          <select {...register('taxRateId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-            <option value="">بدون ضريبة</option>
-            {taxRates.map((t) => <option key={t.id} value={t.id}>{t.name} ({Number(t.rate)}%)</option>)}
-          </select>
-        </div>
+        <Select label="معدل الضريبة (اختياري)" {...register('taxRateId')}>
+          <option value="">بدون ضريبة</option>
+          {taxRates.map((t) => <option key={t.id} value={t.id}>{t.name} ({Number(t.rate)}%)</option>)}
+        </Select>
 
         <label className="flex items-center gap-3 text-sm text-gray-300 cursor-pointer select-none">
           <input type="checkbox" {...register('hasVariants')} className="w-4 h-4 accent-brand-500" />
@@ -546,10 +538,10 @@ function ProductDiscountsSection({ productId }: { productId: string }) {
       {showForm && (
         <div className="bg-gray-900 rounded-md p-3 mb-3 flex flex-col gap-3">
           <div className="flex gap-2">
-            <select value={discountType} onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'fixed')} className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
+            <Select value={discountType} onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'fixed')}>
               <option value="percentage">نسبة %</option>
               <option value="fixed">مبلغ ثابت ج</option>
-            </select>
+            </Select>
             <input type="number" value={discountValue} onChange={(e) => setDiscountValue(e.target.value)} placeholder="القيمة" className="flex-1 bg-gray-700 border border-gray-600 rounded-md px-2 py-1.5 text-sm text-gray-100 focus:outline-none focus:border-brand-500" />
           </div>
           <div className="flex gap-2">
@@ -580,7 +572,7 @@ function ProductDiscountsSection({ productId }: { productId: string }) {
                     {d.discountType === 'percentage' ? `${Number(d.discountValue)}%` : `${Number(d.discountValue)} ج`}
                   </span>
                   <span className="text-gray-500 text-xs mr-2">
-                    {new Date(d.startDate).toLocaleDateString('ar-EG')} — {new Date(d.endDate).toLocaleDateString('ar-EG')}
+                    {formatDate(d.startDate)} — {formatDate(d.endDate)}
                   </span>
                   {isLive && <span className="text-xs text-success-500 font-medium mr-1">● نشط</span>}
                   {isPast && <span className="text-xs text-gray-600 mr-1">منتهي</span>}
@@ -684,30 +676,21 @@ function ProductDetailDrawer({ product, onClose, categories, taxRates, onSuccess
               <textarea {...register('description')} rows={2} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500 resize-none" />
             </div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">الوحدة</label>
-                <select {...register('unit')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-                  <option value="piece">قطعة</option>
-                  <option value="kg">كيلوجرام</option>
-                  <option value="liter">لتر</option>
-                  <option value="box">صندوق</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-sm text-gray-400 block mb-1">الفئة</label>
-                <select {...register('categoryId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-                  <option value="">بدون فئة</option>
-                  {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
+              <Select label="الوحدة" {...register('unit')}>
+                <option value="piece">قطعة</option>
+                <option value="kg">كيلوجرام</option>
+                <option value="liter">لتر</option>
+                <option value="box">صندوق</option>
+              </Select>
+              <Select label="الفئة" {...register('categoryId')}>
+                <option value="">بدون فئة</option>
+                {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </Select>
             </div>
-            <div>
-              <label className="text-sm text-gray-400 block mb-1">معدل الضريبة</label>
-              <select {...register('taxRateId')} className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500">
-                <option value="">بدون ضريبة</option>
-                {taxRates.map((t) => <option key={t.id} value={t.id}>{t.name} ({Number(t.rate)}%)</option>)}
-              </select>
-            </div>
+            <Select label="معدل الضريبة" {...register('taxRateId')}>
+              <option value="">بدون ضريبة</option>
+              {taxRates.map((t) => <option key={t.id} value={t.id}>{t.name} ({Number(t.rate)}%)</option>)}
+            </Select>
             <label className="flex items-center gap-3 text-sm text-gray-300 cursor-pointer">
               <input type="checkbox" {...register('isActive')} className="w-4 h-4 accent-brand-500" />
               منتج نشط

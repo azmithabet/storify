@@ -2,11 +2,12 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Download } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Badge, Money, SkeletonTable, Pagination, Drawer, DateRangePicker, BulkActionBar, Button } from '@/components/ui'
+import { Table, Badge, Money, SkeletonTable, Pagination, Drawer, DateRangePicker, BulkActionBar, Button, Select } from '@/components/ui'
 import { api } from '@/api/client'
 import type { PaginationMeta } from '@/types/api'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
+import { formatDate, formatDateTime } from '@/lib/format'
 
 interface ReturnItem {
   id: string
@@ -41,7 +42,7 @@ function ReturnDetailDrawer({ ret }: { ret: Return }) {
         <div><span className="text-gray-500">العميل</span><p className="text-gray-100">{ret.invoice.customer?.fullName ?? 'نقدي'}</p></div>
         <div><span className="text-gray-500">النوع</span><p><Badge variant={typeMap[ret.returnType].variant}>{typeMap[ret.returnType].label}</Badge></p></div>
         <div><span className="text-gray-500">بواسطة</span><p className="text-gray-100">{ret.processedBy.fullName}</p></div>
-        <div><span className="text-gray-500">التاريخ</span><p className="text-gray-100 font-mono text-xs">{new Date(ret.createdAt).toLocaleString('ar-EG')}</p></div>
+        <div><span className="text-gray-500">التاريخ</span><p className="text-gray-100 font-mono text-xs">{formatDateTime(ret.createdAt)}</p></div>
         <div><span className="text-gray-500">المبلغ المسترد</span><p><Money value={ret.amount} size="lg" /></p></div>
       </div>
 
@@ -107,7 +108,7 @@ export default function Returns() {
         { header: 'المبلغ', accessor: 'amount', width: 14 },
         { header: 'الموظف', accessor: (r) => r.processedBy.fullName, width: 18 },
         { header: 'السبب', accessor: (r) => r.reason ?? '', width: 30 },
-        { header: 'التاريخ', accessor: (r) => new Date(r.createdAt).toLocaleString('ar-EG'), width: 22 },
+        { header: 'التاريخ', accessor: (r) => formatDateTime(r.createdAt), width: 22 },
       ],
       `returns-${selected.length}.xlsx`,
       'المرتجعات',
@@ -119,15 +120,14 @@ export default function Returns() {
       <div className="flex flex-col gap-6">
         {/* Filters */}
         <div className="flex items-center gap-3 flex-wrap">
-          <select
+          <Select
             value={typeFilter}
             onChange={(e) => { setTypeFilter(e.target.value); setPage(1) }}
-            className="bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-sm text-gray-100 focus:outline-none focus:border-brand-500"
           >
             <option value="">كل الأنواع</option>
             <option value="refund">استرداد نقدي</option>
             <option value="credit">رصيد عميل</option>
-          </select>
+          </Select>
           <DateRangePicker
             value={{ from, to }}
             onChange={(v) => { setFrom(v.from); setTo(v.to); setPage(1) }}
@@ -155,7 +155,7 @@ export default function Returns() {
                 { key: 'items', header: 'الأصناف', render: (r) => <span className="font-mono text-gray-400">{r.items.length} صنف</span> },
                 { key: 'amount', header: 'المبلغ', render: (r) => <Money value={r.amount} /> },
                 { key: 'processedBy', header: 'الموظف', render: (r) => <span className="text-gray-500 text-sm">{r.processedBy.fullName}</span> },
-                { key: 'createdAt', header: 'التاريخ', render: (r) => <span className="text-gray-500 text-xs">{new Date(r.createdAt).toLocaleDateString('ar-EG')}</span> },
+                { key: 'createdAt', header: 'التاريخ', render: (r) => <span className="text-gray-500 text-xs">{formatDate(r.createdAt)}</span> },
               ]}
               data={returns} keyExtractor={(r) => r.id} emptyMessage="لا توجد مرتجعات"
             />

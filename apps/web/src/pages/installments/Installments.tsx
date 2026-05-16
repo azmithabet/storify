@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, Search, Plus, Trash2, Printer, Download, Clock, AlertCircle, Send } from 'lucide-react'
+import { Check, X, Search, Plus, Trash2, Printer, Download, Clock, AlertCircle, Send, Table2, LayoutList } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -71,6 +71,7 @@ interface ScheduleTimelineProps {
 }
 
 function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineProps) {
+  const [view, setView] = useState<'table' | 'timeline'>('table')
   const payments = contract.payments ?? []
   if (payments.length === 0) {
     return <p className="text-sm text-gray-500">لم يتم إنشاء جدول السداد بعد.</p>
@@ -105,11 +106,11 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
         <div className="grid grid-cols-3 gap-3 pt-1">
           <div>
             <p className="text-[10px] uppercase tracking-wider text-gray-500">مدفوع</p>
-            <p className="text-sm font-mono text-success-400 num">{formatNumber(paidTotal)} ج</p>
+            <p className="text-sm font-mono text-success-400 num">{formatMoney(paidTotal)} ج</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-gray-500">متبقي</p>
-            <p className="text-sm font-mono text-gray-200 num">{formatNumber(remainingTotal)} ج</p>
+            <p className="text-sm font-mono text-gray-200 num">{formatMoney(remainingTotal)} ج</p>
           </div>
           <div>
             <p className="text-[10px] uppercase tracking-wider text-gray-500">القسط التالي</p>
@@ -118,54 +119,134 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
         </div>
       </div>
 
-      {/* Timeline nodes */}
-      <ol className="relative flex flex-col gap-3 pr-6 border-r border-gray-700">
-        {payments.map((p, idx) => {
-          const isPaid = p.status === 'paid'
-          const isOverdue = p.status === 'overdue'
-          const isNext = !isPaid && nextDue?.id === p.id
-          const dot = isPaid
-            ? { bg: 'bg-success-500', ring: 'ring-success-500/30', icon: <Check className="w-3 h-3 text-white" /> }
-            : isOverdue
-            ? { bg: 'bg-danger-500', ring: 'ring-danger-500/30', icon: <AlertCircle className="w-3 h-3 text-white" /> }
-            : { bg: 'bg-gray-700', ring: 'ring-gray-600/30', icon: <Clock className="w-3 h-3 text-gray-400" /> }
+      {/* View toggle header */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-gray-500">جدول السداد · {payments.length} قسط</p>
+        <div className="flex items-center bg-gray-800 border border-gray-700 rounded-md p-0.5">
+          <button
+            type="button"
+            onClick={() => setView('table')}
+            aria-label="عرض جدول"
+            className={cn('px-2 py-1 rounded transition-colors flex items-center', view === 'table' ? 'bg-gray-700 text-gray-100' : 'text-gray-500 hover:text-gray-300')}
+          >
+            <Table2 className="w-3.5 h-3.5" />
+          </button>
+          <button
+            type="button"
+            onClick={() => setView('timeline')}
+            aria-label="عرض خط زمني"
+            className={cn('px-2 py-1 rounded transition-colors flex items-center', view === 'timeline' ? 'bg-gray-700 text-gray-100' : 'text-gray-500 hover:text-gray-300')}
+          >
+            <LayoutList className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      </div>
 
-          return (
-            <li key={p.id} className="relative">
-              <span
-                className={`absolute -right-[34px] top-2.5 w-6 h-6 rounded-full ${dot.bg} ring-4 ${dot.ring} flex items-center justify-center`}
-                aria-hidden="true"
-              >
-                {dot.icon}
-              </span>
-              <div className={`flex items-center justify-between rounded-md px-3 py-2 border ${isNext ? 'bg-brand-500/5 border-brand-500/30' : isOverdue ? 'bg-danger-500/5 border-danger-500/30' : 'bg-gray-800 border-gray-700'}`}>
-                <div>
-                  <p className="text-sm font-mono text-gray-200">
-                    <span className="text-gray-500 ml-2">#{idx + 1}</span>
-                    {formatDate(p.dueDate)}
-                  </p>
-                  <p className={`text-xs mt-0.5 ${isPaid ? 'text-success-400' : isOverdue ? 'text-danger-400' : 'text-gray-500'}`}>
-                    {isPaid
-                      ? p.paidDate
-                        ? `مدفوع · ${formatDate(p.paidDate)}`
-                        : 'مدفوع'
-                      : dayRelative(p.dueDate)}
-                  </p>
+      {view === 'table' ? (
+        /* ── Table view ── */
+        <div className="overflow-x-auto rounded-lg border border-gray-700">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-gray-900/70 border-b border-gray-700">
+                <th className="text-right px-3 py-2.5 text-[11px] text-gray-500 font-medium w-10">#</th>
+                <th className="text-right px-3 py-2.5 text-[11px] text-gray-500 font-medium">الاستحقاق</th>
+                <th className="text-right px-3 py-2.5 text-[11px] text-gray-500 font-medium">المبلغ</th>
+                <th className="text-right px-3 py-2.5 text-[11px] text-gray-500 font-medium">الحالة</th>
+                <th className="text-right px-3 py-2.5 text-[11px] text-gray-500 font-medium">تاريخ الدفع</th>
+                <th className="w-24" />
+              </tr>
+            </thead>
+            <tbody>
+              {payments.map((p, idx) => {
+                const isPaid = p.status === 'paid'
+                const isOverdue = p.status === 'overdue'
+                const isNext = !isPaid && nextDue?.id === p.id
+                return (
+                  <tr
+                    key={p.id}
+                    className={cn(
+                      'border-b border-gray-700/60 last:border-0 transition-colors',
+                      isPaid ? 'bg-success-500/5' : isOverdue ? 'bg-danger-500/5' : isNext ? 'bg-brand-500/5' : '',
+                    )}
+                  >
+                    <td className="px-3 py-2.5 text-gray-500 font-mono text-xs">{idx + 1}</td>
+                    <td className="px-3 py-2.5 font-mono text-gray-300 text-xs">{formatDate(p.dueDate)}</td>
+                    <td className="px-3 py-2.5 font-mono text-gray-100 text-sm">{formatMoney(Number(p.amount))} ج</td>
+                    <td className="px-3 py-2.5">
+                      {isPaid
+                        ? <Badge variant="success" dot>مدفوع</Badge>
+                        : isOverdue
+                        ? <Badge variant="danger" dot>متأخر</Badge>
+                        : isNext
+                        ? <Badge variant="brand" dot>التالي</Badge>
+                        : <Badge variant="gray">معلق</Badge>}
+                    </td>
+                    <td className="px-3 py-2.5 text-xs text-gray-500 font-mono">
+                      {p.paidDate ? formatDate(p.paidDate) : '—'}
+                    </td>
+                    <td className="px-3 py-2.5 text-left">
+                      {!isPaid && contract.status === 'active' && (
+                        <Button size="sm" loading={isRecording} onClick={() => onRecord(p.id)}>
+                          <Check className="w-3 h-3" />تسجيل
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        /* ── Timeline view ── */
+        <ol className="relative flex flex-col gap-3 pr-6 border-r border-gray-700">
+          {payments.map((p, idx) => {
+            const isPaid = p.status === 'paid'
+            const isOverdue = p.status === 'overdue'
+            const isNext = !isPaid && nextDue?.id === p.id
+            const dot = isPaid
+              ? { bg: 'bg-success-500', ring: 'ring-success-500/30', icon: <Check className="w-3 h-3 text-white" /> }
+              : isOverdue
+              ? { bg: 'bg-danger-500', ring: 'ring-danger-500/30', icon: <AlertCircle className="w-3 h-3 text-white" /> }
+              : { bg: 'bg-gray-700', ring: 'ring-gray-600/30', icon: <Clock className="w-3 h-3 text-gray-400" /> }
+
+            return (
+              <li key={p.id} className="relative">
+                <span
+                  className={`absolute -right-[34px] top-2.5 w-6 h-6 rounded-full ${dot.bg} ring-4 ${dot.ring} flex items-center justify-center`}
+                  aria-hidden="true"
+                >
+                  {dot.icon}
+                </span>
+                <div className={`flex items-center justify-between rounded-md px-3 py-2 border ${isNext ? 'bg-brand-500/5 border-brand-500/30' : isOverdue ? 'bg-danger-500/5 border-danger-500/30' : 'bg-gray-800 border-gray-700'}`}>
+                  <div>
+                    <p className="text-sm font-mono text-gray-200">
+                      <span className="text-gray-500 ml-2">#{idx + 1}</span>
+                      {formatDate(p.dueDate)}
+                    </p>
+                    <p className={`text-xs mt-0.5 ${isPaid ? 'text-success-400' : isOverdue ? 'text-danger-400' : 'text-gray-500'}`}>
+                      {isPaid
+                        ? p.paidDate
+                          ? `مدفوع · ${formatDate(p.paidDate)}`
+                          : 'مدفوع'
+                        : dayRelative(p.dueDate)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Money value={p.amount} />
+                    {!isPaid && contract.status === 'active' && (
+                      <Button size="sm" loading={isRecording} onClick={() => onRecord(p.id)}>
+                        <Check className="w-3 h-3" />تسجيل
+                      </Button>
+                    )}
+                    {isPaid && <Badge variant="success" dot>مدفوع</Badge>}
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <Money value={p.amount} />
-                  {!isPaid && contract.status === 'active' && (
-                    <Button size="sm" loading={isRecording} onClick={() => onRecord(p.id)}>
-                      <Check className="w-3 h-3" />تسجيل
-                    </Button>
-                  )}
-                  {isPaid && <Badge variant="success" dot>مدفوع</Badge>}
-                </div>
-              </div>
-            </li>
-          )
-        })}
-      </ol>
+              </li>
+            )
+          })}
+        </ol>
+      )}
     </div>
   )
 }
@@ -281,7 +362,9 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
   const interestRate = Number(watch('interestRate') ?? 0)
   const subtotal = items.reduce((s, i) => s + (Number(i.unitPrice) * Number(i.quantity) || 0), 0)
   const financed = Math.max(0, subtotal - downPayment)
-  const totalWithInterest = financed * (1 + interestRate / 100)
+  const years = installmentsCount / 12
+  const totalInterest = financed * (interestRate / 100) * years
+  const totalWithInterest = financed + totalInterest
   const installmentAmount = installmentsCount > 0 ? totalWithInterest / installmentsCount : 0
 
   const { mutate, isPending } = useMutation({
@@ -369,13 +452,13 @@ function CreateContractDrawer({ onClose }: { onClose: () => void }) {
       <div className="grid grid-cols-3 gap-3">
         <Input label="المقدم (ج)" type="number" step="0.01" {...register('downPayment')} />
         <Input label="عدد الأقساط" type="number" min={1} max={120} {...register('installmentsCount')} />
-        <Input label="الفائدة %" type="number" step="0.1" min={0} max={100} {...register('interestRate')} />
+        <Input label="الفائدة السنوية %" type="number" step="0.1" min={0} max={100} {...register('interestRate')} />
       </div>
 
       <div className="bg-gray-750 border border-gray-700 rounded-md p-3 text-sm flex flex-col gap-1">
         <div className="flex justify-between text-gray-400"><span>إجمالي الأصناف</span><Money value={subtotal} /></div>
         <div className="flex justify-between text-gray-400"><span>المقدم</span><span className="text-danger-400">- <Money value={downPayment} /></span></div>
-        {interestRate > 0 && <div className="flex justify-between text-gray-400"><span>الفائدة ({interestRate}%)</span><Money value={financed * interestRate / 100} /></div>}
+        {interestRate > 0 && <div className="flex justify-between text-gray-400"><span>الفائدة السنوية ({interestRate}% × {formatNumber(years, { maximumFractionDigits: 2 })} سنة)</span><Money value={totalInterest} /></div>}
         <div className="flex justify-between text-gray-100 font-semibold border-t border-gray-600 pt-1 mt-1">
           <span>القسط الشهري (× {installmentsCount})</span>
           <Money value={installmentAmount} />

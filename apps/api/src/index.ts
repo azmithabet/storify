@@ -1,6 +1,8 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
+import fastifyStatic from '@fastify/static'
+import { join } from 'path'
 import { config } from './config/env'
 import { masterDb } from './config/database'
 import { redis } from './config/redis'
@@ -170,6 +172,18 @@ app.register(async function tenantScoped(sub) {
     return reply.send({ success: true, data: branch })
   })
 })
+
+// ─── Serve React frontend in production ──────────────────────────────────────
+if (config.NODE_ENV === 'production') {
+  const webDist = join(process.cwd(), 'apps/web/dist')
+  app.register(fastifyStatic, { root: webDist, prefix: '/', wildcard: false })
+  app.setNotFoundHandler(async (request, reply) => {
+    if (request.url.startsWith('/api')) {
+      return reply.status(404).send({ success: false, error: { code: 'not_found' } })
+    }
+    return reply.sendFile('index.html', webDist)
+  })
+}
 
 const start = async () => {
   try {

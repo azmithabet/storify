@@ -88,7 +88,10 @@ export async function getContract(db: TenantPrismaClient, contractId: string) {
           paymentMethod: { select: { id: true, name: true } },
         },
       },
-      payments: { orderBy: { installmentNumber: 'asc' } },
+      payments: {
+        orderBy: { installmentNumber: 'asc' },
+        include: { paymentMethod: { select: { id: true, name: true } } },
+      },
     },
   })
   if (!contract) throw notFound()
@@ -429,6 +432,7 @@ export async function recordPayment(
         paidDate,
         receivedById: actorId,
         receiptUrl: input.receiptUrl ?? null,
+        paymentMethodId: input.paymentMethodId ?? null,
       },
     })
 

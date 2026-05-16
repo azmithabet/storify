@@ -26,6 +26,7 @@ export const createInstallmentSchema = z.object({
 
 export const recordPaymentSchema = z.object({
   paidDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  paymentMethodId: z.string().uuid().optional(),
   receiptUrl: z.string().url().optional(),
 })
 

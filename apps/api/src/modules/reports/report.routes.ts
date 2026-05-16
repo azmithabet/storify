@@ -16,6 +16,7 @@ import {
   getFeesReport,
   getProfitLoss,
   getReturnsReport,
+  getDayClose,
 } from './report.service'
 import { buildSalesExcel, buildStockExcel, buildProfitLossExcel } from './excel'
 
@@ -182,6 +183,15 @@ export async function reportRoutes(app: FastifyInstance) {
       return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
     }
     const data = await getReturnsReport(request.tenantDb, parsed.data)
+    return reply.send({ success: true, data })
+  })
+
+  // ─── Day close ───────────────────────────────────────────────────────────────
+  app.get('/day-close', { preHandler: requirePermission('reports', 'read') }, async (request, reply) => {
+    const q = request.query as Record<string, string>
+    const date = q.date ?? new Date().toISOString().slice(0, 10)
+    const branchId = q.branchId || undefined
+    const data = await getDayClose(request.tenantDb, date, branchId)
     return reply.send({ success: true, data })
   })
 }

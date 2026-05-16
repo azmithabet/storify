@@ -536,3 +536,74 @@ export async function getReturnsReport(
     topItems,
   }
 }
+
+// ─── Day close ────────────────────────────────────────────────────────────────
+
+export async function getDayClose(db: TenantPrismaClient, date: string, branchId?: string) {
+  const start = new Date(`${date}T00:00:00.000`)
+  const end = new Date(`${date}T23:59:59.999`)
+  const branchFilter = branchId ? { branchId } : {}
+
+  const [posTotals, posByPM, instPayments] = await Promise.all([
+    db.invoice.aggregate({
+      where: { status: 'completed', createdAt: { gte: start, lte: end }, ...branchFilter },
+      _sum: { totalAmount: true },
+      _count: true,
+    }),
+    db.invoice.groupBy({
+      by: ['paymentMethodId'],
+      where: { status: 'completed', createdAt: { gte: start, lte: end }, ...branchFilter },
+      _sum: { totalAmount: true },
+      _count: true,
+    }),
+    db.installmentPayment.findMany({
+      where: {
+        paidDate: { gte: start, lte: end },
+        status: 'paid',
+        ...(branchId ? { contract: { branchId } } : {}),
+      },
+      select: {
+        amountPaid: true,
+        paymentMethod: { select: { id: true, name: true } },
+      },
+    }),
+  ])
+
+  const pmIds = posByPM.map((r) => r.paymentMethodId)
+  const paymentMethods = await db.paymentMethod.findMany({
+    where: { id: { in: pmIds } },
+    select: { id: true, name: true },
+  })
+  const pmMap = Object.fromEntries(paymentMethods.map((pm) => [pm.id, pm.name]))
+
+  const posBreakdown = posByPM.map((r) => ({
+    methodId: r.paymentMethodId,
+    methodName: pmMap[r.paymentMethodId] ?? 'غير محدد',
+    total: Number(r._sum.totalAmount ?? 0),
+    count: r._count,
+  }))
+
+  const instMap = new Map<string, { methodId: string | null; methodName: string; total: number; count: number }>()
+  for (const p of instPayments) {
+    const key = p.paymentMethod?.id ?? '__none__'
+    const entry = instMap.get(key) ?? { methodId: p.paymentMethod?.id ?? null, methodName: p.paymentMethod?.name ?? 'غير محدد', total: 0, count: 0 }
+    entry.total += Number(p.amountPaid)
+    entry.count += 1
+    instMap.set(key, entry)
+  }
+  const instBreakdown = Array.from(instMap.values())
+
+  return {
+    date,
+    pos: {
+      byMethod: posBreakdown,
+      total: Number(posTotals._sum.totalAmount ?? 0),
+      count: posTotals._count,
+    },
+    installments: {
+      byMethod: instBreakdown,
+      total: instBreakdown.reduce((s, m) => s + m.total, 0),
+      count: instBreakdown.reduce((s, m) => s + m.count, 0),
+    },
+  }
+}

@@ -14,6 +14,7 @@ import {
   LogOut,
   ClipboardList,
   RotateCcw,
+  CalendarCheck,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
@@ -30,6 +31,7 @@ const navItems: Array<{
   permission?: { resource: string; action: string }
 }> = [
   { to: '/pos', icon: ShoppingCart, label: 'نقطة البيع', permission: { resource: 'invoices', action: 'create' } },
+  { to: '/day-close', icon: CalendarCheck, label: 'إغلاق اليوم', permission: { resource: 'reports', action: 'read' } },
   { to: '/products', icon: Package, label: 'المنتجات', permission: { resource: 'products', action: 'read' } },
   { to: '/stock', icon: Warehouse, label: 'المخزون', permission: { resource: 'stock', action: 'read' } },
   { to: '/customers', icon: Users, label: 'العملاء', permission: { resource: 'customers', action: 'read' } },

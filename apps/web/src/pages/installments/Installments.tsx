@@ -22,6 +22,7 @@ interface Payment {
   amountPaid: number
   status: 'pending' | 'paid' | 'overdue'
   paidDate?: string
+  paymentMethod?: { id: string; name: string }
 }
 
 interface InstallmentContract {
@@ -582,6 +583,9 @@ export default function Installments() {
   const [createOpen, setCreateOpen] = useState(false)
   const [confirmAction, setConfirmAction] = useState<{ contract: InstallmentContract; type: 'approve' | 'reject' } | null>(null)
   const [detailContract, setDetailContract] = useState<InstallmentContract | null>(null)
+  const [recordModal, setRecordModal] = useState<{ contractId: string; paymentId: string } | null>(null)
+  const [recordPM, setRecordPM] = useState('')
+  const [recordDate, setRecordDate] = useState(new Date().toISOString().slice(0, 10))
 
   const { mutate: sendReminders, isPending: isSendingReminders } = useMutation({
     mutationFn: async () => {
@@ -609,6 +613,11 @@ export default function Installments() {
     },
   })
   const data = listData?.data ?? []
+
+  const { data: paymentMethods = [] } = useQuery<{ id: string; name: string }[]>({
+    queryKey: ['payment-methods'],
+    queryFn: async () => (await api.get<{ data: { id: string; name: string }[] }>('/payment-methods')).data.data,
+  })
 
   const selection = useSelection(data.map((c) => c.id))
 
@@ -645,10 +654,13 @@ export default function Installments() {
   })
 
   const { mutate: recordPayment, isPending: isRecording } = useMutation({
-    mutationFn: async ({ contractId, paymentId }: { contractId: string; paymentId: string }) =>
-      api.post(`/installments/${contractId}/payments/${paymentId}`, { paidDate: new Date().toISOString().slice(0, 10) }),
+    mutationFn: async ({ contractId, paymentId, paymentMethodId, paidDate }: { contractId: string; paymentId: string; paymentMethodId?: string; paidDate?: string }) =>
+      api.post(`/installments/${contractId}/payments/${paymentId}`, { paidDate: paidDate ?? new Date().toISOString().slice(0, 10), paymentMethodId: paymentMethodId || undefined }),
     onSuccess: () => {
       toast.success('تم تسجيل الدفعة')
+      setRecordModal(null)
+      setRecordPM('')
+      setRecordDate(new Date().toISOString().slice(0, 10))
       qc.invalidateQueries({ queryKey: ['installments'] })
       if (detailContract) {
         api.get<{ data: InstallmentContract }>(`/installments/${detailContract.id}`)
@@ -771,7 +783,7 @@ export default function Installments() {
               <ScheduleTimeline
                 contract={detailContract}
                 isRecording={isRecording}
-                onRecord={(paymentId) => recordPayment({ contractId: detailContract.id, paymentId })}
+                onRecord={(paymentId) => { setRecordDate(new Date().toISOString().slice(0, 10)); setRecordModal({ contractId: detailContract.id, paymentId }) }}
               />
             </div>
           </div>
@@ -807,6 +819,38 @@ export default function Installments() {
             : `هل تريد رفض عقد ${confirmAction?.contract.contractNumber || `#${confirmAction?.contract.id.slice(-6).toUpperCase()}`}؟`}
         </p>
       </Modal>
+      {/* Record payment modal */}
+      <Modal
+        open={!!recordModal}
+        onClose={() => setRecordModal(null)}
+        title="تسجيل دفعة قسط"
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => setRecordModal(null)}>إلغاء</Button>
+            <Button
+              loading={isRecording}
+              disabled={!recordPM}
+              onClick={() => recordModal && recordPayment({ ...recordModal, paymentMethodId: recordPM, paidDate: recordDate })}
+            >
+              تسجيل الدفعة
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <Select label="طريقة الدفع" value={recordPM} onChange={(e) => setRecordPM(e.target.value)}>
+            <option value="">اختر طريقة الدفع...</option>
+            {paymentMethods.map((pm) => <option key={pm.id} value={pm.id}>{pm.name}</option>)}
+          </Select>
+          <Input
+            label="تاريخ الدفع"
+            type="date"
+            value={recordDate}
+            onChange={(e) => setRecordDate(e.target.value)}
+          />
+        </div>
+      </Modal>
+
       <BulkActionBar count={selection.count} onClear={selection.clear}>
         <Button variant="outline" size="sm" onClick={bulkExport}>
           <Download className="w-4 h-4" />تصدير

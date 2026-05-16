@@ -13,6 +13,7 @@ const ComponentsShowcase = lazy(() => import('@/pages/dev/Components'))
 
 // Lazy-load all protected pages (stubs for now)
 const POS = lazy(() => import('@/pages/pos/POS'))
+const DayClose = lazy(() => import('@/pages/pos/DayClose'))
 const Products = lazy(() => import('@/pages/products/Products'))
 const Stock = lazy(() => import('@/pages/stock/Stock'))
 const Customers = lazy(() => import('@/pages/customers/Customers'))
@@ -56,6 +57,7 @@ export default function App() {
               with all empty data and 403s in the console. Super-admin bypasses. */}
           <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
           <Route path="/pos" element={<AuthGuard><RoleGuard resource="invoices" action="create"><POS /></RoleGuard></AuthGuard>} />
+          <Route path="/day-close" element={<AuthGuard><RoleGuard resource="reports" action="read"><DayClose /></RoleGuard></AuthGuard>} />
           <Route path="/products/*" element={<AuthGuard><RoleGuard resource="products" action="read"><Products /></RoleGuard></AuthGuard>} />
           <Route path="/stock/*" element={<AuthGuard><RoleGuard resource="stock" action="read"><Stock /></RoleGuard></AuthGuard>} />
           <Route path="/customers/*" element={<AuthGuard><RoleGuard resource="customers" action="read"><Customers /></RoleGuard></AuthGuard>} />

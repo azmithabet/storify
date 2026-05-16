@@ -41,20 +41,11 @@ const app = Fastify({
   },
 })
 
-// ─── Global plugins ───────────────────────────────────────────────────────────
-app.register(cors, {
-  origin: (origin, cb) => {
-    if (!origin) return cb(null, true) // server-to-server / curl
-    const baseDomain = config.APP_BASE_DOMAIN
-    const allowed =
-      origin === config.FRONTEND_URL ||
-      (baseDomain && (origin === `https://${baseDomain}` || origin.endsWith(`.${baseDomain}`))) ||
-      (config.NODE_ENV === 'development' && /^https?:\/\/localhost(:\d+)?$/.test(origin))
-    cb(allowed ? null : new Error('CORS: origin not allowed'), allowed ?? false)
-  },
-  credentials: true,
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Subdomain'],
-})
+// ─── Global plugins (CORS is NOT global — see apiContext below) ──────────────
+// CORS is registered inside the apiContext encapsulation so it only gates the
+// API routes. Static assets served by fastifyStatic must bypass CORS, otherwise
+// browsers get 500s on /assets/*.js when accessing the app from a domain that
+// isn't in FRONTEND_URL / APP_BASE_DOMAIN (e.g. Railway's *.up.railway.app).
 app.register(sentryPlugin)
 app.register(jwtPlugin)
 app.register(cookiePlugin)
@@ -68,26 +59,42 @@ app.get('/health', async () => {
   return { status: 'ok', env: config.NODE_ENV, timestamp: new Date().toISOString() }
 })
 
-// also expose under /api/plans so the Vite proxy (/api → :3000) works
-app.get('/plans', async (_req, reply) => {
-  const plans = await masterDb.plan.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: 'asc' },
+// ─── API surface — CORS registered here so static assets bypass it ──────────
+app.register(async function apiContext(api) {
+  await api.register(cors, {
+    origin: (origin, cb) => {
+      if (!origin) return cb(null, true) // server-to-server / curl
+      const baseDomain = config.APP_BASE_DOMAIN
+      const allowed =
+        origin === config.FRONTEND_URL ||
+        (baseDomain && (origin === `https://${baseDomain}` || origin.endsWith(`.${baseDomain}`))) ||
+        (config.NODE_ENV === 'development' && /^https?:\/\/localhost(:\d+)?$/.test(origin))
+      cb(allowed ? null : new Error('CORS: origin not allowed'), allowed ?? false)
+    },
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Subdomain'],
   })
-  return reply.send({ data: plans })
-})
-app.get('/api/plans', async (_req, reply) => {
-  const plans = await masterDb.plan.findMany({
-    where: { isActive: true },
-    orderBy: { sortOrder: 'asc' },
+
+  // also expose under /api/plans so the Vite proxy (/api → :3000) works
+  api.get('/plans', async (_req, reply) => {
+    const plans = await masterDb.plan.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    })
+    return reply.send({ data: plans })
   })
-  return reply.send({ data: plans })
-})
+  api.get('/api/plans', async (_req, reply) => {
+    const plans = await masterDb.plan.findMany({
+      where: { isActive: true },
+      orderBy: { sortOrder: 'asc' },
+    })
+    return reply.send({ data: plans })
+  })
 
-app.register(tenantRoutes, { prefix: '/api/tenants' })
+  api.register(tenantRoutes, { prefix: '/api/tenants' })
 
-// ─── Tenant-scoped routes (tenant middleware required) ────────────────────────
-app.register(async function tenantScoped(sub) {
+  // ─── Tenant-scoped routes (tenant middleware required) ──────────────────────
+  api.register(async function tenantScoped(sub) {
   sub.addHook('onRequest', tenantMiddleware)
   sub.register(authRoutes, { prefix: '/api/auth' })
   sub.register(productRoutes, { prefix: '/api/products' })
@@ -172,6 +179,7 @@ app.register(async function tenantScoped(sub) {
     return reply.send({ success: true, data: branch })
   })
 })
+}) // close apiContext
 
 // ─── Serve React frontend in production ──────────────────────────────────────
 if (config.NODE_ENV === 'production') {

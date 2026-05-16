@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Plus, Edit2, Wallet, FileText, Download } from 'lucide-react'
+import { Search, Plus, Edit2, Wallet, FileText, Download, Upload } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -322,6 +322,36 @@ export default function Customers() {
   const [editing, setEditing] = useState<Customer | null>(null)
   const [creditCustomer, setCreditCustomer] = useState<Customer | null>(null)
   const [detailCustomer, setDetailCustomer] = useState<Customer | null>(null)
+  const [importResult, setImportResult] = useState<{ created: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await api.post<{ data: { created: number; skipped: number; errors: { row: number; reason: string }[] } }>(
+        '/customers/import',
+        fd,
+        { headers: { 'Content-Type': 'multipart/form-data' } },
+      )
+      return res.data.data
+    },
+    onSuccess: (result) => {
+      setImportResult(result)
+      qc.invalidateQueries({ queryKey: ['customers'] })
+      toast.success(`تم استيراد ${result.created} عميل`)
+    },
+    onError: () => toast.error('فشل الاستيراد'),
+  })
+
+  const downloadSampleCsv = () => {
+    const csv = 'full_name,phone,email,national_id,address,notes\nعميل تجريبي,01000000000,sample@example.com,,,'
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url; a.download = 'sample-customers.csv'; a.click()
+    URL.revokeObjectURL(url)
+  }
 
   const { data, isLoading } = useQuery<{ data: Customer[]; meta: PaginationMeta }>({
     queryKey: ['customers', search, page],
@@ -356,7 +386,7 @@ export default function Customers() {
   const openNew = () => { setEditing(null); reset({}); setDrawerOpen(true) }
   const openEdit = (c: Customer) => {
     setEditing(c)
-    reset({ fullName: c.fullName, phone: c.phone ?? '', nationalId: c.nationalId ?? '', address: c.address ?? '' })
+    reset({ fullName: c.fullName, phone: c.phone ?? '', email: c.email ?? '', nationalId: c.nationalId ?? '', address: c.address ?? '' })
     setDrawerOpen(true)
   }
 
@@ -377,10 +407,27 @@ export default function Customers() {
   return (
     <AppShell title="العملاء">
       <div className="flex flex-col gap-6">
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-3 flex-wrap">
           <div className="flex-1 max-w-xs">
             <Input placeholder="بحث بالاسم أو الهاتف..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1) }} startIcon={<Search className="w-4 h-4" />} />
           </div>
+          <Button variant="outline" size="sm" onClick={downloadSampleCsv}>
+            <Download className="w-4 h-4" />نموذج CSV
+          </Button>
+          <Button
+            variant="outline" size="sm"
+            onClick={() => fileInputRef.current?.click()}
+            loading={importMutation.isPending}
+          >
+            <Upload className="w-4 h-4" />استيراد CSV
+          </Button>
+          <input
+            ref={fileInputRef} type="file" accept=".csv" className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) { importMutation.mutate(f); e.target.value = '' }
+            }}
+          />
           <Button onClick={openNew}><Plus className="w-4 h-4" />عميل جديد</Button>
         </div>
 
@@ -476,6 +523,41 @@ export default function Customers() {
           <Download className="w-4 h-4" />تصدير
         </Button>
       </BulkActionBar>
+
+      {importResult && (
+        <Modal
+          open
+          title="نتيجة الاستيراد"
+          onClose={() => setImportResult(null)}
+          footer={<Button onClick={() => setImportResult(null)}>إغلاق</Button>}
+        >
+          <div className="space-y-4">
+            <div className="flex gap-6 text-center">
+              <div className="flex-1 bg-success-500/10 rounded-lg p-4">
+                <p className="text-2xl font-bold text-success-400">{importResult.created}</p>
+                <p className="text-sm text-gray-400 mt-1">تم إنشاؤه</p>
+              </div>
+              <div className="flex-1 bg-warning-500/10 rounded-lg p-4">
+                <p className="text-2xl font-bold text-warning-400">{importResult.skipped}</p>
+                <p className="text-sm text-gray-400 mt-1">تم تخطيه</p>
+              </div>
+            </div>
+            {importResult.errors.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 mb-2">الأخطاء</p>
+                <div className="max-h-48 overflow-y-auto bg-gray-900 border border-gray-700 rounded-md divide-y divide-gray-700">
+                  {importResult.errors.map((e, i) => (
+                    <div key={i} className="px-3 py-2 text-xs text-gray-300 flex items-center gap-3">
+                      <span className="font-mono text-gray-500">سطر {e.row}</span>
+                      <span className="text-danger-400">{e.reason}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
     </AppShell>
   )
 }

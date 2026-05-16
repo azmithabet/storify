@@ -13,6 +13,7 @@ export async function startTrial(tenantId: string, planId: string) {
     data: {
       tenantId,
       planId,
+      billingCycle: 'MONTHLY',
       status: 'TRIALING',
       trialEndsAt: trialEndAt,
       currentPeriodStart: new Date(),
@@ -77,7 +78,7 @@ export async function handleWebhookSuccess(params: {
         providerTransactionId: String(transactionId),
         amount: new Decimal(amountCents).dividedBy(100),
         currency: 'EGP',
-        status: 'succeeded',
+        status: 'SUCCESS',
         attemptType: 'initial',
         provider: 'paymob',
         providerResponse: { orderId, transactionId },
@@ -144,7 +145,7 @@ export async function handleWebhookFailure(params: {
         providerTransactionId: String(transactionId),
         amount: new Decimal(amountCents).dividedBy(100),
         currency: 'EGP',
-        status: 'failed',
+        status: 'FAILED',
         attemptType: 'initial',
         provider: 'paymob',
         providerResponse: { errorMessage },
@@ -175,9 +176,12 @@ export async function handleWebhookFailure(params: {
   }
 }
 
+// NOTE: schema has no `cancelAtPeriodEnd` flag, so cancellation is immediate.
+// If "cancel at period end" semantics are needed, add a Boolean column +
+// migration and gate the actual CANCELLED status flip behind a cron.
 export async function cancelSubscription(tenantId: string) {
   await masterDb.subscription.updateMany({
     where: { tenantId },
-    data: { cancelAtPeriodEnd: true },
+    data: { status: 'CANCELLED', cancelledAt: new Date() },
   })
 }

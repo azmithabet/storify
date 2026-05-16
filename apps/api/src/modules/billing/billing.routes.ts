@@ -92,7 +92,7 @@ export async function billingRoutes(app: FastifyInstance) {
 
       const attempts = await masterDb.paymentAttempt.findMany({
         where: { subscriptionId: sub.id },
-        orderBy: { createdAt: 'desc' },
+        orderBy: { attemptedAt: 'desc' },
         take: 10,
       })
 

@@ -3,7 +3,7 @@ import { authenticate, requirePermission } from '../../shared/middleware/auth.mi
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
 import { auditLog } from '../../shared/utils/audit'
 import { toDecimal } from '../../shared/utils/decimal'
-import { createPoSchema, receivePoSchema, poPaymentSchema, listPoSchema } from './po.schema'
+import { createPoSchema, updatePoSchema, receivePoSchema, poPaymentSchema, listPoSchema } from './po.schema'
 
 export async function purchaseOrderRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate)
@@ -98,6 +98,86 @@ export async function purchaseOrderRoutes(app: FastifyInstance) {
       })
       if (!po) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'أمر الشراء غير موجود' } })
       return reply.send({ success: true, data: po })
+    },
+  )
+
+  // ─── PATCH /api/purchase-orders/:id — amend a draft PO ───────────────────────
+  // Only allowed while status === 'draft'. Once submitted, the PO is frozen so
+  // approvers and receivers see a stable target. `items` replaces the entire
+  // line set in a transaction; partial item edits aren't supported on purpose
+  // — UX-wise the user re-sees the full list before saving anyway.
+  app.patch<{ Params: { id: string } }>(
+    '/:id',
+    { preHandler: requirePermission('purchase_orders', 'update') },
+    async (request, reply) => {
+      const parsed = updatePoSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'validation_error', message: parsed.error.errors[0].message },
+        })
+      }
+
+      const existing = await request.tenantDb.purchaseOrder.findUnique({
+        where: { id: request.params.id },
+        select: { id: true, status: true, totalAmount: true },
+      })
+      if (!existing) {
+        return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'أمر الشراء غير موجود' } })
+      }
+      if (existing.status !== 'draft') {
+        return reply.status(409).send({
+          success: false,
+          error: { code: 'not_draft', message: 'يمكن تعديل أمر الشراء أثناء المسودة فقط' },
+        })
+      }
+
+      const actor = request.user as JWTPayload
+      const { supplierId, branchId, expectedDate, paymentType, items } = parsed.data
+
+      const updated = await request.tenantDb.$transaction(async (tx) => {
+        // Replace line items if provided. Recompute totalAmount from the new
+        // set so the saved invoice reflects what the user just saw.
+        let newTotal = existing.totalAmount
+        if (items) {
+          await tx.purchaseOrderItem.deleteMany({ where: { orderId: existing.id } })
+          await tx.purchaseOrderItem.createMany({
+            data: items.map((i) => ({
+              orderId: existing.id,
+              variantId: i.variantId,
+              quantity: i.quantity,
+              unitCost: i.unitCost,
+              subtotal: i.unitCost * i.quantity,
+            })),
+          })
+          newTotal = toDecimal(items.reduce((s, i) => s + i.unitCost * i.quantity, 0))
+        }
+
+        return tx.purchaseOrder.update({
+          where: { id: existing.id },
+          data: {
+            ...(supplierId !== undefined ? { supplierId } : {}),
+            ...(branchId !== undefined ? { branchId } : {}),
+            ...(expectedDate !== undefined ? { expectedDate: expectedDate ? new Date(expectedDate) : null } : {}),
+            ...(paymentType !== undefined ? { paymentType } : {}),
+            ...(items ? { totalAmount: newTotal } : {}),
+          },
+          include: { items: true },
+        })
+      })
+
+      await auditLog({
+        db: request.tenantDb,
+        actorId: actor.userId,
+        entity: 'purchase_order',
+        entityId: existing.id,
+        action: 'update',
+        before: { totalAmount: existing.totalAmount.toString() },
+        after: { totalAmount: updated.totalAmount.toString(), itemCount: updated.items.length },
+        ip: request.ip,
+      })
+
+      return reply.send({ success: true, data: updated })
     },
   )
 

@@ -11,6 +11,11 @@ async function sentryPlugin(app: FastifyInstance) {
   if (!dsn) return
 
   try {
+    // Optional peer dep — the surrounding try/catch handles missing module at
+    // runtime, but TS can't see that without a hint when the package isn't
+    // installed. Install `@sentry/node` to activate real error tracking.
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore -- optional dep, see comment above
     const Sentry = await import('@sentry/node')
     Sentry.init({
       dsn,

@@ -32,6 +32,24 @@ interface FeesReport { summary: FeeSummary; byPaymentMethod: FeeByPM[] }
 
 interface TopProduct { productName: string; variantSku: string; totalQty: number; totalRevenue: number }
 
+interface ReturnsSummary {
+  totalAmount: number
+  totalCount: number
+  refundAmount: number
+  refundCount: number
+  creditAmount: number
+  creditCount: number
+}
+interface ReturnPeriod { period: string; amount: number; count: number }
+interface ReturnReason { reason: string; count: number; amount: number }
+interface ReturnTopItem { variantId: string; sku: string; productName: string; totalReturnedQty: number; occurrences: number }
+interface ReturnsReport {
+  summary: ReturnsSummary
+  byPeriod: ReturnPeriod[]
+  topReasons: ReturnReason[]
+  topItems: ReturnTopItem[]
+}
+
 interface Branch { id: string; name: string }
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
@@ -130,7 +148,7 @@ export default function Reports() {
   const user = useAuthStore((s) => s.user)
   const isSuperAdmin = user?.roleSlug === 'super_admin'
 
-  const [tab, setTab] = useState<'sales' | 'stock' | 'installments' | 'pnl' | 'fees' | 'top'>('sales')
+  const [tab, setTab] = useState<'sales' | 'stock' | 'installments' | 'pnl' | 'fees' | 'top' | 'returns'>('sales')
   const [filters, setFilters] = useState<Filters>({
     from: monthStart(),
     to: today(),
@@ -148,6 +166,7 @@ export default function Reports() {
     { id: 'pnl', label: 'الأرباح والخسائر' },
     { id: 'fees', label: 'رسوم الدفع' },
     { id: 'top', label: 'أكثر المنتجات مبيعاً' },
+    { id: 'returns', label: 'المرتجعات' },
   ] as const
 
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -200,6 +219,13 @@ export default function Reports() {
     queryKey: ['reports-top', topParams],
     queryFn: async () => (await api.get<{ data: TopProduct[] }>('/reports/top-products', { params: topParams })).data.data,
     enabled: tab === 'top',
+  })
+
+  const returnsParams = buildParams(filters, { groupBy: filters.groupBy })
+  const { data: returnsData, isLoading: returnsLoading } = useQuery<ReturnsReport>({
+    queryKey: ['reports-returns', returnsParams],
+    queryFn: async () => (await api.get<{ data: ReturnsReport }>('/reports/returns', { params: returnsParams })).data.data,
+    enabled: tab === 'returns',
   })
 
   const salesSummary = salesData?.summary
@@ -583,6 +609,139 @@ export default function Reports() {
                 keyExtractor={(r) => r.variantSku}
                 emptyMessage="لا توجد بيانات مبيعات في هذه الفترة"
               />
+            )}
+          </>
+        )}
+
+        {/* ── Returns Tab ───────────────────────────────────────────────────── */}
+        {tab === 'returns' && (
+          <>
+            <FilterBar filters={filters} onChange={patchFilters} showGroupBy branches={branches} isSuperAdmin={isSuperAdmin} />
+            <div className="flex justify-end">
+              <Button
+                variant="ghost" size="sm"
+                disabled={!returnsData || returnsData.topReasons.length === 0}
+                onClick={() => returnsData && exportRowsToExcel(
+                  returnsData.topReasons,
+                  [
+                    { header: 'السبب', accessor: 'reason', width: 40 },
+                    { header: 'عدد المرات', accessor: 'count', width: 12 },
+                    { header: 'الإجمالي', accessor: 'amount', width: 14 },
+                  ],
+                  'return-reasons.xlsx',
+                  'أسباب الإرجاع',
+                )}
+              >
+                <Download className="w-3 h-3" />تصدير الأسباب
+              </Button>
+            </div>
+
+            {returnsLoading ? (
+              <SkeletonTable rows={6} cols={3} />
+            ) : returnsData && (
+              <>
+                {/* Summary cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <StatCard
+                    label="إجمالي الإرجاع"
+                    value={formatCurrency(returnsData.summary.totalAmount)}
+                    accentColor="bg-danger-500"
+                  />
+                  <StatCard
+                    label="عدد المرتجعات"
+                    value={formatNumber(returnsData.summary.totalCount)}
+                    accentColor="bg-warning-500"
+                  />
+                  <StatCard
+                    label="استرداد نقدي"
+                    value={`${formatNumber(returnsData.summary.refundCount)} (${formatCurrency(returnsData.summary.refundAmount)})`}
+                    accentColor="bg-info-500"
+                  />
+                  <StatCard
+                    label="رصيد عميل"
+                    value={`${formatNumber(returnsData.summary.creditCount)} (${formatCurrency(returnsData.summary.creditAmount)})`}
+                    accentColor="bg-success-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                  {/* Time-series area chart */}
+                  {returnsData.byPeriod.length > 0 && (
+                    <div className="lg:col-span-2">
+                      <ChartCard title="المرتجعات عبر الزمن" subtitle={filters.groupBy === 'day' ? 'يومي' : filters.groupBy === 'week' ? 'أسبوعي' : 'شهري'} height={260}>
+                        <AreaChartView
+                          data={returnsData.byPeriod}
+                          xKey="period"
+                          series={[{ key: 'amount', name: 'القيمة', color: chartPalette[3] }]}
+                          formatY={formatCurrency}
+                          formatTooltip={(v) => formatCurrency(v)}
+                        />
+                      </ChartCard>
+                    </div>
+                  )}
+
+                  {/* Refund vs credit donut */}
+                  {returnsData.summary.totalCount > 0 && (
+                    <ChartCard title="استرداد نقدي أم رصيد" height={260}>
+                      <DonutChartView
+                        data={[
+                          { name: 'استرداد نقدي', value: returnsData.summary.refundAmount, color: '#EF4444' },
+                          { name: 'رصيد عميل', value: returnsData.summary.creditAmount, color: '#10B981' },
+                        ]}
+                        formatValue={formatCurrency}
+                        centerLabel="إجمالي"
+                        centerValue={formatCurrency(returnsData.summary.totalAmount)}
+                      />
+                    </ChartCard>
+                  )}
+                </div>
+
+                {/* Top reasons + top items side by side */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <ChartCard title="أكثر الأسباب تكراراً" height={320}>
+                    {returnsData.topReasons.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-gray-500">لا توجد أسباب مسجّلة</div>
+                    ) : (
+                      <BarChartView
+                        data={returnsData.topReasons.map((r) => ({ name: r.reason, value: r.count }))}
+                        xKey="name"
+                        series={[{ key: 'value', name: 'عدد المرات', color: chartPalette[3] }]}
+                        formatY={formatNumber}
+                        formatTooltip={(v) => `${formatNumber(v)} مرة`}
+                        layout="vertical"
+                      />
+                    )}
+                  </ChartCard>
+                  <ChartCard title="أكثر الأصناف ارتجاعاً" height={320}>
+                    {returnsData.topItems.length === 0 ? (
+                      <div className="h-full flex items-center justify-center text-sm text-gray-500">لا توجد بيانات</div>
+                    ) : (
+                      <BarChartView
+                        data={returnsData.topItems.map((r) => ({ name: `${r.productName} (${r.sku})`, value: r.totalReturnedQty }))}
+                        xKey="name"
+                        series={[{ key: 'value', name: 'الكمية المرتجعة', color: chartPalette[2] }]}
+                        formatY={formatNumber}
+                        formatTooltip={(v) => `${formatNumber(v)} وحدة`}
+                        layout="vertical"
+                      />
+                    )}
+                  </ChartCard>
+                </div>
+
+                {/* Detailed reasons table */}
+                {returnsData.topReasons.length > 0 && (
+                  <Table
+                    columns={[
+                      { key: 'reason', header: 'السبب', render: (r) => <span className="text-gray-100">{r.reason}</span> },
+                      { key: 'count', header: 'عدد المرات', render: (r) => <span className="font-mono text-warning-400">{r.count}</span> },
+                      { key: 'amount', header: 'الإجمالي', render: (r) => <Money value={r.amount} /> },
+                    ]}
+                    data={returnsData.topReasons}
+                    keyExtractor={(r) => r.reason}
+                    emptyMessage="لا توجد أسباب"
+                  />
+                )}
+              </>
             )}
           </>
         )}

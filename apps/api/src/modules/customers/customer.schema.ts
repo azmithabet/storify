@@ -1,8 +1,17 @@
 import { z } from 'zod'
 
+// `email` is optional and may be sent as an empty string by the UI when the
+// admin clears the field. Zod's `email()` rejects empty strings, so we coerce
+// `''` → `undefined` first via a preprocess wrapper.
+const optionalEmail = z.preprocess(
+  (v) => (v === '' ? undefined : v),
+  z.string().email().max(255).optional(),
+)
+
 export const createCustomerSchema = z.object({
   fullName: z.string().min(1).max(200),
   phone: z.string().max(50).optional(),
+  email: optionalEmail,
   nationalId: z.string().max(50).optional(),
   address: z.string().optional(),
   notes: z.string().optional(),
@@ -11,6 +20,10 @@ export const createCustomerSchema = z.object({
 export const updateCustomerSchema = z.object({
   fullName: z.string().min(1).max(200).optional(),
   phone: z.string().max(50).optional().nullable(),
+  email: z.preprocess(
+    (v) => (v === '' ? null : v),
+    z.string().email().max(255).nullable().optional(),
+  ),
   nationalId: z.string().max(50).optional().nullable(),
   address: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),

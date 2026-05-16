@@ -168,4 +168,19 @@ export async function installmentRoutes(app: FastifyInstance) {
       }
     },
   )
+
+  // ─── POST /api/installments/send-reminders ─────────────────────────────────
+  // Manual trigger for the daily reminder cycle — useful both for testing in
+  // dev and for admins who want to push reminders out right now without
+  // waiting for 09:00 local time. Same idempotency rules apply (won't double-
+  // send to a customer who was reminded in the last 24h).
+  app.post(
+    '/send-reminders',
+    { preHandler: requirePermission('installments', 'update') },
+    async (_request, reply) => {
+      const { runReminderCycle } = await import('../../jobs/installment-reminders.job')
+      const summary = await runReminderCycle()
+      return reply.send({ success: true, data: summary })
+    },
+  )
 }

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard, Printer, Download } from 'lucide-react'
+import { Plus, Eye, Check, Trash2, PackageCheck, CreditCard, Printer, Download, Pencil as Edit } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -282,6 +282,7 @@ export default function PurchaseOrders() {
   const qc = useQueryClient()
   const [page, setPage] = useState(1)
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [editingPO, setEditingPO] = useState<PurchaseOrder | null>(null)
   const [detailPO, setDetailPO] = useState<PurchaseOrder | null>(null)
   const [approveTarget, setApproveTarget] = useState<PurchaseOrder | null>(null)
   const [receiveTarget, setReceiveTarget] = useState<PurchaseOrder | null>(null)
@@ -334,21 +335,46 @@ export default function PurchaseOrders() {
   const { fields, append, remove } = useFieldArray({ control, name: 'items' })
 
   const { mutate: create, isPending: isCreating } = useMutation({
-    mutationFn: async (data: FormData) => api.post('/purchase-orders', {
-      supplierId: data.supplierId,
-      branchId: data.branchId,
-      expectedDate: data.expectedDate,
-      paymentType: data.paymentType,
-      items: data.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitCost: i.unitCost })),
-    }),
+    mutationFn: async (data: FormData) => {
+      const body = {
+        supplierId: data.supplierId,
+        branchId: data.branchId,
+        expectedDate: data.expectedDate || undefined,
+        paymentType: data.paymentType || undefined,
+        items: data.items.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitCost: i.unitCost })),
+      }
+      if (editingPO) {
+        return api.patch(`/purchase-orders/${editingPO.id}`, body)
+      }
+      return api.post('/purchase-orders', body)
+    },
     onSuccess: () => {
-      toast.success('تم إنشاء أمر الشراء')
+      toast.success(editingPO ? 'تم تحديث أمر الشراء' : 'تم إنشاء أمر الشراء')
       qc.invalidateQueries({ queryKey: ['purchase-orders'] })
       setDrawerOpen(false)
+      setEditingPO(null)
       reset()
     },
-    onError: () => toast.error('حدث خطأ'),
+    onError: (e) => toast.error(getApiErrorCode(e) === 'not_draft' ? 'لا يمكن تعديل أمر شراء بعد إرساله' : 'حدث خطأ'),
   })
+
+  const openEdit = (po: PurchaseOrder) => {
+    setEditingPO(po)
+    setDetailPO(null)
+    reset({
+      supplierId: po.supplier?.id ?? '',
+      branchId: po.branch?.id ?? '',
+      expectedDate: po.expectedDate ? po.expectedDate.slice(0, 10) : '',
+      paymentType: '',
+      items: (po.items ?? []).map((it) => ({
+        variantId: it.variant.id,
+        variantLabel: `${it.variant.product.name} (${it.variant.sku})`,
+        quantity: it.quantity,
+        unitCost: Number(it.unitCost),
+      })),
+    })
+    setDrawerOpen(true)
+  }
 
   const { mutate: approve, isPending: isApproving } = useMutation({
     mutationFn: async (id: string) => api.patch(`/purchase-orders/${id}/approve`),
@@ -451,12 +477,18 @@ export default function PurchaseOrders() {
         )}
       </div>
 
-      {/* Create PO Drawer */}
-      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} title="أمر شراء جديد" width="w-[560px]"
+      {/* Create / Edit PO Drawer */}
+      <Drawer
+        open={drawerOpen}
+        onClose={() => { setDrawerOpen(false); setEditingPO(null) }}
+        title={editingPO ? `تعديل ${editingPO.poNumber}` : 'أمر شراء جديد'}
+        width="w-[560px]"
         footer={
           <>
-            <Button variant="secondary" onClick={() => setDrawerOpen(false)}>إلغاء</Button>
-            <Button loading={isCreating} onClick={handleSubmit((d) => create(d))}>إنشاء الأمر</Button>
+            <Button variant="secondary" onClick={() => { setDrawerOpen(false); setEditingPO(null) }}>إلغاء</Button>
+            <Button loading={isCreating} onClick={handleSubmit((d) => create(d))}>
+              {editingPO ? 'حفظ التغييرات' : 'إنشاء الأمر'}
+            </Button>
           </>
         }
       >
@@ -577,6 +609,11 @@ export default function PurchaseOrders() {
             <Button variant="secondary" onClick={() => printPO(detailPO)}>
               <Printer className="w-4 h-4" />طباعة الأمر
             </Button>
+            {detailPO.status === 'draft' && (
+              <Button variant="outline" onClick={() => openEdit(detailPO)}>
+                <Edit className="w-4 h-4" />تعديل المسودة
+              </Button>
+            )}
             {detailPO.status === 'pending_approval' && (
               <Button onClick={() => { setDetailPO(null); setApproveTarget(detailPO) }}>
                 <Check className="w-4 h-4" />الموافقة على الأمر

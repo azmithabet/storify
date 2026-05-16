@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
 import { auditLog } from '../../shared/utils/audit'
+import { contentDispositionAttachment } from '../../shared/utils/content-disposition'
 import {
   createSupplierSchema,
   updateSupplierSchema,
@@ -106,25 +107,67 @@ export async function supplierRoutes(app: FastifyInstance) {
   )
 
   // ─── GET /api/suppliers/:id/transactions ─────────────────────────────────────
+  // Supports optional `type` (purchase|payment|return), `from`, `to` filters.
+  // Response includes a `summary` aggregated over the FILTERED set (not just
+  // the current page) so the drawer can render running totals without a
+  // second round trip.
   app.get<{ Params: { id: string } }>(
     '/:id/transactions',
     { preHandler: requirePermission('suppliers', 'read') },
     async (request, reply) => {
-      const page = Number((request.query as Record<string, string>).page) || 1
-      const limit = Number((request.query as Record<string, string>).limit) || 20
+      const q = request.query as Record<string, string>
+      const page = Number(q.page) || 1
+      const limit = Number(q.limit) || 20
+      const type = q.type
+      const from = q.from
+      const to = q.to
 
-      const [total, items] = await Promise.all([
-        request.tenantDb.supplierTransaction.count({ where: { supplierId: request.params.id } }),
+      const where = {
+        supplierId: request.params.id,
+        ...(type && ['purchase', 'payment', 'return'].includes(type) ? { type } : {}),
+        ...(from || to ? {
+          createdAt: {
+            ...(from ? { gte: new Date(from) } : {}),
+            ...(to ? { lte: new Date(`${to}T23:59:59.999Z`) } : {}),
+          },
+        } : {}),
+      }
+
+      const [total, items, byType] = await Promise.all([
+        request.tenantDb.supplierTransaction.count({ where }),
         request.tenantDb.supplierTransaction.findMany({
-          where: { supplierId: request.params.id },
+          where,
           include: { user: { select: { id: true, fullName: true } }, branch: { select: { id: true, name: true } } },
           orderBy: { createdAt: 'desc' },
           skip: (page - 1) * limit,
           take: limit,
         }),
+        request.tenantDb.supplierTransaction.groupBy({
+          by: ['type'],
+          where,
+          _sum: { amount: true },
+          _count: { _all: true },
+        }),
       ])
 
-      return reply.send({ success: true, data: items, meta: { total, page, limit, pages: Math.ceil(total / limit) } })
+      // Normalize into a stable summary shape so the frontend doesn't have
+      // to hunt for missing buckets.
+      const pick = (t: string) => byType.find((b) => b.type === t)
+      const summary = {
+        totalPurchases: Number(pick('purchase')?._sum.amount ?? 0),
+        totalPayments: Number(pick('payment')?._sum.amount ?? 0),
+        totalReturns: Number(pick('return')?._sum.amount ?? 0),
+        countPurchases: pick('purchase')?._count._all ?? 0,
+        countPayments: pick('payment')?._count._all ?? 0,
+        countReturns: pick('return')?._count._all ?? 0,
+      }
+
+      return reply.send({
+        success: true,
+        data: items,
+        meta: { total, page, limit, pages: Math.ceil(total / limit) },
+        summary,
+      })
     },
   )
 
@@ -240,10 +283,9 @@ export async function supplierRoutes(app: FastifyInstance) {
       poSheet.columns.forEach((col) => { col.width = 20 })
 
       const buf = await wb.xlsx.writeBuffer()
-      const safeName = supplier.name.replace(/[^a-zA-Z0-9؀-ۿ]/g, '_').slice(0, 30)
       return reply
         .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        .header('Content-Disposition', `attachment; filename="supplier-${safeName}.xlsx"`)
+        .header('Content-Disposition', contentDispositionAttachment(`supplier-${supplier.name}.xlsx`))
         .send(buf)
     },
   )

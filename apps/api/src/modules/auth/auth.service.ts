@@ -13,7 +13,16 @@ const REFRESH_TOKEN_TTL = 7 * 24 * 60 * 60 // 7 days in seconds
 export interface LoginResult {
   payload: JWTPayload
   refreshToken: string
-  user: { id: string; email: string; fullName: string; roleSlug: string; branchId: string }
+  user: {
+    id: string
+    email: string
+    fullName: string
+    roleSlug: string
+    branchId: string
+    /** Flat permissions map mirrored from role.permissions so the frontend can
+     * gate menu items without an extra request. */
+    permissions: Record<string, string[]>
+  }
 }
 
 export async function loginUser(

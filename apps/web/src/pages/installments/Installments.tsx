@@ -674,9 +674,10 @@ export default function Installments() {
               allSelected: selection.allVisibleSelected,
               someSelected: selection.someVisibleSelected,
             }}
+            onRowClick={(c) => openDetail(c)}
             columns={[
               { key: 'contractNumber', header: 'رقم العقد', render: (c) => (
-                <button className="font-mono text-brand-400 hover:underline" onClick={() => openDetail(c)}>{c.contractNumber}</button>
+                <span className="font-mono text-brand-400">{c.contractNumber || `#${c.id.slice(-6).toUpperCase()}`}</span>
               )},
               { key: 'customer', header: 'العميل', render: (c) => <span className="font-medium text-gray-100">{c.customer?.fullName ?? '—'}</span> },
               { key: 'totalAmount', header: 'إجمالي العقد', render: (c) => <Money value={c.totalAmount} /> },

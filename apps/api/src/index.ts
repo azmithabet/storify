@@ -188,6 +188,7 @@ if (config.NODE_ENV === 'production') {
 
 const start = async () => {
   try {
+    console.log(`[startup] PORT=${process.env.PORT} API_PORT=${process.env.API_PORT} resolved=${config.API_PORT}`)
     await app.listen({ port: config.API_PORT, host: config.API_HOST })
     console.log(`Server running on port ${config.API_PORT}`)
 

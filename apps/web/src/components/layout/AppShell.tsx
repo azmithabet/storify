@@ -40,7 +40,7 @@ export function AppShell({ children, title }: AppShellProps) {
 
       <div className="lg:mr-60 flex flex-col min-h-dvh">
         <TopBar title={title} onMenuClick={() => setSidebarOpen(true)} />
-        <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 animate-fade-in-up">{children}</main>
+        <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 animate-fade-in">{children}</main>
       </div>
     </div>
   )

@@ -105,14 +105,14 @@ const config: Config = {
         toast: '500',
       },
       animation: {
-        'fade-in-up': 'fadeInUp 400ms ease forwards',
+        'fade-in': 'fadeIn 300ms ease both',
         shimmer: 'shimmer 1500ms infinite',
         'spin-slow': 'spin 1000ms linear infinite',
       },
       keyframes: {
-        fadeInUp: {
-          '0%': { opacity: '0', transform: 'translateY(16px)' },
-          '100%': { opacity: '1', transform: 'translateY(0)' },
+        fadeIn: {
+          '0%': { opacity: '0' },
+          '100%': { opacity: '1' },
         },
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },

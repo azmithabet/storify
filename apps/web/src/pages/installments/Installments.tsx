@@ -186,7 +186,7 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
                       {p.paidDate ? formatDate(p.paidDate) : '—'}
                     </td>
                     <td className="px-3 py-2.5 text-left">
-                      {!isPaid && contract.status === 'active' && (
+                      {isNext && contract.status === 'active' && (
                         <Button size="sm" loading={isRecording} onClick={() => onRecord(p.id)}>
                           <Check className="w-3 h-3" />تسجيل
                         </Button>
@@ -235,7 +235,7 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
                   </div>
                   <div className="flex items-center gap-3">
                     <Money value={p.amountPaid} />
-                    {!isPaid && contract.status === 'active' && (
+                    {isNext && contract.status === 'active' && (
                       <Button size="sm" loading={isRecording} onClick={() => onRecord(p.id)}>
                         <Check className="w-3 h-3" />تسجيل
                       </Button>
@@ -655,7 +655,11 @@ export default function Installments() {
           .then((r) => setDetailContract(r.data.data))
       }
     },
-    onError: () => toast.error('حدث خطأ في تسجيل الدفعة'),
+    onError: (e: unknown) => toast.error(
+      getApiErrorCode(e) === 'previous_installments_not_paid'
+        ? 'يجب سداد الأقساط السابقة أولاً'
+        : 'حدث خطأ في تسجيل الدفعة'
+    ),
   })
 
   const openDetail = async (contract: InstallmentContract) => {

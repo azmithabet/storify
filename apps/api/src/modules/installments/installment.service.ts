@@ -414,6 +414,11 @@ export async function recordPayment(
   if (!payment) throw notFound()
   if (payment.status === 'paid') throw badRequest('already_paid')
 
+  const unpaidPrevious = await db.installmentPayment.count({
+    where: { contractId, installmentNumber: { lt: payment.installmentNumber }, status: { not: 'paid' } },
+  })
+  if (unpaidPrevious > 0) throw badRequest('previous_installments_not_paid')
+
   await db.$transaction(async (tx) => {
     const paidDate = input.paidDate ? new Date(input.paidDate) : new Date()
 

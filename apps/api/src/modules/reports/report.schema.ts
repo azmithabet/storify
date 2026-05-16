@@ -28,3 +28,7 @@ export const installmentsReportSchema = z.object({
 export const feesReportSchema = dateRangeSchema
 
 export const profitLossSchema = dateRangeSchema
+
+export const returnsReportSchema = dateRangeSchema.extend({
+  groupBy: z.enum(['day', 'week', 'month']).default('day'),
+})

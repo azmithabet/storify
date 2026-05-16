@@ -6,11 +6,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Select, Pagination, BulkActionBar } from '@/components/ui'
+import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Select, Pagination, BulkActionBar, DateRangePicker } from '@/components/ui'
 import { api } from '@/api/client'
 import { downloadFromApi } from '@/lib/download'
 import { cn } from '@/lib/cn'
-import { formatMoney, formatDate } from '@/lib/format'
+import { formatMoney, formatDateTime } from '@/lib/format'
 import type { PaginationMeta } from '@/types/api'
 import { useSelection } from '@/hooks/useSelection'
 import { exportRowsToExcel } from '@/lib/export'
@@ -25,6 +25,14 @@ interface SupplierTransaction {
   createdAt: string
   user?: { id: string; fullName: string }
   branch?: { id: string; name: string }
+}
+interface TxnSummary {
+  totalPurchases: number
+  totalPayments: number
+  totalReturns: number
+  countPurchases: number
+  countPayments: number
+  countReturns: number
 }
 interface Branch { id: string; name: string }
 
@@ -62,10 +70,29 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
   const qc = useQueryClient()
   const [txnPage, setTxnPage] = useState(1)
   const [addTxnOpen, setAddTxnOpen] = useState(false)
+  const [typeFilter, setTypeFilter] = useState<'' | 'purchase' | 'payment' | 'return'>('')
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
 
-  const { data: txnData, isLoading: txnLoading } = useQuery<{ data: SupplierTransaction[]; meta: PaginationMeta }>({
-    queryKey: ['supplier-txns', supplier.id, txnPage],
-    queryFn: async () => (await api.get<{ data: SupplierTransaction[]; meta: PaginationMeta }>(`/suppliers/${supplier.id}/transactions`, { params: { page: txnPage, limit: 10 } })).data,
+  const { data: txnData, isLoading: txnLoading } = useQuery<{
+    data: SupplierTransaction[]
+    meta: PaginationMeta
+    summary: TxnSummary
+  }>({
+    queryKey: ['supplier-txns', supplier.id, txnPage, typeFilter, from, to],
+    queryFn: async () => (await api.get<{
+      data: SupplierTransaction[]
+      meta: PaginationMeta
+      summary: TxnSummary
+    }>(`/suppliers/${supplier.id}/transactions`, {
+      params: {
+        page: txnPage,
+        limit: 10,
+        ...(typeFilter ? { type: typeFilter } : {}),
+        ...(from ? { from } : {}),
+        ...(to ? { to } : {}),
+      },
+    })).data,
   })
 
   const { data: branches = [] } = useQuery<Branch[]>({
@@ -75,6 +102,9 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
 
   const txns = txnData?.data ?? []
   const txnMeta = txnData?.meta
+  const summary = txnData?.summary
+  const hasFilters = typeFilter !== '' || from !== '' || to !== ''
+  const clearFilters = () => { setTypeFilter(''); setFrom(''); setTo(''); setTxnPage(1) }
 
   const { register, handleSubmit, reset, watch, formState: { errors } } = useForm<TxnForm>({
     resolver: zodResolver(txnSchema),
@@ -128,11 +158,67 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
 
       {/* Transactions list */}
       <div>
-        <h4 className="text-sm font-semibold text-gray-300 mb-3">سجل المعاملات</h4>
+        <div className="flex items-center justify-between mb-3">
+          <h4 className="text-sm font-semibold text-gray-300">سجل المعاملات</h4>
+          {hasFilters && (
+            <button onClick={clearFilters} className="text-xs text-gray-500 hover:text-gray-300 transition-colors">
+              مسح الفلاتر ×
+            </button>
+          )}
+        </div>
+
+        {/* Filter row */}
+        <div className="flex flex-wrap items-center gap-2 mb-3">
+          <select
+            value={typeFilter}
+            onChange={(e) => { setTypeFilter(e.target.value as typeof typeFilter); setTxnPage(1) }}
+            className="bg-gray-700 border border-gray-600 rounded px-2 py-1.5 text-xs text-gray-100 focus:outline-none focus:border-brand-500"
+          >
+            <option value="">كل الأنواع</option>
+            <option value="purchase">مشتريات</option>
+            <option value="payment">دفعات</option>
+            <option value="return">مرتجعات</option>
+          </select>
+          <DateRangePicker
+            compact
+            value={{ from, to }}
+            onChange={(v) => { setFrom(v.from); setTo(v.to); setTxnPage(1) }}
+          />
+        </div>
+
+        {/* Summary stats over the FILTERED set */}
+        {summary && (
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500">مشتريات</p>
+              <p className="font-mono text-sm text-danger-400 mt-0.5 num">
+                {summary.totalPurchases.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج
+              </p>
+              <p className="text-[10px] text-gray-600">{summary.countPurchases} حركة</p>
+            </div>
+            <div className="bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500">دفعات</p>
+              <p className="font-mono text-sm text-success-400 mt-0.5 num">
+                {summary.totalPayments.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج
+              </p>
+              <p className="text-[10px] text-gray-600">{summary.countPayments} حركة</p>
+            </div>
+            <div className="bg-gray-900/50 border border-gray-700 rounded-md px-3 py-2">
+              <p className="text-[10px] uppercase tracking-wider text-gray-500">مرتجعات</p>
+              <p className="font-mono text-sm text-warning-400 mt-0.5 num">
+                {summary.totalReturns.toLocaleString('ar-EG', { minimumFractionDigits: 2 })} ج
+              </p>
+              <p className="text-[10px] text-gray-600">{summary.countReturns} حركة</p>
+            </div>
+          </div>
+        )}
+
         {txnLoading ? (
           <div className="flex flex-col gap-2">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-12 bg-gray-700 rounded animate-pulse" />)}</div>
         ) : txns.length === 0 ? (
-          <p className="text-sm text-gray-500 text-center py-6">لا توجد معاملات</p>
+          <p className="text-sm text-gray-500 text-center py-6">
+            {hasFilters ? 'لا توجد معاملات تطابق الفلاتر' : 'لا توجد معاملات'}
+          </p>
         ) : (
           <div className="flex flex-col gap-1">
             {txns.map((t) => {
@@ -141,15 +227,24 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
               const amountColor = t.type === 'purchase' ? 'text-danger-400' : 'text-success-400'
               return (
                 <div key={t.id} className="flex items-center justify-between py-2.5 border-b border-gray-700 last:border-0">
-                  <div>
-                    <p className={cn('text-sm font-medium', tm.color)}>{tm.label}</p>
-                    <p className="text-xs text-gray-500">
-                      {t.user?.fullName ?? '—'} · {formatDate(t.createdAt)}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className={cn('text-sm font-medium', tm.color)}>{tm.label}</p>
+                      {t.reference && (
+                        <span className="text-[10px] font-mono text-gray-500 bg-gray-900/60 border border-gray-700 px-1.5 py-0.5 rounded" dir="ltr">
+                          {t.reference}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {t.user?.fullName ?? '—'}
+                      {' · '}
+                      <span className="font-mono">{formatDateTime(t.createdAt, { dateStyle: 'short', timeStyle: 'short' })}</span>
                       {t.branch && ` · ${t.branch.name}`}
                     </p>
-                    {t.note && <p className="text-xs text-gray-600 mt-0.5">{t.note}</p>}
+                    {t.note && <p className="text-xs text-gray-600 mt-0.5 truncate">{t.note}</p>}
                   </div>
-                  <span className={cn('font-mono font-semibold text-sm', amountColor)}>
+                  <span className={cn('font-mono font-semibold text-sm shrink-0 mr-3', amountColor)}>
                     {sign}{formatMoney(Number(t.amount))} ج
                   </span>
                 </div>

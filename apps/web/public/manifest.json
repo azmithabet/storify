@@ -9,6 +9,6 @@
   "dir": "rtl",
   "lang": "ar",
   "icons": [
-    { "src": "/vite.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/storify-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

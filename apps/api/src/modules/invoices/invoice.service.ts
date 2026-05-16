@@ -98,7 +98,7 @@ export async function getInvoice(db: TenantPrismaClient, invoiceId: string) {
     where: { id: invoiceId },
     include: {
       branch: { select: { id: true, name: true } },
-      customer: { select: { id: true, fullName: true, phone: true, creditBalance: true } },
+      customer: { select: { id: true, fullName: true, phone: true, email: true, creditBalance: true } },
       cashier: { select: { id: true, fullName: true } },
       paymentMethod: true,
       currency: true,

@@ -25,6 +25,7 @@ import { billingRoutes } from './modules/billing/billing.routes'
 import { authenticate } from './shared/middleware/auth.middleware'
 import { startEtaWorker } from './jobs/eta-submission.job'
 import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
+import { startReminderWorker, scheduleReminders } from './jobs/installment-reminders.job'
 
 const app = Fastify({
   logger: {
@@ -164,6 +165,8 @@ const start = async () => {
     startEtaWorker()
     startDunningWorker()
     await scheduleDunning()
+    startReminderWorker()
+    await scheduleReminders()
   } catch (err) {
     app.log.error(err)
     process.exit(1)

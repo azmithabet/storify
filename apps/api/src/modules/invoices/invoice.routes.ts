@@ -167,6 +167,83 @@ export async function invoiceRoutes(app: FastifyInstance) {
     },
   )
 
+  // ─── POST /api/invoices/:id/email-receipt ──────────────────────────────────
+  // Send the invoice as an HTML email. If `to` is omitted, falls back to the
+  // customer's email; if neither exists, returns 400.
+  app.post<{ Params: { id: string }; Body: { to?: string } }>(
+    '/:id/email-receipt',
+    { preHandler: requirePermission('invoices', 'read') },
+    async (request, reply) => {
+      const { z } = await import('zod')
+      const parsed = z.object({ to: z.string().email().optional() }).safeParse(request.body ?? {})
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'validation_error', message: 'بريد إلكتروني غير صالح' },
+        })
+      }
+
+      const invoice = await request.tenantDb.invoice.findUnique({
+        where: { id: request.params.id },
+        include: {
+          customer: { select: { id: true, fullName: true, email: true } },
+          paymentMethod: { select: { id: true, name: true } },
+          items: {
+            include: { variant: { include: { product: { select: { name: true } } } } },
+          },
+        },
+      })
+      if (!invoice) {
+        return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الفاتورة غير موجودة' } })
+      }
+
+      // `to` from the body wins; otherwise fall back to the customer's email.
+      const recipient = parsed.data.to ?? invoice.customer?.email ?? null
+      if (!recipient) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'no_email', message: 'لا يوجد بريد إلكتروني للعميل — مرّر "to" في الطلب' },
+        })
+      }
+
+      const { sendInvoiceReceiptEmail } = await import('../../shared/utils/email')
+      await sendInvoiceReceiptEmail({
+        to: recipient,
+        invoice: {
+          invoiceNumber: invoice.invoiceNumber ?? invoice.id,
+          createdAt: invoice.createdAt,
+          customerName: invoice.customer?.fullName,
+          paymentMethodName: invoice.paymentMethod?.name,
+          subtotal: invoice.subtotal.toString(),
+          discountAmount: invoice.discountAmount.toString(),
+          taxTotal: invoice.taxTotal.toString(),
+          feeAmount: invoice.feeAmount.toString(),
+          totalAmount: invoice.totalAmount.toString(),
+          items: invoice.items.map((it) => ({
+            productName: it.variant.product.name,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice.toString(),
+            totalPrice: it.subtotal.toString(),
+          })),
+        },
+      })
+
+      const actor = request.user as JWTPayload
+      const { auditLog } = await import('../../shared/utils/audit')
+      await auditLog({
+        db: request.tenantDb,
+        actorId: actor.userId,
+        entity: 'invoice',
+        entityId: invoice.id,
+        action: 'email_receipt',
+        after: { to: recipient, invoiceNumber: invoice.invoiceNumber },
+        ip: request.ip,
+      })
+
+      return reply.send({ success: true, data: { sentTo: recipient } })
+    },
+  )
+
   // ─── GET /api/returns — list all returns ─────────────────────────────────────
   app.get('/returns', { preHandler: requirePermission('invoices', 'read') }, async (request, reply) => {
     const { z } = await import('zod')

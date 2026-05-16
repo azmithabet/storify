@@ -24,7 +24,14 @@ const queryClient = new QueryClient({
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter
+        future={{
+          // Opt in to v7 behaviour ahead of the migration: state updates wrapped
+          // in React.startTransition, and consistent splat-route resolution.
+          v7_startTransition: true,
+          v7_relativeSplatPath: true,
+        }}
+      >
         <App />
         <Toaster
           position="bottom-left"

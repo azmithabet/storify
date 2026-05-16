@@ -318,6 +318,7 @@ model Customer {
   id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   fullName      String   @db.VarChar(200) @map("full_name")
   phone         String?  @db.VarChar(50)
+  email         String?  @db.VarChar(255)
   nationalId    String?  @db.VarChar(50)  @map("national_id")
   address       String?  @db.Text
   notes         String?  @db.Text

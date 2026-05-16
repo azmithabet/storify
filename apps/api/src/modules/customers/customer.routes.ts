@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
 import { getUploadUrl } from '../../config/r2'
+import { contentDispositionAttachment } from '../../shared/utils/content-disposition'
 import {
   createCustomerSchema,
   updateCustomerSchema,
@@ -275,10 +276,9 @@ export async function customerRoutes(app: FastifyInstance) {
       retSheet.columns.forEach((c) => { c.width = 18 })
 
       const buf = await wb.xlsx.writeBuffer()
-      const safeName = customer.fullName.replace(/[^a-zA-Z0-9؀-ۿ]/g, '_')
       return reply
         .header('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
-        .header('Content-Disposition', `attachment; filename="statement_${safeName}.xlsx"`)
+        .header('Content-Disposition', contentDispositionAttachment(`statement_${customer.fullName}.xlsx`))
         .send(Buffer.from(buf))
     },
   )
@@ -322,4 +322,75 @@ export async function customerRoutes(app: FastifyInstance) {
       })
     },
   )
+
+  // ─── POST /api/customers/import — bulk CSV import ──────────────────────────
+  // CSV columns (header required): full_name, phone, email, national_id, address, notes
+  // Mirrors the products/import shape so admins use the same workflow.
+  app.post('/import', { preHandler: requirePermission('customers', 'create') }, async (request, reply) => {
+    const file = await (request as unknown as { file: () => Promise<{ filename: string; toBuffer: () => Promise<Buffer> }> }).file()
+    if (!file) {
+      return reply.status(400).send({ success: false, error: { code: 'no_file', message: 'لم يتم إرسال ملف' } })
+    }
+
+    const buf = await file.toBuffer()
+    const text = buf.toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^﻿/, '')
+    const lines = text.split('\n').filter((l) => l.trim())
+    if (lines.length < 2) {
+      return reply.status(400).send({ success: false, error: { code: 'empty_file', message: 'الملف فارغ أو لا يحتوي على بيانات' } })
+    }
+
+    const parseCsv = (line: string) => line.split(',').map((c) => c.trim().replace(/^"|"$/g, ''))
+    const headers = parseCsv(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, '_'))
+    const col = (row: string[], name: string) => row[headers.indexOf(name)] ?? ''
+
+    const actor = request.user as JWTPayload
+    const results = { created: 0, skipped: 0, errors: [] as { row: number; reason: string }[] }
+
+    // Loose email shape — strict validation happens via zod when we save.
+    const emailLike = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+    for (let i = 1; i < lines.length; i++) {
+      const row = parseCsv(lines[i])
+      const fullName = col(row, 'full_name') || col(row, 'name')
+      const phone = col(row, 'phone') || undefined
+      const email = col(row, 'email') || undefined
+      const nationalId = col(row, 'national_id') || undefined
+      const address = col(row, 'address') || undefined
+      const notes = col(row, 'notes') || undefined
+
+      if (!fullName) {
+        results.errors.push({ row: i + 1, reason: 'الاسم مفقود' })
+        results.skipped++
+        continue
+      }
+      if (email && !emailLike.test(email)) {
+        results.errors.push({ row: i + 1, reason: `بريد غير صالح: ${email}` })
+        results.skipped++
+        continue
+      }
+
+      try {
+        await request.tenantDb.customer.create({
+          data: { fullName, phone, email, nationalId, address, notes },
+        })
+        results.created++
+      } catch {
+        results.errors.push({ row: i + 1, reason: 'خطأ أثناء الحفظ' })
+        results.skipped++
+      }
+    }
+
+    const { auditLog } = await import('../../shared/utils/audit')
+    await auditLog({
+      db: request.tenantDb,
+      actorId: actor.userId,
+      entity: 'customer',
+      entityId: 'bulk',
+      action: 'bulk_import',
+      after: { created: results.created, skipped: results.skipped },
+      ip: request.ip,
+    })
+
+    return reply.send({ success: true, data: results })
+  })
 }

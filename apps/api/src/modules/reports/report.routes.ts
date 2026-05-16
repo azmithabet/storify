@@ -6,6 +6,7 @@ import {
   salesReportSchema,
   stockReportSchema,
   installmentsReportSchema,
+  returnsReportSchema,
 } from './report.schema'
 import {
   getDashboard,
@@ -14,6 +15,7 @@ import {
   getInstallmentsReport,
   getFeesReport,
   getProfitLoss,
+  getReturnsReport,
 } from './report.service'
 import { buildSalesExcel, buildStockExcel, buildProfitLossExcel } from './excel'
 
@@ -167,6 +169,19 @@ export async function reportRoutes(app: FastifyInstance) {
         .send(buf)
     }
 
+    return reply.send({ success: true, data })
+  })
+
+  // ─── Returns analytics ───────────────────────────────────────────────────────
+  // Read permission is on invoices (returns are an invoice-adjacent concern in
+  // this app's RBAC), not 'reports' — keeps the gate consistent with the
+  // /returns list page.
+  app.get('/returns', { preHandler: requirePermission('invoices', 'read') }, async (request, reply) => {
+    const parsed = returnsReportSchema.safeParse(request.query)
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    }
+    const data = await getReturnsReport(request.tenantDb, parsed.data)
     return reply.send({ success: true, data })
   })
 }

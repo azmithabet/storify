@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Check, X, Search, Plus, Trash2, Printer, Download, Clock, AlertCircle } from 'lucide-react'
+import { Check, X, Search, Plus, Trash2, Printer, Download, Clock, AlertCircle, Send } from 'lucide-react'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -476,6 +476,22 @@ export default function Installments() {
   const [confirmAction, setConfirmAction] = useState<{ contract: InstallmentContract; type: 'approve' | 'reject' } | null>(null)
   const [detailContract, setDetailContract] = useState<InstallmentContract | null>(null)
 
+  const { mutate: sendReminders, isPending: isSendingReminders } = useMutation({
+    mutationFn: async () => {
+      const res = await api.post<{ data: { sent: number; skippedNoEmail: number; skippedRecentlyReminded: number; errors: number } }>('/installments/send-reminders')
+      return res.data.data
+    },
+    onSuccess: (s) => {
+      const parts: string[] = []
+      parts.push(`أُرسل ${s.sent}`)
+      if (s.skippedNoEmail) parts.push(`${s.skippedNoEmail} بدون بريد`)
+      if (s.skippedRecentlyReminded) parts.push(`${s.skippedRecentlyReminded} مُذكَّر سابقاً`)
+      if (s.errors) parts.push(`${s.errors} خطأ`)
+      toast.success(parts.join(' · '))
+    },
+    onError: () => toast.error('فشل إرسال التذكيرات'),
+  })
+
   const { data: listData, isLoading } = useQuery<{ data: InstallmentContract[]; meta: PaginationMeta }>({
     queryKey: ['installments', search, page, statusFilter],
     queryFn: async () => {
@@ -558,6 +574,9 @@ export default function Installments() {
             <option value="cancelled">ملغي</option>
           </Select>
           <div className="flex-1" />
+          <Button variant="outline" loading={isSendingReminders} onClick={() => sendReminders()}>
+            <Send className="w-4 h-4" />إرسال تذكيرات
+          </Button>
           <Button onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4" />عقد جديد
           </Button>

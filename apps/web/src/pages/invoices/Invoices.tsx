@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Search, Eye, RotateCcw, Printer, Download, Ban } from 'lucide-react'
+import { Search, Eye, RotateCcw, Printer, Download, Ban, Mail } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Input, Table, Badge, Money, SkeletonTable, Button, Drawer, Pagination, Modal, DateRangePicker, BulkActionBar, Select } from '@/components/ui'
@@ -16,6 +16,7 @@ import { getApiErrorMessage } from '@/lib/api-error'
 
 interface InvoiceItem {
   id: string
+  variantId: string
   productName: string
   variantSku: string
   quantity: number
@@ -26,7 +27,7 @@ interface InvoiceItem {
 interface Invoice {
   id: string
   invoiceNumber: string
-  customer?: { fullName: string; phone?: string }
+  customer?: { fullName: string; phone?: string; email?: string }
   totalAmount: number
   subtotal: number
   feeAmount: number
@@ -39,21 +40,28 @@ interface Invoice {
   items?: InvoiceItem[]
 }
 
-interface ReturnItem { itemId: string; quantity: number; maxQty: number; productName: string; variantSku: string }
+interface ReturnItem { itemId: string; variantId: string; quantity: number; maxQty: number; productName: string; variantSku: string }
 
 const LIMIT = 20
 
 function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const qc = useQueryClient()
   const [returnItems, setReturnItems] = useState<ReturnItem[]>(
-    (invoice.items ?? []).map((i) => ({ itemId: i.id, quantity: 0, maxQty: i.quantity, productName: i.productName, variantSku: i.variantSku }))
+    (invoice.items ?? []).map((i) => ({
+      itemId: i.id,
+      variantId: i.variantId,
+      quantity: 0,
+      maxQty: i.quantity,
+      productName: i.productName,
+      variantSku: i.variantSku,
+    }))
   )
   const [returnType, setReturnType] = useState<'refund' | 'credit'>('refund')
   const [reason, setReason] = useState('')
 
   const { mutate: submitReturn, isPending } = useMutation({
     mutationFn: async () => {
-      const items = returnItems.filter((i) => i.quantity > 0).map((i) => ({ itemId: i.itemId, quantity: i.quantity }))
+      const items = returnItems.filter((i) => i.quantity > 0).map((i) => ({ variantId: i.variantId, quantity: i.quantity }))
       if (items.length === 0) throw new Error('اختر صنفاً واحداً على الأقل')
       await api.post(`/invoices/${invoice.id}/return`, { returnType, reason: reason || undefined, items })
     },
@@ -64,7 +72,10 @@ function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => vo
     },
     onError: (e: unknown) => {
       const msg = (e as Error).message
-      toast.error(msg === 'اختر صنفاً واحداً على الأقل' ? msg : 'فشل تسجيل المرتجع')
+      // Surface the local "pick at least one item" check; otherwise defer to
+      // the backend's normalized error message via getApiErrorMessage.
+      if (msg === 'اختر صنفاً واحداً على الأقل') toast.error(msg)
+      else toast.error(getApiErrorMessage(e, 'فشل تسجيل المرتجع'))
     },
   })
 
@@ -149,6 +160,8 @@ export default function Invoices() {
   const [detailInvoice, setDetailInvoice] = useState<Invoice | null>(null)
   const [returnInvoice, setReturnInvoice] = useState<Invoice | null>(null)
   const [cancelTarget, setCancelTarget] = useState<Invoice | null>(null)
+  const [emailTarget, setEmailTarget] = useState<Invoice | null>(null)
+  const [emailTo, setEmailTo] = useState('')
   const qc = useQueryClient()
 
   const resetPage = () => setPage(1)
@@ -210,6 +223,22 @@ export default function Invoices() {
     },
     onError: (e: unknown) => toast.error(getApiErrorMessage(e, 'فشل إلغاء الفاتورة')),
   })
+
+  const { mutate: emailInvoiceMutation, isPending: isEmailing } = useMutation({
+    mutationFn: async ({ id, to }: { id: string; to: string }) =>
+      api.post<{ data: { sentTo: string } }>(`/invoices/${id}/email-receipt`, { to }),
+    onSuccess: (res) => {
+      toast.success(`تم إرسال الفاتورة إلى ${res.data.data.sentTo}`)
+      setEmailTarget(null)
+      setEmailTo('')
+    },
+    onError: (e: unknown) => toast.error(getApiErrorMessage(e, 'فشل إرسال البريد')),
+  })
+
+  const openEmailModal = (inv: Invoice) => {
+    setEmailTarget(inv)
+    setEmailTo(inv.customer?.email ?? '')
+  }
 
   return (
     <AppShell title="الفواتير">
@@ -278,6 +307,11 @@ export default function Invoices() {
             <Button variant="ghost" onClick={() => detailInvoice && printInvoice(detailInvoice)}>
               <Printer className="w-4 h-4" />طباعة
             </Button>
+            {detailInvoice && (
+              <Button variant="ghost" onClick={() => openEmailModal(detailInvoice)}>
+                <Mail className="w-4 h-4" />إرسال بالبريد
+              </Button>
+            )}
             {detailInvoice?.status === 'completed' && (
               <Button variant="secondary" onClick={() => { setReturnInvoice(detailInvoice); setDetailInvoice(null) }}>
                 <RotateCcw className="w-4 h-4" />إرجاع
@@ -358,6 +392,43 @@ export default function Invoices() {
           </ul>
           <p className="text-xs text-warning-400 bg-warning-500/10 border border-warning-500/30 rounded-md px-3 py-2">
             هذا الإجراء لا يمكن التراجع عنه.
+          </p>
+        </div>
+      </Modal>
+      <Modal
+        open={!!emailTarget}
+        onClose={() => { setEmailTarget(null); setEmailTo('') }}
+        title={`إرسال فاتورة ${emailTarget?.invoiceNumber ?? ''}`}
+        footer={
+          <>
+            <Button variant="secondary" onClick={() => { setEmailTarget(null); setEmailTo('') }} disabled={isEmailing}>إلغاء</Button>
+            <Button
+              loading={isEmailing}
+              disabled={!emailTo.trim() || !/.+@.+\..+/.test(emailTo)}
+              onClick={() => emailTarget && emailInvoiceMutation({ id: emailTarget.id, to: emailTo.trim() })}
+            >
+              <Mail className="w-4 h-4" />إرسال
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3 text-sm">
+          <Input
+            label="البريد الإلكتروني"
+            type="email"
+            value={emailTo}
+            onChange={(e) => setEmailTo(e.target.value)}
+            placeholder="customer@example.com"
+            autoFocus
+            dir="ltr"
+          />
+          {!emailTarget?.customer?.email && (
+            <p className="text-xs text-gray-500">
+              لا يوجد بريد محفوظ للعميل — أضِف بريداً في صفحة العميل لتعبئته تلقائياً.
+            </p>
+          )}
+          <p className="text-xs text-gray-500">
+            سيتم إرسال نسخة منسّقة من الفاتورة كرسالة HTML.
           </p>
         </div>
       </Modal>

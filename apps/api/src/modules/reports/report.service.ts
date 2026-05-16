@@ -427,3 +427,112 @@ export async function getProfitLoss(
     invoiceCount: revenueAgg._count,
   }
 }
+
+// ─── Returns analytics ───────────────────────────────────────────────────────
+// Aggregates the returns table to help admins spot trends:
+//  • totals + refund/credit split
+//  • bucketed time series for the chart
+//  • most-cited reasons (raw text — light grouping; future work: normalize)
+//  • most-returned products (joins through return_items + variants)
+
+export async function getReturnsReport(
+  db: TenantPrismaClient,
+  opts: { from?: string; to?: string; groupBy?: 'day' | 'week' | 'month' },
+) {
+  const dateFilter = buildDateFilter(opts.from, opts.to)
+  const where = dateFilter ? { createdAt: dateFilter } : {}
+  const groupBy = opts.groupBy ?? 'day'
+
+  const [totals, byType, returns, topItemsRaw] = await Promise.all([
+    db.return.aggregate({ where, _sum: { amount: true }, _count: true }),
+    db.return.groupBy({
+      by: ['returnType'],
+      where,
+      _sum: { amount: true },
+      _count: true,
+    }),
+    db.return.findMany({
+      where,
+      select: { id: true, amount: true, reason: true, returnType: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+      take: 2000, // safety cap; charts/aggregations work fine within this
+    }),
+    db.returnItem.groupBy({
+      by: ['variantId'],
+      where: { return: where },
+      _sum: { quantity: true },
+      _count: true,
+      orderBy: { _sum: { quantity: 'desc' } },
+      take: 10,
+    }),
+  ])
+
+  // Bucket by period for the time-series chart.
+  const periodKey = (d: Date) => {
+    if (groupBy === 'month') return d.toISOString().slice(0, 7) // YYYY-MM
+    if (groupBy === 'week') {
+      // ISO-week start (Mon). Cheap floor; not locale-aware but matches sales chart.
+      const monday = new Date(d)
+      const day = monday.getUTCDay() || 7
+      if (day !== 1) monday.setUTCDate(monday.getUTCDate() - (day - 1))
+      return monday.toISOString().slice(0, 10)
+    }
+    return d.toISOString().slice(0, 10) // YYYY-MM-DD
+  }
+  const periodMap = new Map<string, { period: string; amount: number; count: number }>()
+  for (const r of returns) {
+    const k = periodKey(r.createdAt)
+    const entry = periodMap.get(k) ?? { period: k, amount: 0, count: 0 }
+    entry.amount += Number(r.amount)
+    entry.count++
+    periodMap.set(k, entry)
+  }
+  const byPeriod = Array.from(periodMap.values()).sort((a, b) => a.period.localeCompare(b.period))
+
+  // Top reasons — group by raw text, drop empty / null.
+  const reasonMap = new Map<string, { reason: string; count: number; amount: number }>()
+  for (const r of returns) {
+    const reason = (r.reason ?? '').trim()
+    if (!reason) continue
+    const entry = reasonMap.get(reason) ?? { reason, count: 0, amount: 0 }
+    entry.count++
+    entry.amount += Number(r.amount)
+    reasonMap.set(reason, entry)
+  }
+  const topReasons = Array.from(reasonMap.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10)
+
+  // Resolve variant names for the top-items output.
+  const variantIds = topItemsRaw.map((r) => r.variantId)
+  const variants = await db.productVariant.findMany({
+    where: { id: { in: variantIds } },
+    select: { id: true, sku: true, product: { select: { name: true } } },
+  })
+  const variantMap = new Map(variants.map((v) => [v.id, v]))
+  const topItems = topItemsRaw.map((r) => {
+    const v = variantMap.get(r.variantId)
+    return {
+      variantId: r.variantId,
+      sku: v?.sku ?? r.variantId.slice(0, 8),
+      productName: v?.product.name ?? '—',
+      totalReturnedQty: Number(r._sum?.quantity ?? 0),
+      occurrences: r._count,
+    }
+  })
+
+  const pickType = (t: string) => byType.find((b) => b.returnType === t)
+  return {
+    summary: {
+      totalAmount: Number(totals._sum.amount ?? 0),
+      totalCount: totals._count,
+      refundAmount: Number(pickType('refund')?._sum.amount ?? 0),
+      refundCount: pickType('refund')?._count ?? 0,
+      creditAmount: Number(pickType('credit')?._sum.amount ?? 0),
+      creditCount: pickType('credit')?._count ?? 0,
+    },
+    byPeriod,
+    topReasons,
+    topItems,
+  }
+}

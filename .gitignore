@@ -11,6 +11,7 @@ node_modules/
 dist/
 build/
 .next/
+*.tsbuildinfo
 
 # Logs
 *.log
@@ -35,3 +36,7 @@ coverage/
 
 # Prisma generated client
 packages/database/src/generated/
+
+# Claude Code worktrees + tmp dirs
+.claude/
+.claire/

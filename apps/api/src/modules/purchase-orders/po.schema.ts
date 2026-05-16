@@ -16,6 +16,28 @@ export const createPoSchema = z.object({
     .min(1),
 })
 
+// Amend a draft PO. All fields optional; items, when provided, replace the
+// existing line set wholesale. Frozen once status leaves 'draft'.
+export const updatePoSchema = z.object({
+  supplierId: z.string().uuid().optional(),
+  branchId: z.string().uuid().optional(),
+  expectedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+  paymentType: z.string().max(50).nullable().optional(),
+  items: z
+    .array(
+      z.object({
+        variantId: z.string().uuid(),
+        quantity: z.number().int().positive(),
+        unitCost: z.number().positive(),
+      }),
+    )
+    .min(1)
+    .optional(),
+}).refine(
+  (v) => Object.keys(v).length > 0,
+  { message: 'لا توجد تغييرات' },
+)
+
 // Partial receipts: omit `items` to receive the full outstanding quantity for
 // every line (backwards-compatible with the original full-receive UI).
 // Pass `items` with per-line quantities to record a partial receipt; only

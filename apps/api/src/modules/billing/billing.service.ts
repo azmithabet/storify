@@ -102,7 +102,7 @@ export async function handleWebhookSuccess(params: {
   const tenant = await masterDb.tenant.findUnique({ where: { id: tenantId } })
   if (tenant) {
     await sendEmail({
-      to: '',
+      to: tenant.ownerEmail,
       template: 'payment_succeeded',
       data: { tenantName: tenant.name, amount: `${amountCents / 100} EGP`, period: periodEnd.toLocaleDateString('ar-EG') },
     }).catch(() => {})
@@ -172,7 +172,7 @@ export async function handleWebhookFailure(params: {
 
   const tenant = await masterDb.tenant.findUnique({ where: { id: tenantId } })
   if (tenant) {
-    await sendEmail({ to: '', template: emailTemplate, data: { tenantName: tenant.name } }).catch(() => {})
+    await sendEmail({ to: tenant.ownerEmail, template: emailTemplate, data: { tenantName: tenant.name } }).catch(() => {})
   }
 }
 

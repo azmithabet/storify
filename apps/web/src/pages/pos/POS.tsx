@@ -1,7 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import { useHotkeys } from 'react-hotkeys-hook'
-import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag, WifiOff, BookCheck } from 'lucide-react'
+import { Search, X, Plus, Minus, ShoppingCart, UserPlus, Printer, Check, ScanLine, Tag, WifiOff, BookCheck, ChevronDown } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
 import { Button, Input, Badge, Money, Modal, Kbd } from '@/components/ui'
@@ -111,6 +111,8 @@ export default function POS() {
   const [splitPM, setSplitPM] = useState<PaymentMethod | null>(null)
   const [splitAmount, setSplitAmount] = useState('')
   const [selectedCurrency, setSelectedCurrency] = useState<Currency | null>(null)
+  const [pmSectionOpen, setPmSectionOpen] = useState(true)
+  const [splitSectionOpen, setSplitSectionOpen] = useState(false)
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [offlineQueue, setOfflineQueue] = useState<unknown[]>(() => {
     try { return JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]') } catch { return [] }
@@ -602,58 +604,71 @@ export default function POS() {
             )}
           </div>
 
-          <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-4 flex flex-col gap-3">
-            <p className="text-xs uppercase text-gray-500 font-medium">طريقة الدفع</p>
-            <div className="flex flex-col gap-2">
-              {paymentMethods.map((pm) => {
-                const pmFee = calculateFee(subtotal, pm)
-                return (
-                  <button
-                    key={pm.id}
-                    onClick={() => {
-                      setSelectedPM(pm)
-                      setFeeBearer(pm.feeBearer === 'customer' ? 'customer' : 'merchant')
-                    }}
-                    className={cn(
-                      'flex items-center justify-between rounded-md px-3 py-2 text-sm border transition-all',
-                      selectedPM?.id === pm.id
-                        ? 'bg-brand-600/20 border-brand-500 text-brand-300'
-                        : 'border-gray-700 text-gray-300 hover:border-gray-500',
-                    )}
-                  >
-                    <span>{pm.name}</span>
-                    {pmFee > 0 && (
-                      <span className="text-xs text-warning-500 num">{formatMoney(pmFee)} رسوم</span>
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-
-            {selectedPM && fee > 0 && selectedPM.feeBearer === 'negotiable' && (
-              <div className="flex gap-2 mt-1">
-                <button
-                  onClick={() => setFeeBearer('merchant')}
-                  className={cn(
-                    'flex-1 py-1 rounded text-xs border transition-all',
-                    feeBearer === 'merchant'
-                      ? 'border-brand-500 text-brand-400 bg-brand-600/10'
-                      : 'border-gray-700 text-gray-500',
-                  )}
-                >
-                  التاجر يتحمل
-                </button>
-                <button
-                  onClick={() => setFeeBearer('customer')}
-                  className={cn(
-                    'flex-1 py-1 rounded text-xs border transition-all',
-                    feeBearer === 'customer'
-                      ? 'border-warning-500 text-warning-400 bg-warning-500/10'
-                      : 'border-gray-700 text-gray-500',
-                  )}
-                >
-                  العميل يتحمل
-                </button>
+          <div className="bg-gray-800 rounded-r-xl border border-gray-700 overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setPmSectionOpen((v) => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-750 transition-colors"
+            >
+              <span className="text-xs uppercase text-gray-400 font-semibold tracking-wide">
+                طريقة الدفع
+                {selectedPM && <span className="mr-2 text-brand-400 normal-case font-normal">({selectedPM.name})</span>}
+              </span>
+              <ChevronDown className={cn('w-4 h-4 text-gray-500 transition-transform duration-200', pmSectionOpen && 'rotate-180')} />
+            </button>
+            {pmSectionOpen && (
+              <div className="px-4 pb-4 flex flex-col gap-3 border-t border-gray-700/60">
+                <div className="flex flex-col gap-2 pt-3">
+                  {paymentMethods.map((pm) => {
+                    const pmFee = calculateFee(subtotal, pm)
+                    return (
+                      <button
+                        key={pm.id}
+                        onClick={() => {
+                          setSelectedPM(pm)
+                          setFeeBearer(pm.feeBearer === 'customer' ? 'customer' : 'merchant')
+                        }}
+                        className={cn(
+                          'flex items-center justify-between rounded-md px-3 py-2 text-sm border transition-all',
+                          selectedPM?.id === pm.id
+                            ? 'bg-brand-600/20 border-brand-500 text-brand-300'
+                            : 'border-gray-700 text-gray-300 hover:border-gray-500',
+                        )}
+                      >
+                        <span>{pm.name}</span>
+                        {pmFee > 0 && (
+                          <span className="text-xs text-warning-500 num">{formatMoney(pmFee)} رسوم</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                {selectedPM && fee > 0 && selectedPM.feeBearer === 'negotiable' && (
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setFeeBearer('merchant')}
+                      className={cn(
+                        'flex-1 py-1 rounded text-xs border transition-all',
+                        feeBearer === 'merchant'
+                          ? 'border-brand-500 text-brand-400 bg-brand-600/10'
+                          : 'border-gray-700 text-gray-500',
+                      )}
+                    >
+                      التاجر يتحمل
+                    </button>
+                    <button
+                      onClick={() => setFeeBearer('customer')}
+                      className={cn(
+                        'flex-1 py-1 rounded text-xs border transition-all',
+                        feeBearer === 'customer'
+                          ? 'border-warning-500 text-warning-400 bg-warning-500/10'
+                          : 'border-gray-700 text-gray-500',
+                      )}
+                    >
+                      العميل يتحمل
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -695,42 +710,57 @@ export default function POS() {
 
           {/* Split payment */}
           {selectedPM && (
-            <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-3 flex flex-col gap-2">
-              <p className="text-xs uppercase text-gray-500 font-medium">دفع منقسم (اختياري)</p>
-              <div className="flex flex-col gap-1.5">
-                {paymentMethods.filter((pm) => pm.id !== selectedPM.id).map((pm) => (
-                  <button
-                    key={pm.id}
-                    onClick={() => { setSplitPM(splitPM?.id === pm.id ? null : pm); setSplitAmount('') }}
-                    className={cn(
-                      'flex items-center justify-between rounded-md px-3 py-1.5 text-xs border transition-all',
-                      splitPM?.id === pm.id
-                        ? 'bg-brand-600/20 border-brand-500 text-brand-300'
-                        : 'border-gray-700 text-gray-400 hover:border-gray-500',
-                    )}
-                  >
-                    <span>{pm.name}</span>
-                  </button>
-                ))}
-              </div>
-              {splitPM && (
-                <div className="flex flex-col gap-1">
-                  <input
-                    type="number"
-                    value={splitAmount}
-                    onChange={(e) => setSplitAmount(e.target.value)}
-                    placeholder={`مبلغ ${splitPM.name}...`}
-                    min={0}
-                    max={Math.max(0, total - appliedCredit)}
-                    step={0.01}
-                    className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-1.5 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono"
-                    dir="ltr"
-                  />
-                  {splitAmountNum > 0 && (
-                    <p className="text-xs text-gray-500">
-                      {selectedPM.name}: {formatMoney(Math.max(0, total - appliedCredit) - splitAmountNum)} ج
-                      {' + '}{splitPM.name}: {formatMoney(splitAmountNum)} ج
-                    </p>
+            <div className="bg-gray-800 rounded-r-xl border border-gray-700 overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setSplitSectionOpen((v) => !v)}
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-750 transition-colors"
+              >
+                <span className="text-xs uppercase text-gray-400 font-semibold tracking-wide">
+                  دفع منقسم
+                  {splitPM && <span className="mr-2 text-brand-400 normal-case font-normal">({splitPM.name})</span>}
+                  {!splitPM && <span className="mr-2 text-gray-600 normal-case font-normal">(اختياري)</span>}
+                </span>
+                <ChevronDown className={cn('w-4 h-4 text-gray-500 transition-transform duration-200', splitSectionOpen && 'rotate-180')} />
+              </button>
+              {splitSectionOpen && (
+                <div className="px-4 pb-4 flex flex-col gap-2 border-t border-gray-700/60 pt-3">
+                  <div className="flex flex-col gap-1.5">
+                    {paymentMethods.filter((pm) => pm.id !== selectedPM.id).map((pm) => (
+                      <button
+                        key={pm.id}
+                        onClick={() => { setSplitPM(splitPM?.id === pm.id ? null : pm); setSplitAmount('') }}
+                        className={cn(
+                          'flex items-center justify-between rounded-md px-3 py-1.5 text-xs border transition-all',
+                          splitPM?.id === pm.id
+                            ? 'bg-brand-600/20 border-brand-500 text-brand-300'
+                            : 'border-gray-700 text-gray-400 hover:border-gray-500',
+                        )}
+                      >
+                        <span>{pm.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                  {splitPM && (
+                    <div className="flex flex-col gap-1">
+                      <input
+                        type="number"
+                        value={splitAmount}
+                        onChange={(e) => setSplitAmount(e.target.value)}
+                        placeholder={`مبلغ ${splitPM.name}...`}
+                        min={0}
+                        max={Math.max(0, total - appliedCredit)}
+                        step={0.01}
+                        className="w-full bg-gray-700 border border-gray-600 rounded-md px-3 py-1.5 text-xs text-gray-100 placeholder-gray-500 focus:outline-none focus:border-brand-500 font-mono"
+                        dir="ltr"
+                      />
+                      {splitAmountNum > 0 && (
+                        <p className="text-xs text-gray-500">
+                          {selectedPM.name}: {formatMoney(Math.max(0, total - appliedCredit) - splitAmountNum)} ج
+                          {' + '}{splitPM.name}: {formatMoney(splitAmountNum)} ج
+                        </p>
+                      )}
+                    </div>
                   )}
                 </div>
               )}

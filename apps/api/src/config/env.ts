@@ -10,6 +10,7 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().default(3000),
   API_HOST: z.string().default('0.0.0.0'),
   FRONTEND_URL: z.string().url(),
+  APP_BASE_DOMAIN: z.string().optional(), // e.g. talabia.app — enables per-tenant subdomain URLs
 
   // Database
   DATABASE_MASTER_URL: z.string().url(),

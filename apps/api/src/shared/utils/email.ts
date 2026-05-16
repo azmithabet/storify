@@ -3,6 +3,7 @@ import { config } from '../../config/env'
 interface SendPasswordResetOptions {
   to: string
   rawToken: string
+  subdomain?: string
 }
 
 // ─── Billing / subscription email templates ───────────────────────────────────
@@ -273,8 +274,11 @@ export async function sendInstallmentReminderEmail(data: InstallmentReminderData
   })
 }
 
-export async function sendPasswordResetEmail({ to, rawToken }: SendPasswordResetOptions) {
-  const resetUrl = `${config.FRONTEND_URL}/reset?token=${rawToken}`
+export async function sendPasswordResetEmail({ to, rawToken, subdomain }: SendPasswordResetOptions) {
+  const base = subdomain && config.APP_BASE_DOMAIN
+    ? `https://${subdomain}.${config.APP_BASE_DOMAIN}`
+    : config.FRONTEND_URL
+  const resetUrl = `${base}/reset?token=${rawToken}`
 
   if (!config.RESEND_API_KEY) {
     // Dev mode: log the reset link so the Done-when verify step can see it

@@ -41,7 +41,15 @@ const app = Fastify({
 
 // ─── Global plugins ───────────────────────────────────────────────────────────
 app.register(cors, {
-  origin: config.FRONTEND_URL,
+  origin: (origin, cb) => {
+    if (!origin) return cb(null, true) // server-to-server / curl
+    const baseDomain = config.APP_BASE_DOMAIN
+    const allowed =
+      origin === config.FRONTEND_URL ||
+      (baseDomain && (origin === `https://${baseDomain}` || origin.endsWith(`.${baseDomain}`))) ||
+      (config.NODE_ENV === 'development' && /^https?:\/\/localhost(:\d+)?$/.test(origin))
+    cb(allowed ? null : new Error('CORS: origin not allowed'), allowed ?? false)
+  },
   credentials: true,
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Tenant-Subdomain'],
 })

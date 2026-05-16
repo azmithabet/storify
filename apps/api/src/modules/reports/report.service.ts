@@ -556,16 +556,14 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
       _sum: { totalAmount: true },
       _count: true,
     }),
-    db.installmentPayment.findMany({
+    db.installmentPayment.aggregate({
       where: {
         paidDate: { gte: start, lte: end },
         status: 'paid',
         ...(branchId ? { contract: { branchId } } : {}),
       },
-      select: {
-        amountPaid: true,
-        paymentMethod: { select: { id: true, name: true } },
-      },
+      _sum: { amountPaid: true },
+      _count: true,
     }),
   ])
 
@@ -583,15 +581,9 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
     count: r._count,
   }))
 
-  const instMap = new Map<string, { methodId: string | null; methodName: string; total: number; count: number }>()
-  for (const p of instPayments) {
-    const key = p.paymentMethod?.id ?? '__none__'
-    const entry = instMap.get(key) ?? { methodId: p.paymentMethod?.id ?? null, methodName: p.paymentMethod?.name ?? 'غير محدد', total: 0, count: 0 }
-    entry.total += Number(p.amountPaid)
-    entry.count += 1
-    instMap.set(key, entry)
-  }
-  const instBreakdown = Array.from(instMap.values())
+  const instBreakdown = instPayments._count > 0
+    ? [{ methodId: null, methodName: 'أقساط', total: Number(instPayments._sum.amountPaid ?? 0), count: instPayments._count }]
+    : []
 
   return {
     date,

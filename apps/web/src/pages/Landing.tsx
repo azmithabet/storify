@@ -60,6 +60,7 @@ export default function Landing() {
       <TrustBar />
       <PainPoints />
       <Features />
+      <MidCTA />
       <Pricing plans={plans} />
       {/* Testimonials removed — re-add once we have real customer quotes.
           Fake testimonials hurt trust and violate Google review policies. */}
@@ -97,6 +98,9 @@ function Header({ user }: { user: ReturnType<typeof useAuthStore.getState>['user
             S
           </div>
           <span className="font-display text-xl font-bold text-gray-100">Storify</span>
+          <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-warning-500/15 text-warning-500 border border-warning-500/30">
+            BETA
+          </span>
         </Link>
 
         <nav className="hidden md:flex items-center gap-6">{NavLinks}</nav>
@@ -193,11 +197,11 @@ function Hero() {
           لمتجرك أو سلسلة فروعك في مصر.
         </p>
 
-        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-8">
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
           <Link to="/register">
             <Button variant="primary" size="xl">
               ابدأ تجربتك المجانية
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             </Button>
           </Link>
           <a href="#pricing">
@@ -206,6 +210,12 @@ function Hero() {
             </Button>
           </a>
         </div>
+
+        <p className="text-sm text-gray-500 mb-8">
+          ابدأ من <span className="font-mono num text-gray-300">199</span> جنيه/شهر
+          <span className="mx-2 text-gray-700">·</span>
+          أو جرب <span className="text-gray-300">30 يوم</span> مجاناً
+        </p>
 
         <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-sm text-gray-500">
           <span className="flex items-center gap-1.5">
@@ -230,10 +240,10 @@ function Hero() {
 
 function TrustBar() {
   const items = [
-    { label: 'فاتورة إلكترونية', value: 'ETA معتمد' },
-    { label: 'بوابات الدفع', value: 'Paymob + 6 طرق' },
-    { label: 'اللغة', value: 'عربي بالكامل' },
-    { label: 'الفروع', value: 'متعدد بلا حدود' },
+    { label: 'الفاتورة الإلكترونية', value: 'SDK ETA الرسمي' },
+    { label: 'الدفع', value: 'Paymob + 6 طرق' },
+    { label: 'الأمان', value: 'نسخ احتياطي يومي' },
+    { label: 'الفروع', value: 'بلا حدود' },
   ]
   return (
     <section className="border-y border-gray-800 bg-gray-900/40">
@@ -436,6 +446,31 @@ function Features() {
   )
 }
 
+// ─── Mid-page CTA — bridges Features → Pricing ───────────────────────────────
+
+function MidCTA() {
+  return (
+    <section className="py-10">
+      <div className="max-w-3xl mx-auto px-4">
+        <div className="bg-gradient-to-l from-brand-900/40 to-gray-900/40 border border-brand-500/30 rounded-r-xl px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-center sm:text-right">
+            <div className="font-semibold text-gray-100 mb-1">
+              عجبتك المميزات؟ ابدأ تجربتك في 5 دقايق.
+            </div>
+            <div className="text-sm text-gray-400">شهر مجاني · بدون كارت ائتمان</div>
+          </div>
+          <Link to="/register" className="shrink-0">
+            <Button variant="primary" size="lg">
+              ابدأ مجاناً
+              <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+            </Button>
+          </Link>
+        </div>
+      </div>
+    </section>
+  )
+}
+
 // ─── Pricing ─────────────────────────────────────────────────────────────────
 
 function Pricing({ plans }: { plans: Plan[] }) {
@@ -510,7 +545,7 @@ function Pricing({ plans }: { plans: Plan[] }) {
                     <p className="text-sm text-gray-400">{plan.description ?? ''}</p>
                   </div>
 
-                  <div className="mb-6">
+                  <div className="mb-4">
                     <div className="flex items-baseline gap-1">
                       <span className="font-mono text-4xl font-bold text-gray-50 num">
                         {Math.round(price)}
@@ -524,16 +559,33 @@ function Pricing({ plans }: { plans: Plan[] }) {
                     )}
                   </div>
 
+                  {/* Limits strip — scannable comparison across plans */}
+                  <div className="grid grid-cols-3 gap-2 mb-6 py-3 border-y border-gray-700/50">
+                    <LimitStat
+                      value={
+                        plan.maxProducts >= 999_999
+                          ? '∞'
+                          : formatCompact(plan.maxProducts)
+                      }
+                      label="منتج"
+                    />
+                    <LimitStat
+                      value={
+                        plan.maxOrders >= 999_999
+                          ? '∞'
+                          : formatCompact(plan.maxOrders)
+                      }
+                      label="طلب / شهر"
+                    />
+                    <LimitStat
+                      value={
+                        plan.maxUsers >= 999_999 ? '∞' : String(plan.maxUsers)
+                      }
+                      label="مستخدمين"
+                    />
+                  </div>
+
                   <ul className="space-y-2 mb-8 flex-1 text-sm text-gray-300">
-                    <FeatureLine>
-                      حتى <span className="font-mono num">{plan.maxProducts.toLocaleString()}</span> منتج
-                    </FeatureLine>
-                    <FeatureLine>
-                      حتى <span className="font-mono num">{plan.maxOrders.toLocaleString()}</span> طلب / شهر
-                    </FeatureLine>
-                    <FeatureLine>
-                      <span className="font-mono num">{plan.maxUsers}</span> مستخدمين
-                    </FeatureLine>
                     <FeatureLine enabled={Boolean(plan.features?.installments)}>أقساط</FeatureLine>
                     <FeatureLine enabled={Boolean(plan.features?.multi_currency)}>عملات متعددة</FeatureLine>
                     <FeatureLine enabled={Boolean(plan.features?.suppliers)}>موردين وأوامر شراء</FeatureLine>
@@ -564,10 +616,33 @@ function Pricing({ plans }: { plans: Plan[] }) {
 function FeatureLine({ children, enabled = true }: { children: React.ReactNode; enabled?: boolean }) {
   return (
     <li className={`flex items-center gap-2 ${enabled ? '' : 'opacity-40 line-through'}`}>
-      <Check className={`w-4 h-4 ${enabled ? 'text-success-500' : 'text-gray-600'}`} />
+      <Check
+        className={`w-4 h-4 ${enabled ? 'text-success-500' : 'text-gray-600'}`}
+        aria-hidden="true"
+      />
       <span>{children}</span>
     </li>
   )
+}
+
+function LimitStat({ value, label }: { value: string; label: string }) {
+  return (
+    <div className="text-center">
+      <div className="font-mono text-lg font-bold text-gray-100 num leading-none mb-1">
+        {value}
+      </div>
+      <div className="text-[10px] text-gray-500 uppercase tracking-wider">{label}</div>
+    </div>
+  )
+}
+
+// 1234 -> "1.2K", 50000 -> "50K", 500 -> "500"
+function formatCompact(n: number): string {
+  if (n >= 1000) {
+    const k = n / 1000
+    return (k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)) + 'K'
+  }
+  return String(n)
 }
 
 // ─── FAQ ─────────────────────────────────────────────────────────────────────

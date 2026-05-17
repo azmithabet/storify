@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
 import { Eye, EyeOff } from 'lucide-react'
@@ -35,6 +35,10 @@ type FormData = z.infer<typeof schema>
 export default function Register() {
   const [showPwd, setShowPwd] = useState(false)
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  // Pre-fill plan from Landing.tsx pricing CTA: /register?plan=<slug>
+  const initialPlan = searchParams.get('plan') ?? ''
+
   const { data: plans } = useQuery<Plan[]>({
     queryKey: ['plans'],
     queryFn: async () => {
@@ -45,6 +49,7 @@ export default function Register() {
 
   const { register, handleSubmit, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
+    defaultValues: { planSlug: initialPlan },
   })
 
   const { mutate, isPending, error } = useMutation({
@@ -89,9 +94,9 @@ export default function Register() {
                 {...register('name')}
               />
               <Input
-                label="Subdomain"
+                label="معرف المتجر"
                 placeholder="my-store"
-                hint="my-store.storify.com"
+                hint="حروف صغيرة وأرقام فقط — هيظهر في الفواتير"
                 autoComplete="off"
                 error={errors.subdomain?.message}
                 {...register('subdomain')}

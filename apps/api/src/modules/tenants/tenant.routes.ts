@@ -38,6 +38,20 @@ export async function tenantRoutes(app: FastifyInstance) {
         })
       }
 
+      if (error.message === 'email_taken') {
+        return reply.status(409).send({
+          success: false,
+          error: { code: 'email_taken', message: 'هذا البريد الإلكتروني مسجل بالفعل، جرّب تسجيل الدخول' },
+        })
+      }
+
+      if (error.message === 'tenant_conflict') {
+        return reply.status(409).send({
+          success: false,
+          error: { code: 'tenant_conflict', message: 'بيانات التسجيل مستخدمة بالفعل' },
+        })
+      }
+
       if (error.message === 'plan_not_found') {
         return reply.status(400).send({
           success: false,

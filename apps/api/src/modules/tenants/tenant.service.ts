@@ -188,6 +188,14 @@ export async function provisionTenant(data: RegisterTenantInput) {
     throw err
   }
 
+  // 1b. Check email availability (Tenant.email is @unique in schema)
+  const existingByEmail = await masterDb.tenant.findUnique({ where: { email: data.ownerEmail } })
+  if (existingByEmail) {
+    const err = new Error('email_taken') as Error & { statusCode: number }
+    err.statusCode = 409
+    throw err
+  }
+
   // 2. Resolve plan
   const plan = await masterDb.plan.findUnique({ where: { slug: data.planSlug } })
   if (!plan) {
@@ -197,19 +205,38 @@ export async function provisionTenant(data: RegisterTenantInput) {
   }
 
   // 3. Create tenant row (status: PROVISIONING)
-  const tenant = await masterDb.tenant.create({
-    data: {
-      name: data.name,
-      subdomain: data.subdomain,
-      schemaName,
-      schemaVersion: 0,
-      email: data.ownerEmail,
-      ownerName: data.ownerName,
-      ownerEmail: data.ownerEmail,
-      planId: plan.id,
-      status: 'PROVISIONING',
-    },
-  })
+  // Wrapped in try/catch as defense-in-depth: pre-checks above can race with
+  // a concurrent registration, so Prisma may still throw P2002 here.
+  let tenant
+  try {
+    tenant = await masterDb.tenant.create({
+      data: {
+        name: data.name,
+        subdomain: data.subdomain,
+        schemaName,
+        schemaVersion: 0,
+        email: data.ownerEmail,
+        ownerName: data.ownerName,
+        ownerEmail: data.ownerEmail,
+        planId: plan.id,
+        status: 'PROVISIONING',
+      },
+    })
+  } catch (createErr: unknown) {
+    const e = createErr as { code?: string; meta?: { target?: string[] } }
+    if (e.code === 'P2002') {
+      const target = e.meta?.target ?? []
+      const code = target.includes('email')
+        ? 'email_taken'
+        : target.includes('subdomain') || target.includes('schema_name')
+          ? 'subdomain_taken'
+          : 'tenant_conflict'
+      const err = new Error(code) as Error & { statusCode: number }
+      err.statusCode = 409
+      throw err
+    }
+    throw createErr
+  }
 
   try {
     // 4. Create PostgreSQL schema

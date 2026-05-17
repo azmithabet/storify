@@ -25,6 +25,8 @@ import { reportRoutes } from './modules/reports/report.routes'
 import { couponRoutes } from './modules/coupons/coupon.routes'
 import { etaRoutes } from './modules/eta/eta.routes'
 import { billingRoutes } from './modules/billing/billing.routes'
+import { adminRoutes } from './modules/admin/admin.routes'
+import { seedOwnerFromEnv } from './modules/admin/admin.auth.service'
 import { authenticate } from './shared/middleware/auth.middleware'
 import { startEtaWorker } from './jobs/eta-submission.job'
 import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
@@ -92,6 +94,9 @@ app.register(async function apiContext(api) {
   })
 
   api.register(tenantRoutes, { prefix: '/api/tenants' })
+
+  // ─── Platform-owner admin panel (cross-tenant, no tenant scoping) ────────
+  api.register(adminRoutes, { prefix: '/api/admin' })
 
   // ─── Tenant-scoped routes (tenant middleware required) ──────────────────────
   api.register(async function tenantScoped(sub) {
@@ -196,6 +201,10 @@ if (config.NODE_ENV === 'production') {
 
 const start = async () => {
   try {
+    // Idempotent — seeds OWNER from env vars on first boot, rotates password
+    // if OWNER_PASSWORD changed. No-op when env vars are unset (dev).
+    await seedOwnerFromEnv()
+
     await app.listen({ port: config.API_PORT, host: config.API_HOST })
     console.log(`Server running on port ${config.API_PORT}`)
 

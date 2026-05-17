@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthGuard, GuestGuard, RoleGuard } from '@/components/guards/AuthGuard'
+import { AdminAuthGuard, AdminGuestGuard } from '@/components/admin/AdminShell'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Skeleton } from '@/components/ui'
 import { trackPageView } from '@/lib/analytics'
@@ -27,6 +28,16 @@ const Reports = lazy(() => import('@/pages/reports/Reports'))
 const PurchaseOrders = lazy(() => import('@/pages/purchase-orders/PurchaseOrders'))
 const Settings = lazy(() => import('@/pages/settings/Settings'))
 const Returns = lazy(() => import('@/pages/returns/Returns'))
+
+// ─── Platform-owner admin panel (cross-tenant) ────────────────────────────
+const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'))
+const AdminDashboard = lazy(() => import('@/pages/admin/AdminDashboard'))
+const AdminTenants = lazy(() => import('@/pages/admin/AdminTenants'))
+const AdminTenantDetail = lazy(() => import('@/pages/admin/AdminTenantDetail'))
+const AdminPlans = lazy(() => import('@/pages/admin/AdminPlans'))
+const AdminSubscriptions = lazy(() => import('@/pages/admin/AdminSubscriptions'))
+const AdminAdmins = lazy(() => import('@/pages/admin/AdminAdmins'))
+const AdminAuditLogs = lazy(() => import('@/pages/admin/AdminAuditLogs'))
 
 const PageLoader = () => (
   <div className="p-8 flex flex-col gap-4">
@@ -80,6 +91,16 @@ export default function App() {
           <Route path="/purchase-orders/*" element={<AuthGuard><RoleGuard resource="purchase_orders" action="read"><PurchaseOrders /></RoleGuard></AuthGuard>} />
           <Route path="/settings/*" element={<AuthGuard><RoleGuard resource="settings" action="read"><Settings /></RoleGuard></AuthGuard>} />
           <Route path="/returns/*" element={<AuthGuard><RoleGuard resource="invoices" action="read"><Returns /></RoleGuard></AuthGuard>} />
+
+          {/* ─── Platform-owner admin panel — separate auth store, no tenant scoping ── */}
+          <Route path="/admin/login" element={<AdminGuestGuard><AdminLogin /></AdminGuestGuard>} />
+          <Route path="/admin" element={<AdminAuthGuard><AdminDashboard /></AdminAuthGuard>} />
+          <Route path="/admin/tenants" element={<AdminAuthGuard><AdminTenants /></AdminAuthGuard>} />
+          <Route path="/admin/tenants/:id" element={<AdminAuthGuard><AdminTenantDetail /></AdminAuthGuard>} />
+          <Route path="/admin/plans" element={<AdminAuthGuard><AdminPlans /></AdminAuthGuard>} />
+          <Route path="/admin/subscriptions" element={<AdminAuthGuard><AdminSubscriptions /></AdminAuthGuard>} />
+          <Route path="/admin/admins" element={<AdminAuthGuard><AdminAdmins /></AdminAuthGuard>} />
+          <Route path="/admin/audit-logs" element={<AdminAuthGuard><AdminAuditLogs /></AdminAuthGuard>} />
 
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

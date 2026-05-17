@@ -141,3 +141,46 @@ enum PaymentAttemptStatus {
   PENDING
   REFUNDED
 }
+
+// ─── Platform admin (SaaS owner) ─────────────────────────────────────────────
+// Cross-tenant. Lives in the master DB. JWTs issued to these users carry
+// `scope: 'platform'` and are validated by platformAdminMiddleware — they
+// never carry a tenantId and cannot hit tenant-scoped routes.
+model PlatformAdmin {
+  id           String              @id @default(cuid())
+  email        String              @unique @db.VarChar(255)
+  passwordHash String              @map("password_hash")
+  fullName     String              @db.VarChar(200)         @map("full_name")
+  role         PlatformAdminRole   @default(ADMIN)
+  isActive     Boolean             @default(true)           @map("is_active")
+  lastLogin    DateTime?           @map("last_login")
+  createdAt    DateTime            @default(now())          @map("created_at")
+  updatedAt    DateTime            @updatedAt               @map("updated_at")
+
+  auditLogs    PlatformAuditLog[]
+
+  @@map("platform_admins")
+}
+
+enum PlatformAdminRole {
+  OWNER   // can manage other admins; only one expected, seeded from OWNER_EMAIL
+  ADMIN   // full panel access, cannot manage other admins
+}
+
+model PlatformAuditLog {
+  id        String   @id @default(cuid())
+  actorId   String   @map("actor_id")
+  entity    String   @db.VarChar(100)  // 'tenant', 'plan', 'admin', 'subscription'
+  entityId  String?  @db.VarChar(100)  @map("entity_id")
+  action    String   @db.VarChar(100)  // 'suspend', 'unsuspend', 'plan_change', 'create', 'update', 'delete', 'login'
+  before    Json?
+  after     Json?
+  ip        String?  @db.VarChar(64)
+  createdAt DateTime @default(now()) @map("created_at")
+
+  actor     PlatformAdmin @relation(fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([entity, entityId, createdAt(sort: Desc)], name: "idx_platform_audit_entity")
+  @@index([actorId, createdAt(sort: Desc)], name: "idx_platform_audit_actor")
+  @@map("platform_audit_logs")
+}

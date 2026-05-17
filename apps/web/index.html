@@ -39,6 +39,197 @@
     <!-- Robots -->
     <meta name="robots" content="index, follow, max-image-preview:large" />
     <meta name="googlebot" content="index, follow" />
+
+    <!-- ─── JSON-LD Structured Data ─────────────────────────────────────────
+         Static schema mirrors visible Landing.tsx content. Keep these in sync
+         when you change pricing, FAQ, or org details. Validate with:
+           https://search.google.com/test/rich-results?url=https://talabia.app
+         ─────────────────────────────────────────────────────────────────── -->
+
+    <!-- Organization: brand entity -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Storify",
+      "alternateName": "ستوريفاي",
+      "url": "https://talabia.app",
+      "logo": "https://talabia.app/storify-icon.svg",
+      "image": "https://talabia.app/og-image.png",
+      "description": "نظام إدارة متاجر متكامل: نقطة بيع، مخزون، أقساط، فاتورة إلكترونية ETA.",
+      "areaServed": {
+        "@type": "Country",
+        "name": "Egypt"
+      },
+      "inLanguage": "ar-EG"
+    }
+    </script>
+
+    <!-- WebSite: site identity -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Storify",
+      "alternateName": "ستوريفاي",
+      "url": "https://talabia.app",
+      "inLanguage": "ar-EG",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Storify",
+        "url": "https://talabia.app"
+      }
+    }
+    </script>
+
+    <!-- SoftwareApplication: Storify as a product, with the 3 plans as Offers.
+         Mirror /api/plans pricing — update if plans change. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Storify",
+      "applicationCategory": "BusinessApplication",
+      "applicationSubCategory": "Point of Sale (POS) System",
+      "operatingSystem": "Web, iOS, Android",
+      "description": "نظام إدارة متاجر متكامل بـ POS، مخزون، أقساط، وفاتورة إلكترونية ETA معتمدة من مصلحة الضرائب المصرية.",
+      "url": "https://talabia.app",
+      "image": "https://talabia.app/og-image.png",
+      "inLanguage": "ar-EG",
+      "publisher": {
+        "@type": "Organization",
+        "name": "Storify",
+        "url": "https://talabia.app"
+      },
+      "offers": [
+        {
+          "@type": "Offer",
+          "name": "Starter",
+          "description": "للمتاجر الصغيرة",
+          "price": "199",
+          "priceCurrency": "EGP",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "199",
+            "priceCurrency": "EGP",
+            "billingDuration": "P1M",
+            "unitText": "MONTH"
+          },
+          "availability": "https://schema.org/InStock",
+          "url": "https://talabia.app/register?plan=starter"
+        },
+        {
+          "@type": "Offer",
+          "name": "Professional",
+          "description": "للمتاجر المتوسطة والنامية",
+          "price": "499",
+          "priceCurrency": "EGP",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "499",
+            "priceCurrency": "EGP",
+            "billingDuration": "P1M",
+            "unitText": "MONTH"
+          },
+          "availability": "https://schema.org/InStock",
+          "url": "https://talabia.app/register?plan=professional"
+        },
+        {
+          "@type": "Offer",
+          "name": "Enterprise",
+          "description": "للمتاجر الكبيرة — بلا حدود",
+          "price": "999",
+          "priceCurrency": "EGP",
+          "priceSpecification": {
+            "@type": "UnitPriceSpecification",
+            "price": "999",
+            "priceCurrency": "EGP",
+            "billingDuration": "P1M",
+            "unitText": "MONTH"
+          },
+          "availability": "https://schema.org/InStock",
+          "url": "https://talabia.app/register?plan=enterprise"
+        }
+      ]
+    }
+    </script>
+
+    <!-- FAQPage: 8 Q&As mirroring the FAQ section in Landing.tsx.
+         If you edit FAQ items there, edit them here too — Google checks
+         that schema content matches visible page content. -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "inLanguage": "ar-EG",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "هل التجربة المجانية بتحتاج كارت ائتمان؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "لا، أبداً. سجّل، استخدم كل المميزات لشهر كامل، وادفع بس لما تقتنع. وقتها تختار طريقة الدفع."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "هل النظام بيدعم الفاتورة الإلكترونية ETA؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "آه — تكامل مباشر مع مصلحة الضرائب. كل فاتورة بتترسل تلقائياً وبتستلم رد ETA. متاح في كل الباقات."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "ممكن أنقل بياناتي من نظام تاني؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "أيوة. عندنا أدوات استيراد للمنتجات والعملاء والموردين عبر CSV. وفريقنا بيساعدك في النقل لو محتاج."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "هل بيشتغل بدون إنترنت؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "نقطة البيع بتشتغل offline تلقائياً وتزامن لما الإنترنت يرجع. متاح في باقة Enterprise."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "هل أقدر أغير الباقة بعدين؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "في أي وقت. ترقّى أو نزّل — والفرق بيتحسب تلقائياً."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "كم فرع أقدر أضيف؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Starter: فرع واحد. Professional: حتى 5 فروع. Enterprise: فروع بلا حدود."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "البيانات بتاعتي آمنة؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "كل بياناتك مشفّرة في قاعدة معزولة لمتجرك لوحده. نسخ احتياطية يومية تلقائية، وحقك في تحميل كل بياناتك متى ما طلبت."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "هل في دعم فني بالعربي؟",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "طبعاً. فريق دعم مصري، عبر الواتساب والإيميل، طول أيام الأسبوع."
+          }
+        }
+      ]
+    }
+    </script>
   </head>
   <body>
     <div id="root"></div>

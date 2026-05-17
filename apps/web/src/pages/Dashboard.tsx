@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { TrendingUp, ShoppingBag, AlertTriangle, Clock, PackageOpen, FileX } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { StatCard, Badge, Alert, Skeleton, Money } from '@/components/ui'
+import { UsageBanner } from '@/components/UsageBanner'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import { formatNumber, formatDate, formatTime } from '@/lib/format'
@@ -146,6 +147,8 @@ export default function Dashboard() {
       {error && (
         <Alert variant="warning" className="mb-6">تعذّر تحميل بيانات اللوحة.</Alert>
       )}
+
+      <UsageBanner />
 
       {/* ── KPI Cards ── */}
       {isLoading ? (

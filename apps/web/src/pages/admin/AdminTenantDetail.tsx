@@ -2,9 +2,9 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import toast from 'react-hot-toast'
-import { ArrowRight, AlertTriangle, CheckCircle2, Package2, RotateCw } from 'lucide-react'
+import { ArrowRight, AlertTriangle, CheckCircle2, Package2, RotateCw, CalendarPlus, Ban, PlayCircle } from 'lucide-react'
 import { AdminShell } from '@/components/admin/AdminShell'
-import { Card, StatCard, Badge, Button, Skeleton, Alert, Modal, Select } from '@/components/ui'
+import { Card, StatCard, Badge, Button, Skeleton, Alert, Modal, Select, Input } from '@/components/ui'
 import { adminApi } from '@/api/admin-client'
 import { formatDate, formatDateTime, formatMoney, formatNumber } from '@/lib/format'
 import { getApiErrorMessage } from '@/lib/api-error'
@@ -65,6 +65,8 @@ const statusLabel = {
   PROVISIONING: 'قيد التجهيز',
 }
 
+type SubAction = 'extend' | 'cancel' | 'reactivate'
+
 export default function AdminTenantDetail() {
   const { id } = useParams<{ id: string }>()
   const qc = useQueryClient()
@@ -72,6 +74,9 @@ export default function AdminTenantDetail() {
   const [planOpen, setPlanOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [selectedPlanId, setSelectedPlanId] = useState<string>('')
+  const [subAction, setSubAction] = useState<{ id: string; type: SubAction } | null>(null)
+  const [extendDays, setExtendDays] = useState(14)
+  const [subReason, setSubReason] = useState('')
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'tenant', id],
@@ -113,6 +118,38 @@ export default function AdminTenantDetail() {
       qc.invalidateQueries({ queryKey: ['admin', 'tenant', id] })
       qc.invalidateQueries({ queryKey: ['admin', 'tenants'] })
     },
+    onError: (err) => toast.error(getApiErrorMessage(err)),
+  })
+
+  const closeSubModal = () => {
+    setSubAction(null)
+    setSubReason('')
+    setExtendDays(14)
+  }
+
+  const refetchTenant = () => qc.invalidateQueries({ queryKey: ['admin', 'tenant', id] })
+
+  const extendTrialMutation = useMutation({
+    mutationFn: async ({ subId, days, reason: r }: { subId: string; days: number; reason?: string }) => {
+      await adminApi.patch(`/subscriptions/${subId}/extend-trial`, { days, reason: r || undefined })
+    },
+    onSuccess: () => { toast.success('تم تمديد الفترة التجريبية'); closeSubModal(); refetchTenant() },
+    onError: (err) => toast.error(getApiErrorMessage(err)),
+  })
+
+  const cancelSubMutation = useMutation({
+    mutationFn: async ({ subId, reason: r }: { subId: string; reason?: string }) => {
+      await adminApi.patch(`/subscriptions/${subId}/cancel`, { reason: r || undefined })
+    },
+    onSuccess: () => { toast.success('تم إلغاء الاشتراك'); closeSubModal(); refetchTenant() },
+    onError: (err) => toast.error(getApiErrorMessage(err)),
+  })
+
+  const reactivateMutation = useMutation({
+    mutationFn: async ({ subId }: { subId: string }) => {
+      await adminApi.patch(`/subscriptions/${subId}/reactivate`, {})
+    },
+    onSuccess: () => { toast.success('تم إعادة تفعيل الاشتراك'); closeSubModal(); refetchTenant() },
     onError: (err) => toast.error(getApiErrorMessage(err)),
   })
 
@@ -239,10 +276,34 @@ export default function AdminTenantDetail() {
                   <p className="text-xs text-gray-500 mt-2">
                     {formatDate(s.currentPeriodStart)} → {formatDate(s.currentPeriodEnd)}
                   </p>
+                  {s.trialEndsAt && s.status === 'TRIALING' && (
+                    <p className="text-xs text-info-400 mt-1">تنتهي التجربة: {formatDate(s.trialEndsAt)}</p>
+                  )}
                 </div>
                 <div className="text-left">
                   <p className="font-mono text-base text-brand-300" dir="ltr">{formatMoney(Number(s.priceAtSubscription))} EGP</p>
                 </div>
+              </div>
+
+              <div className="flex flex-wrap gap-2 mb-3">
+                {(s.status === 'TRIALING' || s.status === 'PAST_DUE') && (
+                  <Button variant="outline" size="sm" onClick={() => setSubAction({ id: s.id, type: 'extend' })}>
+                    <CalendarPlus className="w-3.5 h-3.5" />
+                    تمديد التجربة
+                  </Button>
+                )}
+                {(s.status === 'PAST_DUE' || s.status === 'SUSPENDED') && (
+                  <Button variant="outline" size="sm" onClick={() => setSubAction({ id: s.id, type: 'reactivate' })}>
+                    <PlayCircle className="w-3.5 h-3.5" />
+                    إعادة تفعيل
+                  </Button>
+                )}
+                {s.status !== 'CANCELLED' && (
+                  <Button variant="ghost" size="sm" className="text-danger-400" onClick={() => setSubAction({ id: s.id, type: 'cancel' })}>
+                    <Ban className="w-3.5 h-3.5" />
+                    إلغاء
+                  </Button>
+                )}
               </div>
 
               {s.paymentAttempts.length > 0 && (
@@ -332,6 +393,100 @@ export default function AdminTenantDetail() {
         </Select>
         <p className="text-xs text-gray-500 mt-3">
           ملاحظة: تغيير الباقة لا يُنشئ اشتراكاً جديداً بشكل تلقائي — استخدمه لتعديل الباقة الافتراضية للمتجر.
+        </p>
+      </Modal>
+
+      {/* ─── Extend Trial Modal ─── */}
+      <Modal
+        open={subAction?.type === 'extend'}
+        onClose={closeSubModal}
+        title="تمديد الفترة التجريبية"
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeSubModal}>إلغاء</Button>
+            <Button
+              loading={extendTrialMutation.isPending}
+              disabled={!extendDays || extendDays < 1 || extendDays > 180}
+              onClick={() => subAction && extendTrialMutation.mutate({ subId: subAction.id, days: extendDays, reason: subReason })}
+            >
+              <CalendarPlus className="w-4 h-4" />
+              تمديد
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-300 mb-4">
+          سيتم تمديد الفترة التجريبية بعدد الأيام المحدد (يُحفظ الإجراء في سجل النشاط).
+        </p>
+        <Input
+          label="عدد الأيام"
+          type="number"
+          min={1}
+          max={180}
+          value={extendDays}
+          onChange={(e) => setExtendDays(Number(e.target.value) || 0)}
+        />
+        <textarea
+          className="w-full mt-3 rounded-md border-[1.5px] bg-gray-800 px-3 py-2 text-sm text-gray-100 border-gray-600 focus:border-brand-500 focus:outline-none"
+          rows={3}
+          placeholder="السبب (اختياري)"
+          value={subReason}
+          onChange={(e) => setSubReason(e.target.value)}
+        />
+      </Modal>
+
+      {/* ─── Cancel Subscription Modal ─── */}
+      <Modal
+        open={subAction?.type === 'cancel'}
+        onClose={closeSubModal}
+        title="إلغاء الاشتراك"
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeSubModal}>تراجع</Button>
+            <Button
+              variant="danger"
+              loading={cancelSubMutation.isPending}
+              onClick={() => subAction && cancelSubMutation.mutate({ subId: subAction.id, reason: subReason })}
+            >
+              <Ban className="w-4 h-4" />
+              تأكيد الإلغاء
+            </Button>
+          </>
+        }
+      >
+        <Alert variant="warning" className="mb-3">
+          الإلغاء فوري ولا يمكن التراجع — استخدم إعادة التفعيل لاحقاً إذا احتجت.
+        </Alert>
+        <textarea
+          className="w-full rounded-md border-[1.5px] bg-gray-800 px-3 py-2 text-sm text-gray-100 border-gray-600 focus:border-brand-500 focus:outline-none"
+          rows={3}
+          placeholder="السبب (اختياري) — يُحفظ في سجل النشاط"
+          value={subReason}
+          onChange={(e) => setSubReason(e.target.value)}
+        />
+      </Modal>
+
+      {/* ─── Reactivate Subscription Modal ─── */}
+      <Modal
+        open={subAction?.type === 'reactivate'}
+        onClose={closeSubModal}
+        title="إعادة تفعيل الاشتراك"
+        footer={
+          <>
+            <Button variant="ghost" onClick={closeSubModal}>إلغاء</Button>
+            <Button
+              variant="success"
+              loading={reactivateMutation.isPending}
+              onClick={() => subAction && reactivateMutation.mutate({ subId: subAction.id })}
+            >
+              <PlayCircle className="w-4 h-4" />
+              إعادة التفعيل
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-gray-300">
+          سيُعاد ضبط حالة الاشتراك إلى <strong>ACTIVE</strong> وستُصفّر محاولات الدفع الفاشلة. تأكد أن المتجر قد سدد بطريقة بديلة أو تم منحه رصيد قبل التفعيل.
         </p>
       </Modal>
     </AdminShell>

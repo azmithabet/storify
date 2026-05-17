@@ -69,7 +69,13 @@ export async function handleWebhookSuccess(params: {
   if (!sub) return
 
   const periodStart = new Date()
-  const periodEnd = new Date(Date.now() + 30 * 24 * 3600 * 1000)
+  // Period length must match billing cycle — yearly subs renew yearly, not in 30 days.
+  const periodEnd = new Date(periodStart)
+  if (sub.billingCycle === 'YEARLY') {
+    periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+  } else {
+    periodEnd.setMonth(periodEnd.getMonth() + 1)
+  }
 
   await masterDb.$transaction([
     masterDb.paymentAttempt.create({
@@ -157,7 +163,6 @@ export async function handleWebhookFailure(params: {
         failedAttempts: newFailedAttempts,
         lastFailureReason: errorMessage ?? 'payment_failed',
         status: newStatus,
-        ...(newStatus === 'SUSPENDED' ? { suspendedAt: new Date() } : {}),
         ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date() } : {}),
       },
     }),

@@ -25,8 +25,26 @@ interface Plan {
   priceYearly: string
   isActive: boolean
   sortOrder: number
+  features: Record<string, unknown> | null
   _count: { tenants: number; subscriptions: number }
 }
+
+// Known feature flags consumed by `requireFeature()` on the backend and by
+// frontend gates. Keep this in sync with `packages/database/src/seeds/master.seed.ts`.
+const BOOLEAN_FEATURES: { key: string; label: string; hint?: string }[] = [
+  { key: 'installments', label: 'الأقساط', hint: 'إنشاء خطط أقساط للعملاء' },
+  { key: 'multi_currency', label: 'تعدد العملات' },
+  { key: 'suppliers', label: 'الموردون' },
+  { key: 'expenses', label: 'المصروفات' },
+  { key: 'advanced_reports', label: 'تقارير متقدمة' },
+  { key: 'offline_mode', label: 'الوضع غير المتصل' },
+  { key: 'api_access', label: 'الوصول للـ API' },
+]
+
+const NUMERIC_FEATURES: { key: string; label: string; hint?: string }[] = [
+  { key: 'max_branches', label: 'حد الفروع', hint: '-1 = بدون حد' },
+  { key: 'max_users', label: 'حد المستخدمين (ميزة)', hint: '-1 = بدون حد' },
+]
 
 const planSchema = z.object({
   name: z.string().min(1),
@@ -41,6 +59,7 @@ const planSchema = z.object({
   maxInstallmentPlansMonthly: z.coerce.number().int().min(0),
   sortOrder: z.coerce.number().int().default(0),
   isActive: z.boolean().default(true),
+  features: z.record(z.string(), z.union([z.boolean(), z.number()])).default({}),
 })
 
 type PlanForm = z.infer<typeof planSchema>
@@ -182,9 +201,17 @@ function PlanFormModal({
   onSaved: () => void
 }) {
   const isEdit = !!plan
+  const initialFeatures: Record<string, boolean | number> = {}
+  if (plan?.features) {
+    for (const [k, v] of Object.entries(plan.features)) {
+      if (typeof v === 'boolean' || typeof v === 'number') initialFeatures[k] = v
+    }
+  }
   const {
     register,
     handleSubmit,
+    watch,
+    setValue,
     formState: { errors },
   } = useForm<PlanForm>({
     resolver: zodResolver(planSchema),
@@ -202,6 +229,7 @@ function PlanFormModal({
           maxInstallmentPlansMonthly: plan.maxInstallmentPlansMonthly,
           sortOrder: plan.sortOrder,
           isActive: plan.isActive,
+          features: initialFeatures,
         }
       : {
           isActive: true,
@@ -211,8 +239,25 @@ function PlanFormModal({
           maxUsers: 3,
           maxStorage: 1024,
           maxInstallmentPlansMonthly: 0,
+          features: {
+            installments: true,
+            multi_currency: false,
+            suppliers: false,
+            expenses: false,
+            advanced_reports: false,
+            offline_mode: false,
+            api_access: false,
+            max_branches: 1,
+            max_users: 3,
+          },
         },
   })
+
+  const features = watch('features') || {}
+  const toggleBoolFeature = (key: string) =>
+    setValue('features', { ...features, [key]: !features[key] }, { shouldDirty: true })
+  const setNumericFeature = (key: string, value: number) =>
+    setValue('features', { ...features, [key]: value }, { shouldDirty: true })
 
   const mutation = useMutation({
     mutationFn: async (form: PlanForm) => {
@@ -248,6 +293,7 @@ function PlanFormModal({
       <form className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Input label="الاسم" error={errors.name?.message} {...register('name')} />
         <Input label="Slug" placeholder="starter" disabled={isEdit} error={errors.slug?.message} {...register('slug')} />
+        <Input label="الوصف" {...register('description')} />
         <Input label="السعر الشهري (EGP)" type="number" step="0.01" error={errors.priceMonthly?.message} {...register('priceMonthly')} />
         <Input label="السعر السنوي (EGP)" type="number" step="0.01" error={errors.priceYearly?.message} {...register('priceYearly')} />
         <Input label="حد المنتجات" type="number" error={errors.maxProducts?.message} {...register('maxProducts')} />
@@ -260,6 +306,39 @@ function PlanFormModal({
           <input type="checkbox" className="w-4 h-4 accent-brand-500" {...register('isActive')} />
           مفعّلة (يمكن للمتاجر الاشتراك بها)
         </label>
+
+        <div className="sm:col-span-2 border-t border-gray-700 pt-3 mt-2">
+          <h4 className="text-sm font-semibold text-gray-200 mb-1">الميزات</h4>
+          <p className="text-xs text-gray-500 mb-3">
+            تتحكم في ما يُسمح للمتاجر باستخدامه — تُقرأ من <code className="font-mono">requireFeature()</code> في الخلفية.
+          </p>
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+            {BOOLEAN_FEATURES.map((f) => (
+              <label key={f.key} className="flex items-center gap-2 text-sm text-gray-300 cursor-pointer rounded-md px-2 py-1 hover:bg-gray-800/40">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 accent-brand-500"
+                  checked={!!features[f.key]}
+                  onChange={() => toggleBoolFeature(f.key)}
+                />
+                <span title={f.hint}>{f.label}</span>
+              </label>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
+            {NUMERIC_FEATURES.map((f) => (
+              <div key={f.key}>
+                <Input
+                  label={f.label}
+                  type="number"
+                  value={typeof features[f.key] === 'number' ? (features[f.key] as number) : 0}
+                  onChange={(e) => setNumericFeature(f.key, Number(e.target.value))}
+                />
+                {f.hint && <p className="text-[10px] text-gray-500 mt-1">{f.hint}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
       </form>
     </Modal>
   )

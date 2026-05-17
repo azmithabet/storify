@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthGuard, GuestGuard, RoleGuard } from '@/components/guards/AuthGuard'
+import { FeatureGate } from '@/components/guards/FeatureGate'
 import { AdminAuthGuard, AdminGuestGuard } from '@/components/admin/AdminShell'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Skeleton } from '@/components/ui'
@@ -85,8 +86,8 @@ export default function App() {
           <Route path="/customers/*" element={<AuthGuard><RoleGuard resource="customers" action="read"><Customers /></RoleGuard></AuthGuard>} />
           <Route path="/invoices/*" element={<AuthGuard><RoleGuard resource="invoices" action="read"><Invoices /></RoleGuard></AuthGuard>} />
           <Route path="/installments/*" element={<AuthGuard><RoleGuard resource="installments" action="read"><Installments /></RoleGuard></AuthGuard>} />
-          <Route path="/suppliers/*" element={<AuthGuard><RoleGuard resource="suppliers" action="read"><Suppliers /></RoleGuard></AuthGuard>} />
-          <Route path="/expenses/*" element={<AuthGuard><RoleGuard resource="expenses" action="read"><Expenses /></RoleGuard></AuthGuard>} />
+          <Route path="/suppliers/*" element={<AuthGuard><RoleGuard resource="suppliers" action="read"><FeatureGate feature="suppliers" title="الموردين"><Suppliers /></FeatureGate></RoleGuard></AuthGuard>} />
+          <Route path="/expenses/*" element={<AuthGuard><RoleGuard resource="expenses" action="read"><FeatureGate feature="expenses" title="المصروفات"><Expenses /></FeatureGate></RoleGuard></AuthGuard>} />
           <Route path="/reports/*" element={<AuthGuard><RoleGuard resource="reports" action="read"><Reports /></RoleGuard></AuthGuard>} />
           <Route path="/purchase-orders/*" element={<AuthGuard><RoleGuard resource="purchase_orders" action="read"><PurchaseOrders /></RoleGuard></AuthGuard>} />
           <Route path="/settings/*" element={<AuthGuard><RoleGuard resource="settings" action="read"><Settings /></RoleGuard></AuthGuard>} />

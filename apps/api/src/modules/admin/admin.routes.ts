@@ -477,6 +477,151 @@ export async function adminRoutes(app: FastifyInstance) {
       return reply.send({ success: true, data: rows, meta: { total, page, limit, pages: Math.ceil(total / limit) } })
     })
 
+    // ── PATCH /subscriptions/:id/extend-trial ─────────────────────────────
+    const extendTrialSchema = z.object({
+      days: z.coerce.number().int().min(1).max(180),
+      reason: z.string().max(500).optional(),
+    })
+
+    scoped.patch<{ Params: { id: string } }>('/subscriptions/:id/extend-trial', async (request, reply) => {
+      const parsed = extendTrialSchema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'validation_error', message: parsed.error.errors[0].message },
+        })
+      }
+      const sub = await masterDb.subscription.findUnique({
+        where: { id: request.params.id },
+        include: { tenant: { select: { id: true, subdomain: true } } },
+      })
+      if (!sub) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الاشتراك غير موجود' } })
+      if (sub.status !== 'TRIALING' && sub.status !== 'PAST_DUE') {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'invalid_status', message: 'تمديد الفترة التجريبية متاح فقط لاشتراك TRIALING أو PAST_DUE' },
+        })
+      }
+
+      const base = sub.trialEndsAt && sub.trialEndsAt > new Date() ? sub.trialEndsAt : new Date()
+      const newTrialEnd = new Date(base.getTime() + parsed.data.days * 24 * 3600 * 1000)
+
+      const updated = await masterDb.subscription.update({
+        where: { id: sub.id },
+        data: {
+          status: 'TRIALING',
+          trialEndsAt: newTrialEnd,
+          currentPeriodEnd: newTrialEnd,
+          failedAttempts: 0,
+          lastFailureReason: null,
+        },
+      })
+      await invalidateTenantCache(sub.tenant.subdomain, sub.tenant.id)
+
+      await platformAudit({
+        actorId: request.platformAdmin!.id,
+        entity: 'subscription',
+        entityId: sub.id,
+        action: 'extend_trial',
+        before: { status: sub.status, trialEndsAt: sub.trialEndsAt },
+        after: { status: updated.status, trialEndsAt: updated.trialEndsAt, days: parsed.data.days, reason: parsed.data.reason },
+        ip: request.ip,
+      })
+
+      return reply.send({ success: true, data: { id: updated.id, status: updated.status, trialEndsAt: updated.trialEndsAt } })
+    })
+
+    // ── PATCH /subscriptions/:id/cancel ───────────────────────────────────
+    const cancelSubSchema = z.object({
+      reason: z.string().max(500).optional(),
+    })
+
+    scoped.patch<{ Params: { id: string } }>('/subscriptions/:id/cancel', async (request, reply) => {
+      const parsed = cancelSubSchema.safeParse(request.body ?? {})
+      if (!parsed.success) {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'validation_error', message: parsed.error.errors[0].message },
+        })
+      }
+      const sub = await masterDb.subscription.findUnique({
+        where: { id: request.params.id },
+        include: { tenant: { select: { id: true, subdomain: true } } },
+      })
+      if (!sub) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الاشتراك غير موجود' } })
+      if (sub.status === 'CANCELLED') {
+        return reply.status(400).send({ success: false, error: { code: 'already_cancelled', message: 'الاشتراك ملغى بالفعل' } })
+      }
+
+      const updated = await masterDb.subscription.update({
+        where: { id: sub.id },
+        data: { status: 'CANCELLED', cancelledAt: new Date() },
+      })
+      await invalidateTenantCache(sub.tenant.subdomain, sub.tenant.id)
+
+      await platformAudit({
+        actorId: request.platformAdmin!.id,
+        entity: 'subscription',
+        entityId: sub.id,
+        action: 'cancel',
+        before: { status: sub.status },
+        after: { status: updated.status, cancelledAt: updated.cancelledAt, reason: parsed.data.reason },
+        ip: request.ip,
+      })
+
+      return reply.send({ success: true, data: { id: updated.id, status: updated.status, cancelledAt: updated.cancelledAt } })
+    })
+
+    // ── PATCH /subscriptions/:id/reactivate ───────────────────────────────
+    // Move a PAST_DUE / SUSPENDED sub back to ACTIVE — for manual recovery
+    // after an out-of-band payment or goodwill credit.
+    scoped.patch<{ Params: { id: string } }>('/subscriptions/:id/reactivate', async (request, reply) => {
+      const sub = await masterDb.subscription.findUnique({
+        where: { id: request.params.id },
+        include: { tenant: { select: { id: true, subdomain: true } } },
+      })
+      if (!sub) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الاشتراك غير موجود' } })
+      if (sub.status !== 'PAST_DUE' && sub.status !== 'SUSPENDED') {
+        return reply.status(400).send({
+          success: false,
+          error: { code: 'invalid_status', message: 'إعادة التفعيل متاحة فقط لاشتراك PAST_DUE أو SUSPENDED' },
+        })
+      }
+
+      const periodStart = new Date()
+      const periodEnd = new Date(periodStart)
+      if (sub.billingCycle === 'YEARLY') {
+        periodEnd.setFullYear(periodEnd.getFullYear() + 1)
+      } else {
+        periodEnd.setMonth(periodEnd.getMonth() + 1)
+      }
+
+      const updated = await masterDb.subscription.update({
+        where: { id: sub.id },
+        data: {
+          status: 'ACTIVE',
+          failedAttempts: 0,
+          lastFailureReason: null,
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+          nextBillingAt: periodEnd,
+        },
+      })
+      await invalidateTenantCache(sub.tenant.subdomain, sub.tenant.id)
+
+      await platformAudit({
+        actorId: request.platformAdmin!.id,
+        entity: 'subscription',
+        entityId: sub.id,
+        action: 'reactivate',
+        before: { status: sub.status, failedAttempts: sub.failedAttempts },
+        after: { status: updated.status },
+        ip: request.ip,
+      })
+
+      return reply.send({ success: true, data: { id: updated.id, status: updated.status } })
+    })
+
     // ── GET /revenue — platform-wide metrics ─────────────────────────────
     scoped.get('/revenue', async (_request, reply) => {
       const now = new Date()

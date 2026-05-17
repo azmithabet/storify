@@ -19,16 +19,19 @@ import {
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
 import { api } from '@/api/client'
+import { useMe, type PlanFeatures } from '@/hooks/useMe'
 
 // Each entry is gated by a (resource, action) the user must have to see it.
 // Super-admin bypasses these via `hasPermission`. The backend enforces the
 // same checks per-route, so this is purely UX — hides menu items the user
 // would 403 on anyway. POS / settings/password are visible to everyone.
+// `feature` adds a second layer for plan-gated items (suppliers, expenses…).
 const navItems: Array<{
   to: string
   icon: typeof ShoppingCart
   label: string
   permission?: { resource: string; action: string }
+  feature?: keyof PlanFeatures
 }> = [
   { to: '/pos', icon: ShoppingCart, label: 'نقطة البيع', permission: { resource: 'invoices', action: 'create' } },
   { to: '/day-close', icon: CalendarCheck, label: 'إغلاق اليوم', permission: { resource: 'reports', action: 'read' } },
@@ -38,9 +41,9 @@ const navItems: Array<{
   { to: '/invoices', icon: FileText, label: 'الفواتير', permission: { resource: 'invoices', action: 'read' } },
   { to: '/returns', icon: RotateCcw, label: 'المرتجعات', permission: { resource: 'invoices', action: 'read' } },
   { to: '/installments', icon: CreditCard, label: 'الأقساط', permission: { resource: 'installments', action: 'read' } },
-  { to: '/suppliers', icon: Truck, label: 'الموردون', permission: { resource: 'suppliers', action: 'read' } },
-  { to: '/purchase-orders', icon: ClipboardList, label: 'أوامر الشراء', permission: { resource: 'purchase_orders', action: 'read' } },
-  { to: '/expenses', icon: Receipt, label: 'المصروفات', permission: { resource: 'expenses', action: 'read' } },
+  { to: '/suppliers', icon: Truck, label: 'الموردون', permission: { resource: 'suppliers', action: 'read' }, feature: 'suppliers' },
+  { to: '/purchase-orders', icon: ClipboardList, label: 'أوامر الشراء', permission: { resource: 'purchase_orders', action: 'read' }, feature: 'suppliers' },
+  { to: '/expenses', icon: Receipt, label: 'المصروفات', permission: { resource: 'expenses', action: 'read' }, feature: 'expenses' },
   { to: '/reports', icon: BarChart3, label: 'التقارير', permission: { resource: 'reports', action: 'read' } },
   // Settings is split — most pages need settings.read, but every user can
   // still reach the password tab via direct URL. Filter on settings.read
@@ -58,6 +61,8 @@ interface SidebarProps {
 export function Sidebar({ open, onClose }: SidebarProps) {
   const asideRef = useRef<HTMLElement>(null)
   const { user, logout, hasPermission } = useAuthStore()
+  const { data: me } = useMe()
+  const features = me?.tenant.plan.features ?? {}
 
   // Track large-screen breakpoint so we never aria-hide a visible sidebar
   const [isLg, setIsLg] = useState(() => window.matchMedia('(min-width: 1024px)').matches)
@@ -77,9 +82,13 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     el.inert = !isVisible
   }, [isVisible])
 
-  const visibleItems = navItems.filter(
-    (item) => !item.permission || hasPermission(item.permission.resource, item.permission.action),
-  )
+  const visibleItems = navItems.filter((item) => {
+    if (item.permission && !hasPermission(item.permission.resource, item.permission.action)) return false
+    // Hide plan-gated items until `useMe` resolves to avoid flicker — Sidebar
+    // re-renders when `me` loads, so the items reappear if the feature is on.
+    if (item.feature && me && !features[item.feature]) return false
+    return true
+  })
 
   const handleLogout = async () => {
     try {

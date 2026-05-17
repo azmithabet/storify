@@ -194,6 +194,77 @@ export async function authRoutes(app: FastifyInstance) {
     }
   })
 
+  // ─── GET /api/auth/me — current user + tenant + plan features ────────────
+  // Frontend uses `plan.features` and limits to gate UI before backend rejects.
+  app.get('/me', { preHandler: [authenticate] }, async (request, reply) => {
+    const auth = request.user as JWTPayload
+    const user = await request.tenantDb.user.findUnique({
+      where: { id: auth.userId },
+      include: { role: { select: { id: true, name: true, slug: true, permissions: true } } },
+    })
+    if (!user) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'المستخدم غير موجود' } })
+
+    const tenant = request.tenant
+    return reply.send({
+      success: true,
+      data: {
+        user: {
+          id: user.id,
+          fullName: user.fullName,
+          email: user.email,
+          roleSlug: user.role.slug,
+          branchId: user.branchId ?? '',
+          permissions: (user.role.permissions as Record<string, string[]>) ?? {},
+        },
+        tenant: {
+          id: tenant.id,
+          name: tenant.name,
+          subdomain: tenant.subdomain,
+          plan: {
+            id: tenant.plan.id,
+            name: tenant.plan.name,
+            slug: tenant.plan.slug,
+            features: tenant.plan.features ?? {},
+            limits: {
+              maxProducts: tenant.plan.maxProducts,
+              maxOrders: tenant.plan.maxOrders,
+              maxUsers: tenant.plan.maxUsers,
+              maxStorage: tenant.plan.maxStorage,
+              maxInstallmentPlansMonthly: tenant.plan.maxInstallmentPlansMonthly,
+            },
+          },
+        },
+      },
+    })
+  })
+
+  // ─── GET /api/auth/me/usage — current usage vs. plan limits ─────────────
+  app.get('/me/usage', { preHandler: [authenticate] }, async (request, reply) => {
+    const tenant = request.tenant
+    const plan = tenant.plan
+
+    // installmentPlanCount this calendar month (consistent with installment cap).
+    const now = new Date()
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+
+    const [users, products, invoices, installmentPlansThisMonth] = await Promise.all([
+      request.tenantDb.user.count(),
+      request.tenantDb.product.count(),
+      request.tenantDb.invoice.count(),
+      request.tenantDb.installmentContract.count({ where: { createdAt: { gte: monthStart } } }).catch(() => 0),
+    ])
+
+    return reply.send({
+      success: true,
+      data: {
+        users: { used: users, limit: plan.maxUsers },
+        products: { used: products, limit: plan.maxProducts },
+        invoices: { used: invoices, limit: plan.maxOrders },
+        installmentPlansThisMonth: { used: installmentPlansThisMonth, limit: plan.maxInstallmentPlansMonthly },
+      },
+    })
+  })
+
   // ─── GET /api/auth/users — list all tenant users ─────────────────────────
   app.get('/users', { preHandler: [authenticate, requirePermission('users', 'read')] }, async (request, reply) => {
     const users = await request.tenantDb.user.findMany({

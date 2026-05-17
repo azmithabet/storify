@@ -548,8 +548,10 @@ function Pricing({ plans }: { plans: Plan[] }) {
             كل الباقات بتجي بشهر تجريبي مجاني. تقدر تغير أو تلغي في أي وقت.
           </p>
 
-          <div className="inline-flex items-center gap-1 mt-6 p-1 bg-gray-800 rounded-md border border-gray-700">
+          <div role="group" aria-label="فترة الفواتير" className="inline-flex items-center gap-1 mt-6 p-1 bg-gray-800 rounded-md border border-gray-700">
             <button
+              type="button"
+              aria-pressed={!yearly}
               onClick={() => {
                 setYearly(false)
                 track('pricing_toggle_yearly', { billing: 'monthly' })
@@ -561,6 +563,8 @@ function Pricing({ plans }: { plans: Plan[] }) {
               شهري
             </button>
             <button
+              type="button"
+              aria-pressed={yearly}
               onClick={() => {
                 setYearly(true)
                 track('pricing_toggle_yearly', { billing: 'yearly' })
@@ -571,7 +575,7 @@ function Pricing({ plans }: { plans: Plan[] }) {
             >
               سنوي
               <span className="mr-2 text-[10px] bg-success-500/20 text-success-500 px-1.5 py-0.5 rounded">
-                وفر شهرين
+                وفر ~17%
               </span>
             </button>
           </div>
@@ -617,19 +621,35 @@ function Pricing({ plans }: { plans: Plan[] }) {
                           </span>
                           <span className="text-gray-400 text-sm">جنيه / شهر</span>
                         </div>
+                        <p className="text-[11px] text-gray-500 mt-1">
+                          سعر أساسي — السعر النهائي حسب عدد الفروع والمستخدمين
+                        </p>
                       </>
                     ) : (
-                      <div className="flex items-baseline gap-1">
-                        <span className="font-mono text-4xl font-bold text-gray-50 num">
-                          {Math.round(price)}
-                        </span>
-                        <span className="text-gray-400 text-sm">جنيه / شهر</span>
-                      </div>
-                    )}
-                    {yearly && !isEnterprise && (
-                      <p className="text-xs text-success-500 mt-1">
-                        فاتورة سنوية {Number(plan.priceYearly).toLocaleString()} جنيه
-                      </p>
+                      <>
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-mono text-4xl font-bold text-gray-50 num">
+                            {Math.round(price)}
+                          </span>
+                          <span className="text-gray-400 text-sm">جنيه / شهر</span>
+                        </div>
+                        {yearly && (() => {
+                          const annual = Number(plan.priceYearly)
+                          const monthly = Number(plan.priceMonthly)
+                          const yearlyEquivOfMonthly = monthly * 12
+                          const savings = Math.max(0, yearlyEquivOfMonthly - annual)
+                          return (
+                            <p className="text-xs text-success-500 mt-1">
+                              فاتورة سنوية {annual.toLocaleString()} جنيه
+                              {savings > 0 && (
+                                <span className="mr-1 text-gray-400">
+                                  (توفير {savings.toLocaleString()} جنيه/سنة)
+                                </span>
+                              )}
+                            </p>
+                          )
+                        })()}
+                      </>
                     )}
                     {PRICE_ANCHORS[plan.slug] && (
                       <p className="text-xs text-gray-500 mt-2">{PRICE_ANCHORS[plan.slug]}</p>

@@ -26,6 +26,7 @@ import { Button } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth.store'
 import { api } from '@/api/client'
 import { track } from '@/lib/analytics'
+import { SALES_MESSAGES, whatsappLink } from '@/lib/contact'
 
 interface Plan {
   id: string
@@ -46,8 +47,11 @@ interface Plan {
 const PRICE_ANCHORS: Record<string, string> = {
   starter: 'أقل من 7 جنيه/يوم — ثمن قهوتين',
   professional: 'أرخص من نص ساعة من محاسب شاطر',
-  enterprise: 'باقة شاملة لسلاسل المتاجر',
+  enterprise: 'بنسعّر حسب حجم نشاطك وعدد فروعك',
 }
+
+// Display price for Enterprise — anchor only, real price quoted via sales.
+const ENTERPRISE_ANCHOR_PRICE = 2499
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
@@ -581,6 +585,7 @@ function Pricing({ plans }: { plans: Plan[] }) {
           <div className="grid md:grid-cols-3 gap-4 max-w-5xl mx-auto">
             {sorted.map((plan, idx) => {
               const isFeatured = idx === 1
+              const isEnterprise = plan.slug === 'enterprise'
               const price = yearly ? Number(plan.priceYearly) / 12 : Number(plan.priceMonthly)
               return (
                 <div
@@ -603,13 +608,25 @@ function Pricing({ plans }: { plans: Plan[] }) {
                   </div>
 
                   <div className="mb-4">
-                    <div className="flex items-baseline gap-1">
-                      <span className="font-mono text-4xl font-bold text-gray-50 num">
-                        {Math.round(price)}
-                      </span>
-                      <span className="text-gray-400 text-sm">جنيه / شهر</span>
-                    </div>
-                    {yearly && (
+                    {isEnterprise ? (
+                      <>
+                        <div className="text-xs text-gray-500 mb-1">ابتداءً من</div>
+                        <div className="flex items-baseline gap-1">
+                          <span className="font-mono text-4xl font-bold text-gray-50 num">
+                            {ENTERPRISE_ANCHOR_PRICE.toLocaleString()}
+                          </span>
+                          <span className="text-gray-400 text-sm">جنيه / شهر</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-mono text-4xl font-bold text-gray-50 num">
+                          {Math.round(price)}
+                        </span>
+                        <span className="text-gray-400 text-sm">جنيه / شهر</span>
+                      </div>
+                    )}
+                    {yearly && !isEnterprise && (
                       <p className="text-xs text-success-500 mt-1">
                         فاتورة سنوية {Number(plan.priceYearly).toLocaleString()} جنيه
                       </p>
@@ -663,22 +680,42 @@ function Pricing({ plans }: { plans: Plan[] }) {
                     <FeatureLine enabled={Boolean(plan.features?.api_access)}>API access</FeatureLine>
                   </ul>
 
-                  <Link
-                    to={`/register?plan=${plan.slug}`}
-                    onClick={() =>
-                      track('plan_card_click', {
-                        plan_slug: plan.slug,
-                        plan_name: plan.name,
-                        billing: yearly ? 'yearly' : 'monthly',
-                        position: idx,
-                        is_featured: isFeatured,
-                      })
-                    }
-                  >
-                    <Button variant={isFeatured ? 'primary' : 'outline'} size="lg" className="w-full">
-                      ابدأ بـ {plan.name}
-                    </Button>
-                  </Link>
+                  {isEnterprise ? (
+                    <a
+                      href={whatsappLink(SALES_MESSAGES.enterprise)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() =>
+                        track('enterprise_contact_click', {
+                          channel: 'whatsapp',
+                          source: 'pricing_card',
+                          position: idx,
+                        })
+                      }
+                    >
+                      <Button variant="outline" size="lg" className="w-full">
+                        تواصل معنا
+                        <ArrowLeft className="w-4 h-4" aria-hidden="true" />
+                      </Button>
+                    </a>
+                  ) : (
+                    <Link
+                      to={`/register?plan=${plan.slug}`}
+                      onClick={() =>
+                        track('plan_card_click', {
+                          plan_slug: plan.slug,
+                          plan_name: plan.name,
+                          billing: yearly ? 'yearly' : 'monthly',
+                          position: idx,
+                          is_featured: isFeatured,
+                        })
+                      }
+                    >
+                      <Button variant={isFeatured ? 'primary' : 'outline'} size="lg" className="w-full">
+                        ابدأ بـ {plan.name}
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               )
             })}

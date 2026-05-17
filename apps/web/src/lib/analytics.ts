@@ -37,6 +37,9 @@ export type EventName =
   | 'plan_card_click'
   | 'pricing_toggle_yearly'
   | 'faq_open'
+  // Sales — high-intent contact
+  | 'enterprise_contact_click'
+  | 'sales_whatsapp_click'
   // Register funnel
   | 'register_start'
   | 'register_submit'

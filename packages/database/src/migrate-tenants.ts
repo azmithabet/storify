@@ -46,8 +46,19 @@ export async function runTenantMigrations(schemaName: string, tenantId: string):
       continue
     }
 
-    // Split into individual statements — $executeRawUnsafe rejects multi-statement strings
-    const statements = sql
+    // Split into individual statements — $executeRawUnsafe rejects multi-statement strings.
+    // First strip `--` line comments so a stray `;` inside a comment doesn't break the
+    // split (e.g. "-- rows safely; pre-existing" was being chopped into two statements,
+    // with the second starting with `pre-existing` → Postgres 42601 syntax error).
+    const stripped = sql
+      .split('\n')
+      .map((line) => {
+        const idx = line.indexOf('--')
+        return idx === -1 ? line : line.slice(0, idx)
+      })
+      .join('\n')
+
+    const statements = stripped
       .split(';')
       .map((s) => s.trim())
       .filter((s) => s.length > 0)

@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -25,6 +25,7 @@ import {
 import { Button } from '@/components/ui'
 import { useAuthStore } from '@/stores/auth.store'
 import { api } from '@/api/client'
+import { track } from '@/lib/analytics'
 
 interface Plan {
   id: string
@@ -116,20 +117,29 @@ function Header({ user }: { user: ReturnType<typeof useAuthStore.getState>['user
 
         <div className="hidden md:flex items-center gap-2">
           {user ? (
-            <Link to="/dashboard">
+            <Link
+              to="/dashboard"
+              onClick={() => track('secondary_cta_click', { location: 'header', destination: '/dashboard' })}
+            >
               <Button variant="primary" size="md">
                 افتح لوحة التحكم
-                <ArrowLeft className="w-4 h-4" />
+                <ArrowLeft className="w-4 h-4" aria-hidden="true" />
               </Button>
             </Link>
           ) : (
             <>
-              <Link to="/login">
+              <Link
+                to="/login"
+                onClick={() => track('secondary_cta_click', { location: 'header', destination: '/login' })}
+              >
                 <Button variant="ghost" size="md">
                   تسجيل دخول
                 </Button>
               </Link>
-              <Link to="/register">
+              <Link
+                to="/register"
+                onClick={() => track('secondary_cta_click', { location: 'header', destination: '/register' })}
+              >
                 <Button variant="primary" size="md">
                   ابدأ مجاناً
                 </Button>
@@ -207,13 +217,16 @@ function Hero() {
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-4">
-          <Link to="/register">
+          <Link to="/register" onClick={() => track('hero_cta_click', { destination: '/register' })}>
             <Button variant="primary" size="xl">
               ابدأ تجربتك المجانية
               <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             </Button>
           </Link>
-          <a href="#pricing">
+          <a
+            href="#pricing"
+            onClick={() => track('secondary_cta_click', { location: 'hero', destination: '#pricing' })}
+          >
             <Button variant="outline" size="xl">
               شوف الباقات
             </Button>
@@ -468,7 +481,11 @@ function MidCTA() {
             </div>
             <div className="text-sm text-gray-400">شهر مجاني · بدون كارت ائتمان</div>
           </div>
-          <Link to="/register" className="shrink-0">
+          <Link
+            to="/register"
+            className="shrink-0"
+            onClick={() => track('midcta_cta_click', { destination: '/register' })}
+          >
             <Button variant="primary" size="lg">
               ابدأ مجاناً
               <ArrowLeft className="w-4 h-4" aria-hidden="true" />
@@ -484,6 +501,29 @@ function MidCTA() {
 
 function Pricing({ plans }: { plans: Plan[] }) {
   const [yearly, setYearly] = useState(false)
+  const sectionRef = useRef<HTMLElement | null>(null)
+  const viewedRef = useRef(false)
+
+  // Fire plan_card_view once when the pricing section scrolls into view.
+  // IntersectionObserver gives us cheap, accurate "did the user actually
+  // see this section" data — useful for funnel drop-off analysis.
+  useEffect(() => {
+    if (!sectionRef.current || viewedRef.current) return
+    const obs = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && !viewedRef.current) {
+            viewedRef.current = true
+            track('plan_card_view', { plan_count: plans.length })
+            obs.disconnect()
+          }
+        }
+      },
+      { threshold: 0.3 },
+    )
+    obs.observe(sectionRef.current)
+    return () => obs.disconnect()
+  }, [plans.length])
 
   // Sort by sortOrder if provided, fall back to API order
   const sorted = [...plans].sort((a, b) =>
@@ -491,7 +531,7 @@ function Pricing({ plans }: { plans: Plan[] }) {
   )
 
   return (
-    <section id="pricing" className="py-20 md:py-28">
+    <section id="pricing" ref={sectionRef} className="py-20 md:py-28">
       <div className="max-w-7xl mx-auto px-4">
         <div className="text-center max-w-2xl mx-auto mb-12">
           <div className="inline-block px-3 py-1 rounded-full bg-brand-500/10 text-brand-300 text-xs font-medium mb-4">
@@ -506,7 +546,10 @@ function Pricing({ plans }: { plans: Plan[] }) {
 
           <div className="inline-flex items-center gap-1 mt-6 p-1 bg-gray-800 rounded-md border border-gray-700">
             <button
-              onClick={() => setYearly(false)}
+              onClick={() => {
+                setYearly(false)
+                track('pricing_toggle_yearly', { billing: 'monthly' })
+              }}
               className={`px-4 py-1.5 text-sm rounded transition-colors ${
                 !yearly ? 'bg-brand-500 text-white' : 'text-gray-400 hover:text-gray-200'
               }`}
@@ -514,7 +557,10 @@ function Pricing({ plans }: { plans: Plan[] }) {
               شهري
             </button>
             <button
-              onClick={() => setYearly(true)}
+              onClick={() => {
+                setYearly(true)
+                track('pricing_toggle_yearly', { billing: 'yearly' })
+              }}
               className={`px-4 py-1.5 text-sm rounded transition-colors ${
                 yearly ? 'bg-brand-500 text-white' : 'text-gray-400 hover:text-gray-200'
               }`}
@@ -617,7 +663,18 @@ function Pricing({ plans }: { plans: Plan[] }) {
                     <FeatureLine enabled={Boolean(plan.features?.api_access)}>API access</FeatureLine>
                   </ul>
 
-                  <Link to={`/register?plan=${plan.slug}`}>
+                  <Link
+                    to={`/register?plan=${plan.slug}`}
+                    onClick={() =>
+                      track('plan_card_click', {
+                        plan_slug: plan.slug,
+                        plan_name: plan.name,
+                        billing: yearly ? 'yearly' : 'monthly',
+                        position: idx,
+                        is_featured: isFeatured,
+                      })
+                    }
+                  >
                     <Button variant={isFeatured ? 'primary' : 'outline'} size="lg" className="w-full">
                       ابدأ بـ {plan.name}
                     </Button>
@@ -824,7 +881,14 @@ function FAQ() {
                 className="bg-gray-800/60 border border-gray-800 rounded-r-md overflow-hidden"
               >
                 <button
-                  onClick={() => setOpenIdx(open ? null : i)}
+                  onClick={() => {
+                    const next = open ? null : i
+                    setOpenIdx(next)
+                    if (next !== null) {
+                      // Truncate question for clean GA UI; keep index for sorting
+                      track('faq_open', { question_index: i, question: it.q.slice(0, 80) })
+                    }
+                  }}
                   className="w-full px-5 py-4 flex items-center justify-between text-right gap-4 hover:bg-gray-800 transition-colors"
                 >
                   <span className="font-medium text-gray-100">{it.q}</span>
@@ -861,13 +925,19 @@ function FinalCTA() {
           5 دقايق إعداد. شهر مجاني كامل. مفيش كارت ائتمان مطلوب.
         </p>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-          <Link to="/register">
+          <Link
+            to="/register"
+            onClick={() => track('finalcta_cta_click', { destination: '/register' })}
+          >
             <Button variant="primary" size="xl">
               ابدأ تجربتك المجانية
               <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             </Button>
           </Link>
-          <Link to="/login">
+          <Link
+            to="/login"
+            onClick={() => track('secondary_cta_click', { location: 'finalcta', destination: '/login' })}
+          >
             <Button variant="outline" size="xl">
               لدي حساب بالفعل
             </Button>

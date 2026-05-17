@@ -1,8 +1,9 @@
-import { lazy, Suspense, type ReactNode } from 'react'
+import { lazy, Suspense, useEffect, type ReactNode } from 'react'
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { AuthGuard, GuestGuard, RoleGuard } from '@/components/guards/AuthGuard'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Skeleton } from '@/components/ui'
+import { trackPageView } from '@/lib/analytics'
 
 const Landing = lazy(() => import('@/pages/Landing'))
 const Login = lazy(() => import('@/pages/auth/Login'))
@@ -36,6 +37,12 @@ const PageLoader = () => (
 
 function RouteBoundary({ children }: { children: ReactNode }) {
   const location = useLocation()
+
+  // Track SPA route changes as GA4 page_views. No-op when GA is disabled.
+  useEffect(() => {
+    trackPageView(location.pathname + location.search, document.title)
+  }, [location.pathname, location.search])
+
   return <ErrorBoundary resetKey={location.pathname}>{children}</ErrorBoundary>
 }
 

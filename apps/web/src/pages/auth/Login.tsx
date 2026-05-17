@@ -10,6 +10,7 @@ import { Button, Input, Alert } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { useAuthStore, type AuthUser } from '@/stores/auth.store'
+import { track } from '@/lib/analytics'
 
 const schema = z.object({
   email: z.string().email('بريد إلكتروني غير صالح'),
@@ -34,6 +35,7 @@ export default function Login() {
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: async (data: FormData) => {
+      track('login_submit', {})
       const res = await api.post<{ success: boolean; data: { accessToken: string; user: AuthUser } }>(
         '/auth/login',
         { email: data.email, password: data.password },
@@ -43,8 +45,16 @@ export default function Login() {
     },
     onSuccess: ({ accessToken, user, subdomain }) => {
       setAuth(user, accessToken, subdomain)
+      track('login_success', { role: user.roleSlug })
       toast.success('تم تسجيل الدخول بنجاح')
       navigate(from, { replace: true })
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { status?: number; data?: { error?: { code?: string } } } }
+      track('login_failure', {
+        error_code: e?.response?.data?.error?.code ?? 'unknown',
+        status: e?.response?.status ?? 0,
+      })
     },
   })
 
@@ -57,7 +67,7 @@ export default function Login() {
         </div>
 
         <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-8 shadow-xl">
-          {error && (
+          {Boolean(error) && (
             <Alert variant="danger" className="mb-6">
               {getApiErrorMessage(error, 'خطأ في تسجيل الدخول')}
             </Alert>

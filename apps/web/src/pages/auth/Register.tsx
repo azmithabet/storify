@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -10,6 +10,7 @@ import { Button, Input, Alert, Select } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatNumber } from '@/lib/format'
+import { track } from '@/lib/analytics'
 
 interface Plan {
   id: string
@@ -39,6 +40,12 @@ export default function Register() {
   // Pre-fill plan from Landing.tsx pricing CTA: /register?plan=<slug>
   const initialPlan = searchParams.get('plan') ?? ''
 
+  // Funnel entry — fire once on mount with the plan they arrived with
+  useEffect(() => {
+    track('register_start', { plan_slug: initialPlan || 'none' })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const { data: plans } = useQuery<Plan[]>({
     queryKey: ['plans'],
     queryFn: async () => {
@@ -54,6 +61,7 @@ export default function Register() {
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: async (data: FormData) => {
+      track('register_submit', { plan_slug: data.planSlug })
       await api.post('/tenants/register', {
         name: data.name,
         subdomain: data.subdomain,
@@ -62,10 +70,18 @@ export default function Register() {
         ownerEmail: data.ownerEmail,
         ownerPassword: data.ownerPassword,
       })
+      return { plan_slug: data.planSlug }
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
+      track('register_success', { plan_slug: result.plan_slug })
       toast.success('تم إنشاء المتجر بنجاح!')
       navigate('/login')
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { error?: { code?: string } } } }
+      track('register_failure', {
+        error_code: e?.response?.data?.error?.code ?? 'unknown',
+      })
     },
   })
 
@@ -78,7 +94,7 @@ export default function Register() {
         </div>
 
         <div className="bg-gray-800 rounded-r-xl border border-gray-700 p-8 shadow-xl">
-          {error && (
+          {Boolean(error) && (
             <Alert variant="danger" className="mb-6">
               {getApiErrorMessage(error)}
             </Alert>

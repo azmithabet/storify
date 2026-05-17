@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import {
@@ -36,7 +36,16 @@ interface Plan {
   maxProducts: number
   maxOrders: number
   maxUsers: number
+  maxInstallmentPlansMonthly?: number
   features: Record<string, boolean | number>
+}
+
+// Value-anchor copy per plan slug (under the price headline).
+// Reframes "199 EGP/mo" from cost to compared-value.
+const PRICE_ANCHORS: Record<string, string> = {
+  starter: 'أقل من 7 جنيه/يوم — ثمن قهوتين',
+  professional: 'أرخص من نص ساعة من محاسب شاطر',
+  enterprise: 'باقة شاملة لسلاسل المتاجر',
 }
 
 // ─── Page ────────────────────────────────────────────────────────────────────
@@ -518,6 +527,8 @@ function Pricing({ plans }: { plans: Plan[] }) {
           </div>
         </div>
 
+        <VsAlternativesStrip />
+
         {sorted.length === 0 ? (
           <div className="text-center text-gray-500 py-12">جاري تحميل الباقات…</div>
         ) : (
@@ -557,6 +568,9 @@ function Pricing({ plans }: { plans: Plan[] }) {
                         فاتورة سنوية {Number(plan.priceYearly).toLocaleString()} جنيه
                       </p>
                     )}
+                    {PRICE_ANCHORS[plan.slug] && (
+                      <p className="text-xs text-gray-500 mt-2">{PRICE_ANCHORS[plan.slug]}</p>
+                    )}
                   </div>
 
                   {/* Limits strip — scannable comparison across plans */}
@@ -586,7 +600,16 @@ function Pricing({ plans }: { plans: Plan[] }) {
                   </div>
 
                   <ul className="space-y-2 mb-8 flex-1 text-sm text-gray-300">
-                    <FeatureLine enabled={Boolean(plan.features?.installments)}>أقساط</FeatureLine>
+                    <FeatureLine enabled={(plan.maxInstallmentPlansMonthly ?? 0) > 0}>
+                      أقساط
+                      {(plan.maxInstallmentPlansMonthly ?? 0) > 0 && (
+                        <span className="text-xs text-gray-500 mr-1">
+                          {plan.maxInstallmentPlansMonthly! >= 999_999
+                            ? '— بلا حدود'
+                            : `— حتى ${plan.maxInstallmentPlansMonthly} خطة/شهر`}
+                        </span>
+                      )}
+                    </FeatureLine>
                     <FeatureLine enabled={Boolean(plan.features?.multi_currency)}>عملات متعددة</FeatureLine>
                     <FeatureLine enabled={Boolean(plan.features?.suppliers)}>موردين وأوامر شراء</FeatureLine>
                     <FeatureLine enabled={Boolean(plan.features?.expenses)}>مصروفات</FeatureLine>
@@ -643,6 +666,101 @@ function formatCompact(n: number): string {
     return (k % 1 === 0 ? k.toFixed(0) : k.toFixed(1)) + 'K'
   }
   return String(n)
+}
+
+// ─── vs-Alternatives strip ───────────────────────────────────────────────────
+// Reframes the price by comparing to the real alternatives Egyptian retail
+// uses today: paper/Excel (free but slow + ETA risk) and a manual accountant
+// (1.5-3k EGP/mo). Anchors Storify Starter as the obvious value.
+
+function VsAlternativesStrip() {
+  const rows = [
+    {
+      label: 'السرعة',
+      paper: 'بطيء',
+      accountant: '2-3 أيام',
+      storify: 'لحظي',
+      storifyGood: true,
+    },
+    {
+      label: 'ETA معتمد',
+      paper: 'لا (غرامة 20,000+ جنيه)',
+      accountant: 'جزئي',
+      storify: 'بالكامل',
+      storifyGood: true,
+    },
+    {
+      label: 'أقساط',
+      paper: 'يدوي / دفتر',
+      accountant: 'لا',
+      storify: 'نظام كامل',
+      storifyGood: true,
+    },
+    {
+      label: 'التكلفة الشهرية',
+      paper: 'وقتك (4-6 ساعات/يوم)',
+      accountant: '1,500–3,000 جنيه',
+      storify: 'من 199 جنيه',
+      storifyGood: true,
+    },
+  ]
+  return (
+    <div className="max-w-5xl mx-auto mb-12 bg-gray-800/40 border border-gray-800 rounded-r-xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-gray-800 bg-gray-900/40">
+        <div className="text-xs text-gray-500 uppercase tracking-wider mb-1">قارن بنفسك</div>
+        <div className="text-sm text-gray-300">
+          منافسنا الحقيقي مش نظام تاني — منافسنا هو الورقة والمحاسب.
+        </div>
+      </div>
+      <div className="grid grid-cols-4 text-xs sm:text-sm">
+        <div className="px-3 py-3 bg-gray-900/30 border-b border-gray-800 text-gray-500 text-[10px] uppercase tracking-wider">
+          المعيار
+        </div>
+        <div className="px-3 py-3 bg-gray-900/30 border-b border-gray-800 text-center text-gray-400">
+          📓 ورق / Excel
+        </div>
+        <div className="px-3 py-3 bg-gray-900/30 border-b border-gray-800 text-center text-gray-400">
+          🧾 محاسب يدوي
+        </div>
+        <div className="px-3 py-3 bg-brand-900/40 border-b border-brand-500/40 text-center font-semibold text-brand-300">
+          ⚡ Storify
+        </div>
+
+        {rows.map((r, i) => (
+          <Fragment key={r.label}>
+            <div
+              className={`px-3 py-3 text-gray-300 ${
+                i < rows.length - 1 ? 'border-b border-gray-800/60' : ''
+              }`}
+            >
+              {r.label}
+            </div>
+            <div
+              className={`px-3 py-3 text-center text-gray-500 ${
+                i < rows.length - 1 ? 'border-b border-gray-800/60' : ''
+              }`}
+            >
+              {r.paper}
+            </div>
+            <div
+              className={`px-3 py-3 text-center text-gray-500 ${
+                i < rows.length - 1 ? 'border-b border-gray-800/60' : ''
+              }`}
+            >
+              {r.accountant}
+            </div>
+            <div
+              className={`px-3 py-3 text-center font-medium ${
+                r.storifyGood ? 'text-success-500' : 'text-gray-300'
+              } ${i < rows.length - 1 ? 'border-b border-brand-500/20 bg-brand-900/20' : 'bg-brand-900/20'}`}
+            >
+              {r.storify}
+            </div>
+          </Fragment>
+        ))}
+      </div>
+    </div>
+  )
 }
 
 // ─── FAQ ─────────────────────────────────────────────────────────────────────

@@ -20,6 +20,10 @@ model Plan {
   maxOrders    Int      @default(500)  @map("max_orders")
   maxUsers     Int      @default(3)    @map("max_users")
   maxStorage   Int      @default(1024) @map("max_storage")
+  // Per-calendar-month cap on installment contract creation.
+  // 0 = feature disabled (legacy); 999999 = effectively unlimited.
+  // Enforced server-side in apps/api/src/modules/installments/installment.routes.ts.
+  maxInstallmentPlansMonthly Int @default(0) @map("max_installment_plans_monthly")
   priceMonthly Decimal  @db.Decimal(10, 2) @map("price_monthly")
   priceYearly  Decimal  @db.Decimal(10, 2) @map("price_yearly")
   features     Json     @default("[]")

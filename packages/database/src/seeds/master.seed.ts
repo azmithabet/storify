@@ -17,11 +17,15 @@ const plans = [
     maxOrders: 300,
     maxUsers: 3,
     maxStorage: 512,
+    // Installments now unlocked at every tier (was the #1 differentiating
+    // feature for Egyptian retail and the biggest leak in Starter). Volume
+    // cap creates upgrade pressure instead of a hard feature wall.
+    maxInstallmentPlansMonthly: 15,
     sortOrder: 1,
     features: {
       max_branches: 1,
       max_users: 3,
-      installments: false,
+      installments: true,
       multi_currency: false,
       suppliers: false,
       expenses: false,
@@ -40,6 +44,7 @@ const plans = [
     maxOrders: 3000,
     maxUsers: 10,
     maxStorage: 5120,
+    maxInstallmentPlansMonthly: 100,
     sortOrder: 2,
     features: {
       max_branches: 5,
@@ -63,6 +68,7 @@ const plans = [
     maxOrders: 999999,
     maxUsers: 999999,
     maxStorage: 102400,
+    maxInstallmentPlansMonthly: 999999,
     sortOrder: 3,
     features: {
       max_branches: -1,

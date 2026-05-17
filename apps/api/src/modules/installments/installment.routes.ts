@@ -50,6 +50,45 @@ export async function installmentRoutes(app: FastifyInstance) {
       })
     }
 
+    // ─── Plan quota enforcement ─────────────────────────────────────────────
+    // Installments are now unlocked at every tier (was Pro+ only) but capped
+    // per calendar month. tenantMiddleware already hydrated request.tenant.plan
+    // from the master DB (cached in Redis).
+    const plan = request.tenant?.plan as { maxInstallmentPlansMonthly?: number } | undefined
+    const monthlyLimit = plan?.maxInstallmentPlansMonthly ?? 0
+
+    if (monthlyLimit === 0) {
+      return reply.status(403).send({
+        success: false,
+        error: {
+          code: 'installments_not_in_plan',
+          message: 'الأقساط غير متاحة في باقتك الحالية. ترقّى لباقة أعلى لتفعيلها.',
+        },
+      })
+    }
+
+    if (monthlyLimit < 999_999) {
+      const monthStart = new Date()
+      monthStart.setDate(1)
+      monthStart.setHours(0, 0, 0, 0)
+
+      const usedThisMonth = await request.tenantDb.installmentContract.count({
+        where: { createdAt: { gte: monthStart } },
+      })
+
+      if (usedThisMonth >= monthlyLimit) {
+        return reply.status(402).send({
+          success: false,
+          error: {
+            code: 'installments_quota_exceeded',
+            message: `وصلت لحد ${monthlyLimit} خطة قسط في الشهر. ترقّى لباقة أعلى لإضافة المزيد.`,
+            used: usedThisMonth,
+            limit: monthlyLimit,
+          },
+        })
+      }
+    }
+
     const actor = request.user as JWTPayload
 
     try {

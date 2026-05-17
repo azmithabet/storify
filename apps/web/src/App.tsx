@@ -4,6 +4,7 @@ import { AuthGuard, GuestGuard, RoleGuard } from '@/components/guards/AuthGuard'
 import { ErrorBoundary } from '@/components/ErrorBoundary'
 import { Skeleton } from '@/components/ui'
 
+const Landing = lazy(() => import('@/pages/Landing'))
 const Login = lazy(() => import('@/pages/auth/Login'))
 const ForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'))
 const ResetPassword = lazy(() => import('@/pages/auth/ResetPassword'))
@@ -52,10 +53,13 @@ export default function App() {
           {/* Dev route (no auth required in dev) */}
           <Route path="/dev/components" element={<ComponentsShowcase />} />
 
+          {/* Public marketing landing — visible to everyone */}
+          <Route path="/" element={<Landing />} />
+
           {/* Protected routes — each wrapped in RoleGuard so unauthorized users
               see a friendly "forbidden" view rather than a half-loaded page
               with all empty data and 403s in the console. Super-admin bypasses. */}
-          <Route path="/" element={<AuthGuard><Dashboard /></AuthGuard>} />
+          <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
           <Route path="/pos" element={<AuthGuard><RoleGuard resource="invoices" action="create"><POS /></RoleGuard></AuthGuard>} />
           <Route path="/day-close" element={<AuthGuard><RoleGuard resource="reports" action="read"><DayClose /></RoleGuard></AuthGuard>} />
           <Route path="/products/*" element={<AuthGuard><RoleGuard resource="products" action="read"><Products /></RoleGuard></AuthGuard>} />

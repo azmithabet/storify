@@ -1,0 +1,28 @@
+# https://talabia.app/robots.txt
+# Storify — multi-tenant retail SaaS for Egypt
+
+User-agent: *
+Allow: /
+
+# Authenticated app surface — not for indexing
+Disallow: /api/
+Disallow: /dashboard
+Disallow: /pos
+Disallow: /day-close
+Disallow: /products
+Disallow: /stock
+Disallow: /customers
+Disallow: /invoices
+Disallow: /installments
+Disallow: /suppliers
+Disallow: /purchase-orders
+Disallow: /expenses
+Disallow: /reports
+Disallow: /returns
+Disallow: /settings
+Disallow: /dev/
+
+# Crawl-delay is ignored by Google but respected by some others
+Crawl-delay: 1
+
+Sitemap: https://talabia.app/sitemap.xml

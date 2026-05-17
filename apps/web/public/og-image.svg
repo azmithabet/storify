@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <!-- Background gradient -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#0B1220"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#6366F1" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#6366F1" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Grid pattern -->
+  <g stroke="#1E293B" stroke-width="1" opacity="0.5">
+    <line x1="0" y1="100"  x2="1200" y2="100"/>
+    <line x1="0" y1="200"  x2="1200" y2="200"/>
+    <line x1="0" y1="300"  x2="1200" y2="300"/>
+    <line x1="0" y1="400"  x2="1200" y2="400"/>
+    <line x1="0" y1="500"  x2="1200" y2="500"/>
+    <line x1="0"   y1="0" x2="0"   y2="630"/>
+    <line x1="200" y1="0" x2="200" y2="630"/>
+    <line x1="400" y1="0" x2="400" y2="630"/>
+    <line x1="600" y1="0" x2="600" y2="630"/>
+    <line x1="800" y1="0" x2="800" y2="630"/>
+    <line x1="1000" y1="0" x2="1000" y2="630"/>
+  </g>
+
+  <!-- Logo block (top right because RTL) -->
+  <g transform="translate(960, 80)">
+    <rect width="64" height="64" rx="10" fill="#6366F1"/>
+    <text x="32" y="48" font-family="Arial, sans-serif" font-size="40" font-weight="700"
+          fill="white" text-anchor="middle">S</text>
+  </g>
+  <text x="1040" y="125" font-family="Arial, sans-serif" font-size="32" font-weight="700"
+        fill="#F1F5F9">Storify</text>
+
+  <!-- Main heading -->
+  <text x="600" y="290" font-family="Arial, sans-serif" font-size="64" font-weight="800"
+        fill="#F8FAFC" text-anchor="middle">نظام إدارة متاجر</text>
+  <text x="600" y="370" font-family="Arial, sans-serif" font-size="64" font-weight="800"
+        fill="#818CF8" text-anchor="middle">متكامل — مصري بالكامل</text>
+
+  <!-- Tagline -->
+  <text x="600" y="450" font-family="Arial, sans-serif" font-size="28" font-weight="400"
+        fill="#94A3B8" text-anchor="middle">POS · مخزون · أقساط · فاتورة إلكترونية ETA · تقارير</text>
+
+  <!-- URL -->
+  <text x="600" y="540" font-family="monospace" font-size="22" font-weight="500"
+        fill="#6366F1" text-anchor="middle">talabia.app</text>
+
+  <!-- Pill -->
+  <g transform="translate(530, 565)">
+    <rect width="140" height="32" rx="16" fill="#10B981" opacity="0.15" stroke="#10B981" stroke-width="1"/>
+    <text x="70" y="22" font-family="Arial, sans-serif" font-size="14" font-weight="600"
+          fill="#10B981" text-anchor="middle">ابدأ مجاناً</text>
+  </g>
+</svg>

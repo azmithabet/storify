@@ -61,7 +61,8 @@ export default function Landing() {
       <PainPoints />
       <Features />
       <Pricing plans={plans} />
-      <Testimonials />
+      {/* Testimonials removed — re-add once we have real customer quotes.
+          Fake testimonials hurt trust and violate Google review policies. */}
       <FAQ />
       <FinalCTA />
       <Footer />
@@ -569,62 +570,6 @@ function FeatureLine({ children, enabled = true }: { children: React.ReactNode; 
   )
 }
 
-// ─── Testimonials ────────────────────────────────────────────────────────────
-
-function Testimonials() {
-  const items = [
-    {
-      quote:
-        '“النظام وفر علينا ساعات في اليوم. الفاتورة الإلكترونية بقت تلقائياً، وما عدنا نخاف من غرامات ETA.”',
-      name: 'أحمد ع.',
-      role: 'صاحب متجر إلكترونيات، القاهرة',
-    },
-    {
-      quote:
-        '“إدارة الأقساط لوحدها بتسوي قيمة الاشتراك. كل عميل متابع، وما في قسط بيفوت.”',
-      name: 'منى ج.',
-      role: 'سلسلة بوتيكات، الإسكندرية',
-    },
-    {
-      quote:
-        '“ربطنا 3 فروع في أسبوع. التقارير اللحظية خلتنا نقرر تنقلات البضاعة بناءً على بيانات حقيقية.”',
-      name: 'كريم س.',
-      role: 'سوبر ماركت، الجيزة',
-    },
-  ]
-  return (
-    <section className="py-20 md:py-28 bg-gray-900/40 border-y border-gray-800">
-      <div className="max-w-7xl mx-auto px-4">
-        <div className="text-center max-w-2xl mx-auto mb-12">
-          <div className="inline-block px-3 py-1 rounded-full bg-brand-500/10 text-brand-300 text-xs font-medium mb-4">
-            تجارب حقيقية
-          </div>
-          <h2 className="font-display text-3xl md:text-4xl font-bold text-gray-50 mb-4">
-            تجار اختاروا Storify — وما رجعوش.
-          </h2>
-        </div>
-
-        <div className="grid md:grid-cols-3 gap-4">
-          {items.map((t) => (
-            <div key={t.name} className="bg-gray-800/60 border border-gray-800 rounded-r-xl p-6">
-              <p className="text-gray-300 leading-relaxed mb-6">{t.quote}</p>
-              <div className="flex items-center gap-3 pt-4 border-t border-gray-800">
-                <div className="w-10 h-10 rounded-full bg-brand-500/20 text-brand-400 flex items-center justify-center font-semibold">
-                  {t.name[0]}
-                </div>
-                <div>
-                  <div className="text-sm font-medium text-gray-100">{t.name}</div>
-                  <div className="text-xs text-gray-500">{t.role}</div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 // ─── FAQ ─────────────────────────────────────────────────────────────────────
 
 function FAQ() {
@@ -726,15 +671,17 @@ function FinalCTA() {
           <Link to="/register">
             <Button variant="primary" size="xl">
               ابدأ تجربتك المجانية
-              <ArrowLeft className="w-5 h-5" />
+              <ArrowLeft className="w-5 h-5" aria-hidden="true" />
             </Button>
           </Link>
-          <a href="https://wa.me/201000000000" target="_blank" rel="noreferrer">
+          <Link to="/login">
             <Button variant="outline" size="xl">
-              تواصل بالواتساب
+              لدي حساب بالفعل
             </Button>
-          </a>
+          </Link>
         </div>
+        {/* TODO: re-add WhatsApp CTA once a real business number is connected.
+            Previously hard-coded to wa.me/201000000000 which is a placeholder. */}
       </div>
     </section>
   )

@@ -1,21 +1,71 @@
 <!doctype html>
-<html lang="ar" dir="rtl">
+<html lang="ar-EG" dir="rtl">
   <head>
     <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#6366f1" />
+
+    <!-- Canonical -->
+    <link rel="canonical" href="https://talabia.app/" />
+
+    <!-- Icons & manifest -->
     <link rel="icon" type="image/svg+xml" href="/storify-icon.svg" />
     <link rel="manifest" href="/manifest.json" />
-    <meta name="theme-color" content="#6366f1" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- Primary SEO -->
+    <title>Storify — نظام إدارة متاجر متكامل</title>
     <meta name="description" content="Storify — نظام إدارة متاجر متكامل: نقطة بيع، مخزون، أقساط، فاتورة إلكترونية ETA. ابدأ تجربتك المجانية." />
+    <meta name="keywords" content="نظام نقاط بيع, POS مصر, فاتورة إلكترونية, ETA, إدارة متاجر, أقساط, مخزون, Storify, talabia" />
+    <meta name="author" content="Storify" />
+
+    <!-- Open Graph (Facebook, WhatsApp, LinkedIn) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://talabia.app/" />
     <meta property="og:title" content="Storify — نظام إدارة متاجر متكامل" />
     <meta property="og:description" content="نقطة بيع، مخزون، أقساط، فاتورة إلكترونية معتمدة من ETA. لمتجرك أو سلسلة فروعك في مصر." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://talabia.app" />
+    <meta property="og:image" content="https://talabia.app/og-image.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Storify — نظام إدارة متاجر متكامل" />
+    <meta property="og:locale" content="ar_EG" />
+    <meta property="og:site_name" content="Storify" />
+
+    <!-- Twitter / X -->
     <meta name="twitter:card" content="summary_large_image" />
-    <title>Storify — نظام إدارة متاجر متكامل</title>
+    <meta name="twitter:title" content="Storify — نظام إدارة متاجر متكامل" />
+    <meta name="twitter:description" content="نقطة بيع، مخزون، أقساط، فاتورة إلكترونية ETA. ابدأ مجاناً." />
+    <meta name="twitter:image" content="https://talabia.app/og-image.png" />
+
+    <!-- Robots -->
+    <meta name="robots" content="index, follow, max-image-preview:large" />
+    <meta name="googlebot" content="index, follow" />
   </head>
   <body>
     <div id="root"></div>
+
+    <!-- Fallback for crawlers/users without JS. The real app is React-rendered. -->
+    <noscript>
+      <div style="max-width:720px;margin:48px auto;padding:24px;font-family:Arial,sans-serif;color:#F1F5F9;background:#0F172A;border-radius:8px;text-align:center;direction:rtl;">
+        <h1 style="color:#818CF8;margin:0 0 12px;">Storify — نظام إدارة متاجر متكامل</h1>
+        <p style="color:#94A3B8;line-height:1.7;">
+          نقطة بيع، مخزون، أقساط، فاتورة إلكترونية معتمدة من مصلحة الضرائب،
+          وتقارير لحظية — لمتجرك أو سلسلة فروعك في مصر.
+        </p>
+        <p style="margin-top:16px;">
+          <a href="/register" style="display:inline-block;background:#6366F1;color:white;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">
+            ابدأ تجربتك المجانية
+          </a>
+          &nbsp;
+          <a href="/login" style="color:#818CF8;text-decoration:none;">
+            تسجيل دخول
+          </a>
+        </p>
+        <p style="margin-top:24px;color:#64748B;font-size:14px;">
+          هذا الموقع يحتاج JavaScript للعمل بشكل كامل. الرجاء تفعيله في المتصفح.
+        </p>
+      </div>
+    </noscript>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

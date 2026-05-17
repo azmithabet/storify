@@ -1,6 +1,7 @@
 import { FastifyRequest, FastifyReply } from 'fastify'
 import { masterDb, getTenantDb } from '../../config/database'
 import { redis } from '../../config/redis'
+import { config } from '../../config/env'
 
 const SYSTEM_HOSTS = new Set(['admin', 'www', 'api', 'localhost', '127.0.0.1'])
 const CACHE_TTL_SECONDS = 300 // 5 minutes
@@ -15,9 +16,27 @@ export async function tenantMiddleware(
 ): Promise<void> {
   // strip port if present (e.g. "localhost:3000" → "localhost")
   const hostname = request.hostname.split(':')[0]
-  let subdomain = hostname.split('.')[0]
+  const baseDomain = config.APP_BASE_DOMAIN
 
-  // In dev the frontend runs on localhost — fall back to the X-Tenant-Subdomain header
+  // Resolve subdomain relative to the platform base domain when configured.
+  // Without this, a request to the bare platform host (e.g. "talabia.app") was
+  // treated as if "talabia" were a tenant subdomain — causing 404s on /api/auth/*
+  // and every other tenant-scoped route from the marketing/login page.
+  let subdomain: string
+  if (baseDomain && hostname === baseDomain) {
+    // Bare platform domain — no tenant prefix; rely on X-Tenant-Subdomain header.
+    subdomain = ''
+  } else if (baseDomain && hostname.endsWith(`.${baseDomain}`)) {
+    // <subdomain>.<baseDomain> — strip the suffix and take the first remaining label.
+    const prefix = hostname.slice(0, -(baseDomain.length + 1))
+    subdomain = prefix.split('.')[0]
+  } else {
+    // Dev (localhost), IPs, Railway internal host, or APP_BASE_DOMAIN not configured —
+    // fall back to the original first-label heuristic.
+    subdomain = hostname.split('.')[0]
+  }
+
+  // In dev (and on the bare platform domain) the frontend sends the tenant via header.
   if (SYSTEM_HOSTS.has(subdomain) || !subdomain) {
     const header = request.headers['x-tenant-subdomain']
     subdomain = Array.isArray(header) ? header[0] : (header ?? '')

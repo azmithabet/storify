@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
+import { requireUnderLimit } from '../../shared/middleware/limit.middleware'
 import {
   createInvoiceSchema,
   listInvoicesSchema,
@@ -25,7 +26,7 @@ export async function invoiceRoutes(app: FastifyInstance) {
   })
 
   // ─── POST /api/invoices ──────────────────────────────────────────────────────
-  app.post('/', { preHandler: requirePermission('invoices', 'create') }, async (request, reply) => {
+  app.post('/', { preHandler: [requirePermission('invoices', 'create'), requireUnderLimit('invoices')] }, async (request, reply) => {
     const parsed = createInvoiceSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.status(400).send({

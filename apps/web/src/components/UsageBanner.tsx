@@ -5,7 +5,7 @@ import { useUsage, type UsageItem } from '@/hooks/useMe'
 const LABELS: Record<string, string> = {
   users: 'المستخدمين',
   products: 'المنتجات',
-  invoices: 'الفواتير',
+  invoicesThisMonth: 'الفواتير هذا الشهر',
   installmentPlansThisMonth: 'خطط الأقساط هذا الشهر',
 }
 

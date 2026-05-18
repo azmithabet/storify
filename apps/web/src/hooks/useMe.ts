@@ -73,7 +73,10 @@ export interface UsageItem {
 export interface UsageResponse {
   users: UsageItem
   products: UsageItem
-  invoices: UsageItem
+  // Renamed from `invoices` (all-time) to `invoicesThisMonth` so that the
+  // displayed count matches what the server actually enforces — the per-month
+  // requireUnderLimit('invoices') check.
+  invoicesThisMonth: UsageItem
   installmentPlansThisMonth: UsageItem
 }
 

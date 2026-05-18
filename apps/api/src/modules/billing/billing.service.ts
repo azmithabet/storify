@@ -1,9 +1,32 @@
 import { masterDb } from '@/config/database'
+import { redis } from '@/config/redis'
 import { PaymobClient, type PaymobBillingData } from './paymob.client'
 import { sendEmail } from '@/shared/utils/email'
 import Decimal from 'decimal.js'
 import { Prisma } from '@storify/database'
 import dayjs from 'dayjs'
+
+/**
+ * Webhook handlers and admin cancellation flip subscription state, which the
+ * tenant middleware caches in two keys:
+ *   • `tenant:{subdomain}`   — full tenant row incl. plan (5 min TTL)
+ *   • `sub:status:{tenantId}` — latest sub.status (30s TTL)
+ *
+ * Without explicit invalidation, a user whose card just cleared could still
+ * be served a stale 402 for up to 30s; one whose card just bounced could
+ * keep using the system for the same window. Short, but irritating — and
+ * easy to fix at the write site.
+ */
+async function invalidateSubscriptionCaches(tenantId: string) {
+  const tenant = await masterDb.tenant.findUnique({
+    where: { id: tenantId },
+    select: { subdomain: true },
+  })
+  await Promise.all([
+    redis.del(`sub:status:${tenantId}`),
+    tenant ? redis.del(`tenant:${tenant.subdomain}`) : Promise.resolve(0),
+  ])
+}
 
 /**
  * Adds one billing cycle to `start` using calendar math, not raw setMonth /
@@ -105,6 +128,9 @@ export async function handleWebhookSuccess(params: {
           status: 'ACTIVE',
           failedAttempts: 0,
           lastFailureReason: null,
+          // Clear the dunning anchor so a future failure starts a fresh 3/7/14
+          // cycle instead of inheriting the prior failure window.
+          lastFailedAt: null,
           lastPaymentAt: periodStart,
           nextBillingAt: periodEnd,
           currentPeriodStart: periodStart,
@@ -120,6 +146,8 @@ export async function handleWebhookSuccess(params: {
     }
     throw err
   }
+
+  await invalidateSubscriptionCaches(tenantId)
 
   const tenant = await masterDb.tenant.findUnique({ where: { id: tenantId } })
   if (tenant) {
@@ -174,6 +202,10 @@ export async function handleWebhookFailure(params: {
         data: {
           failedAttempts: newFailedAttempts,
           lastFailureReason: errorMessage ?? 'payment_failed',
+          // Anchor for dunning's 3/7/14-day retry schedule. Updated on every
+          // failure so the cadence resets if a manual retry succeeds and then
+          // a later renewal fails.
+          lastFailedAt: new Date(),
           status: newStatus,
           ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date() } : {}),
         },
@@ -184,6 +216,13 @@ export async function handleWebhookFailure(params: {
       return
     }
     throw err
+  }
+
+  // Status may have changed (PAST_DUE / SUSPENDED / CANCELLED) — bust caches
+  // so the next request reflects the new state without waiting on the 30s
+  // sub-status TTL.
+  if (newStatus !== sub.status) {
+    await invalidateSubscriptionCaches(tenantId)
   }
 
   const emailTemplate =
@@ -199,12 +238,67 @@ export async function handleWebhookFailure(params: {
   }
 }
 
-// NOTE: schema has no `cancelAtPeriodEnd` flag, so cancellation is immediate.
-// If "cancel at period end" semantics are needed, add a Boolean column +
-// migration and gate the actual CANCELLED status flip behind a cron.
-export async function cancelSubscription(tenantId: string) {
-  await masterDb.subscription.updateMany({
+/**
+ * Cancel a tenant's active subscription.
+ *
+ * @param tenantId      tenant whose subscription to cancel
+ * @param atPeriodEnd   when true (default), the subscription keeps serving
+ *                      until currentPeriodEnd, then the trial-expiry job (or
+ *                      a manual sweep) flips it to CANCELLED. When false,
+ *                      cancel is immediate — used for admin-driven punitive
+ *                      cancellation or tenant deletion.
+ *
+ * Returns the updated subscription so the caller can show a confirmation
+ * with the effective end date (period end for scheduled, now for immediate).
+ */
+export async function cancelSubscription(tenantId: string, atPeriodEnd = true) {
+  const sub = await masterDb.subscription.findFirst({
     where: { tenantId },
-    data: { status: 'CANCELLED', cancelledAt: new Date() },
+    orderBy: { createdAt: 'desc' },
   })
+  if (!sub) return null
+
+  // No grace period for cancellation of a still-trialing sub — there's no
+  // paid time to preserve. Also no point keeping a CANCELLED sub on file
+  // marked "will cancel at period end".
+  const effectiveAtPeriodEnd =
+    atPeriodEnd && sub.status !== 'TRIALING' && sub.status !== 'CANCELLED'
+
+  const updated = await masterDb.subscription.update({
+    where: { id: sub.id },
+    data: effectiveAtPeriodEnd
+      ? { cancelAtPeriodEnd: true }
+      : { status: 'CANCELLED', cancelledAt: new Date(), cancelAtPeriodEnd: false },
+  })
+
+  await invalidateSubscriptionCaches(tenantId)
+  return updated
+}
+
+/**
+ * Sweep subscriptions that opted in to cancel-at-period-end and whose period
+ * has now ended. Called from the trial-expiry job's daily run — no separate
+ * cron needed since both checks run on the same daily schedule.
+ */
+export async function sweepScheduledCancellations() {
+  const now = new Date()
+  const due = await masterDb.subscription.findMany({
+    where: {
+      cancelAtPeriodEnd: true,
+      status: { notIn: ['CANCELLED'] },
+      currentPeriodEnd: { lte: now },
+    },
+    select: { id: true, tenantId: true },
+  })
+
+  for (const sub of due) {
+    await masterDb.subscription.update({
+      where: { id: sub.id },
+      data: { status: 'CANCELLED', cancelledAt: now, cancelAtPeriodEnd: false },
+    })
+    await invalidateSubscriptionCaches(sub.tenantId)
+    console.info(`[CancelSweep] Cancelled subscription ${sub.id} at scheduled period end`)
+  }
+
+  return due.length
 }

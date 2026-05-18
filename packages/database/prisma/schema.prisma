@@ -87,9 +87,19 @@ model Subscription {
   providerCustomerId     String?            @db.VarChar(200)   @map("provider_customer_id")
   providerCardToken      String?            @db.Text           @map("provider_card_token")
   lastPaymentAt          DateTime?          @map("last_payment_at")
+  // Set when a charge attempt fails. Distinct from lastPaymentAt: dunning uses
+  // this to schedule retry intervals (3/7/14 days after the *failure*, not the
+  // last success — those can be months apart).
+  lastFailedAt           DateTime?          @map("last_failed_at")
   nextBillingAt          DateTime?          @map("next_billing_at")
   failedAttempts         Int                @default(0)        @map("failed_attempts")
   lastFailureReason      String?            @db.Text           @map("last_failure_reason")
+  // When true, status flips to CANCELLED at currentPeriodEnd instead of
+  // immediately. Lets users finish out the period they paid for.
+  cancelAtPeriodEnd      Boolean            @default(false)    @map("cancel_at_period_end")
+  // Counts how many pre-trial-expiry reminders the cron has sent (T-3, T-1).
+  // Job uses this to avoid re-emailing the same tenant on every run.
+  trialRemindersSent     Int                @default(0)        @map("trial_reminders_sent")
 
   createdAt              DateTime           @default(now())    @map("created_at")
   updatedAt              DateTime           @updatedAt         @map("updated_at")

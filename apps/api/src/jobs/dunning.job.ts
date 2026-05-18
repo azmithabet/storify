@@ -56,10 +56,15 @@ export async function scheduleDunning() {
 async function runDunningCycle() {
   const now = new Date()
 
-  // Find all subscriptions with failed_attempts > 0 that haven't been retried recently
+  // Only retry subscriptions that have:
+  //   • a card on file (no card → no point retrying — trial-expired tenants
+  //     fall into this category and need an interactive checkout)
+  //   • at least one failed attempt recorded
+  // TRIALING is excluded because trial subs don't have a charge to retry until
+  // they actually convert; trial-expiry.job handles them separately.
   const subs = await masterDb.subscription.findMany({
     where: {
-      status: { in: ['PAST_DUE', 'ACTIVE', 'TRIALING'] },
+      status: { in: ['PAST_DUE', 'ACTIVE'] },
       failedAttempts: { gt: 0 },
       providerCardToken: { not: null },
     },
@@ -68,11 +73,24 @@ async function runDunningCycle() {
 
   let transientFailures = 0
   for (const sub of subs) {
-    const daysSinceLastPayment = sub.lastPaymentAt
-      ? Math.floor((now.getTime() - sub.lastPaymentAt.getTime()) / (24 * 3600 * 1000))
-      : 999
+    // Anchor retries to the *failure* timestamp, not the last successful
+    // payment. lastPaymentAt can be months stale on a long-lived ACTIVE sub
+    // whose renewal just failed — using it would say "999 days since payment,
+    // retry overdue" every single day and either DDoS Paymob or never line up
+    // with the intended 3/7/14 cadence.
+    //
+    // Fallback chain: lastFailedAt (set by handleWebhookFailure and by trial
+    // expiry) → updatedAt (set on every state change) → never retry.
+    const anchor = sub.lastFailedAt ?? sub.updatedAt
+    if (!anchor) continue
 
-    const retryDue = RETRY_INTERVALS_DAYS.some((d) => daysSinceLastPayment >= d)
+    const daysSinceFailure = Math.floor((now.getTime() - anchor.getTime()) / (24 * 3600 * 1000))
+
+    // Pick the largest interval ≤ daysSinceFailure — i.e. the most recent
+    // retry milestone the sub has passed. The 24h job cadence means we'll
+    // attempt at most one retry per day per sub even if multiple milestones
+    // are eligible.
+    const retryDue = RETRY_INTERVALS_DAYS.some((d) => daysSinceFailure >= d)
     if (!retryDue) continue
 
     try {

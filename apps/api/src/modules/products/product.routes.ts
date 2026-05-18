@@ -2,6 +2,7 @@ import { randomUUID } from 'crypto'
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
+import { requireUnderLimit } from '../../shared/middleware/limit.middleware'
 import { auditLog } from '../../shared/utils/audit'
 import { getUploadUrl } from '../../config/r2'
 import {
@@ -86,7 +87,7 @@ export async function productRoutes(app: FastifyInstance) {
   // ─── POST /api/products ──────────────────────────────────────────────────────
   app.post(
     '/',
-    { preHandler: requirePermission('products', 'create') },
+    { preHandler: [requirePermission('products', 'create'), requireUnderLimit('products')] },
     async (request, reply) => {
       const parsed = createProductSchema.safeParse(request.body)
       if (!parsed.success) {
@@ -475,11 +476,44 @@ export async function productRoutes(app: FastifyInstance) {
     const actor = request.user as JWTPayload
     const results = { created: 0, skipped: 0, errors: [] as { row: number; reason: string }[] }
 
+    // Plan-cap enforcement for bulk import. requireUnderLimit() only checks
+    // one row at a time, so it can't see that this CSV would push us over.
+    // Cap = remaining headroom; rows beyond that are skipped with a clear
+    // error so the user can upgrade and re-import the rest.
+    const plan = request.tenant?.plan
+    const planCap = plan?.maxProducts ?? 0
+    let remainingHeadroom = Infinity
+    if (planCap > 0) {
+      const currentCount = await request.tenantDb.product.count()
+      remainingHeadroom = Math.max(0, planCap - currentCount)
+      if (remainingHeadroom === 0) {
+        return reply.status(402).send({
+          success: false,
+          error: {
+            code: 'plan_limit_reached',
+            message: `وصلت للحد الأقصى (${planCap} منتج) في باقتك الحالية. ترقّى لباقة أعلى لإضافة المزيد.`,
+            resource: 'products',
+            used: currentCount,
+            limit: planCap,
+          },
+        })
+      }
+    }
+
     // Pre-load categories for matching by name
     const categories = await request.tenantDb.category.findMany({ select: { id: true, name: true } })
     const catMap = new Map(categories.map((c) => [c.name.toLowerCase(), c.id]))
 
     for (let i = 1; i < lines.length; i++) {
+      // Stop importing once we'd cross the plan cap; remaining rows are
+      // recorded as skipped so the operator sees exactly how many were left
+      // and can decide to upgrade.
+      if (results.created >= remainingHeadroom) {
+        results.errors.push({ row: i + 1, reason: `وصلت لحد الباقة (${planCap} منتج) — تم تخطي باقي الصفوف` })
+        results.skipped += (lines.length - i)
+        break
+      }
+
       const row = parseCsv(lines[i])
       const name = col(row, 'name')
       const sku = col(row, 'sku')

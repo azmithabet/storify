@@ -9,6 +9,8 @@ import {
   handleWebhookFailure,
 } from './billing.service'
 import { masterDb } from '@/config/database'
+import { redis } from '@/config/redis'
+import { sendEmail } from '@/shared/utils/email'
 
 const checkoutSchema = z.object({
   firstName: z.string(),
@@ -104,8 +106,69 @@ export async function billingRoutes(app: FastifyInstance) {
     '/billing/cancel',
     { preHandler: [authenticate] },
     async (request, reply) => {
-      await cancelSubscription(request.tenant!.id)
-      return reply.send({ message: 'cancelled_at_period_end' })
+      const tenant = request.tenant!
+      const updated = await cancelSubscription(tenant.id)
+      if (!updated) {
+        return reply.code(404).send({ success: false, error: { code: 'no_subscription', message: 'لا يوجد اشتراك للإلغاء' } })
+      }
+
+      // Notify the owner so the scheduled cancellation isn't a surprise — they
+      // can use POST /billing/resume to undo it before the period ends.
+      if (updated.cancelAtPeriodEnd) {
+        await sendEmail({
+          to: tenant.ownerEmail,
+          template: 'subscription_cancellation_scheduled',
+          data: {
+            tenantName: tenant.name,
+            periodEnd: updated.currentPeriodEnd.toLocaleDateString('ar-EG'),
+          },
+        }).catch(() => {})
+      }
+
+      return reply.send({
+        success: true,
+        data: {
+          scheduled: updated.cancelAtPeriodEnd,
+          effectiveAt: updated.cancelAtPeriodEnd ? updated.currentPeriodEnd : updated.cancelledAt,
+          status: updated.status,
+        },
+      })
+    },
+  )
+
+  // Undo a scheduled cancellation. Only meaningful while cancelAtPeriodEnd is
+  // true and the sweep hasn't fired yet (status still ACTIVE/PAST_DUE).
+  app.post(
+    '/billing/resume',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const tenantId = request.tenant!.id
+      const sub = await masterDb.subscription.findFirst({
+        where: { tenantId },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (!sub) {
+        return reply.code(404).send({ success: false, error: { code: 'no_subscription', message: 'لا يوجد اشتراك' } })
+      }
+      if (!sub.cancelAtPeriodEnd || sub.status === 'CANCELLED') {
+        return reply.code(400).send({
+          success: false,
+          error: { code: 'not_scheduled', message: 'لا يوجد إلغاء مجدول لإيقافه' },
+        })
+      }
+
+      const updated = await masterDb.subscription.update({
+        where: { id: sub.id },
+        data: { cancelAtPeriodEnd: false },
+      })
+      // Status didn't change, but the user's perception did — bust the cache
+      // so any UI banner relying on cancelAtPeriodEnd refreshes promptly.
+      await redis.del(`sub:status:${tenantId}`)
+
+      return reply.send({
+        success: true,
+        data: { status: updated.status, cancelAtPeriodEnd: updated.cancelAtPeriodEnd },
+      })
     },
   )
 }

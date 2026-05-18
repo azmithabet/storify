@@ -12,6 +12,7 @@ import {
 } from './auth.service'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
+import { requireUnderLimit } from '../../shared/middleware/limit.middleware'
 
 const REFRESH_COOKIE = 'refreshToken'
 const COOKIE_MAX_AGE = 7 * 24 * 60 * 60 // 7 days
@@ -275,14 +276,16 @@ export async function authRoutes(app: FastifyInstance) {
     const tenant = request.tenant
     const plan = tenant.plan
 
-    // installmentPlanCount this calendar month (consistent with installment cap).
+    // Invoice + installment caps are per calendar month — match the
+    // requireUnderLimit('invoices') middleware and the installment quota check.
+    // Users + products are all-time totals.
     const now = new Date()
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
 
-    const [users, products, invoices, installmentPlansThisMonth] = await Promise.all([
+    const [users, products, invoicesThisMonth, installmentPlansThisMonth] = await Promise.all([
       request.tenantDb.user.count(),
       request.tenantDb.product.count(),
-      request.tenantDb.invoice.count(),
+      request.tenantDb.invoice.count({ where: { createdAt: { gte: monthStart } } }),
       request.tenantDb.installmentContract.count({ where: { createdAt: { gte: monthStart } } }).catch(() => 0),
     ])
 
@@ -291,7 +294,7 @@ export async function authRoutes(app: FastifyInstance) {
       data: {
         users: { used: users, limit: plan.maxUsers },
         products: { used: products, limit: plan.maxProducts },
-        invoices: { used: invoices, limit: plan.maxOrders },
+        invoicesThisMonth: { used: invoicesThisMonth, limit: plan.maxOrders },
         installmentPlansThisMonth: { used: installmentPlansThisMonth, limit: plan.maxInstallmentPlansMonthly },
       },
     })
@@ -326,7 +329,7 @@ export async function authRoutes(app: FastifyInstance) {
     branchId: z.string().uuid().optional(),
   })
 
-  app.post('/users', { preHandler: [authenticate, requirePermission('users', 'create')] }, async (request, reply) => {
+  app.post('/users', { preHandler: [authenticate, requirePermission('users', 'create'), requireUnderLimit('users')] }, async (request, reply) => {
     const parsed = createUserSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })

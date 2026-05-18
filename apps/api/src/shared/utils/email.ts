@@ -83,6 +83,41 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
           </p>
           <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
             لمتابعة الاستخدام يرجى اختيار خطة اشتراك وإتمام الدفع.
+          </p>
+          ${data.checkoutUrl ? `
+          <p style="margin:24px 0;text-align:center">
+            <a href="${data.checkoutUrl}" style="display:inline-block;padding:12px 28px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">إتمام الاشتراك</a>
+          </p>` : ''}`),
+      }
+
+    case 'trial_ending_soon':
+      return {
+        subject: `تنتهي فترة تجربتك خلال ${data.daysRemaining ?? ''} ${data.daysRemaining === '1' ? 'يوم' : 'أيام'} — Storify`,
+        html: wrap('فترة تجربتك تقترب من الانتهاء', `
+          <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:20px 0">
+            <p style="margin:0;color:#c2410c;font-size:14px;font-weight:600">
+              ستنتهي فترة التجربة المجانية خلال ${data.daysRemaining ?? ''} ${data.daysRemaining === '1' ? 'يوم' : 'أيام'}.
+            </p>
+          </div>
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
+            لتجنّب انقطاع الخدمة وحفظ بياناتكم، يرجى اختيار خطة اشتراك وإتمام الدفع قبل انتهاء التجربة.
+          </p>
+          ${data.checkoutUrl ? `
+          <p style="margin:24px 0;text-align:center">
+            <a href="${data.checkoutUrl}" style="display:inline-block;padding:12px 28px;background:#4f46e5;color:#fff;text-decoration:none;border-radius:6px;font-weight:600">إتمام الاشتراك الآن</a>
+          </p>` : ''}`),
+      }
+
+    case 'subscription_cancellation_scheduled':
+      return {
+        subject: 'تم جدولة إلغاء اشتراكك — Storify',
+        html: wrap('تم استلام طلب الإلغاء', `
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
+            سيتم إلغاء اشتراككم في نهاية الفترة الحالية بتاريخ <strong>${data.periodEnd ?? ''}</strong>.
+            ستستمرون في استخدام Storify بشكل طبيعي حتى ذلك التاريخ.
+          </p>
+          <p style="font-size:14px;line-height:1.7;color:#374151;margin:0">
+            إذا غيّرتم رأيكم، يمكنكم إيقاف الإلغاء من إعدادات الاشتراك في أي وقت قبل تاريخ الانتهاء.
           </p>`),
       }
 

@@ -171,9 +171,9 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
                       isPaid ? 'bg-success-500/5' : isOverdue ? 'bg-danger-500/5' : isNext ? 'bg-brand-500/5' : '',
                     )}
                   >
-                    <td className="px-3 py-2.5 text-gray-500 font-mono text-xs">{idx + 1}</td>
-                    <td className="px-3 py-2.5 font-mono text-gray-300 text-xs">{formatDate(p.dueDate)}</td>
-                    <td className="px-3 py-2.5 font-mono text-gray-100 text-sm">{formatMoney(Number(p.amountPaid))} ج</td>
+                    <td className="px-3 py-2.5 font-numeric num num-muted text-xs">{idx + 1}</td>
+                    <td className="px-3 py-2.5 font-numeric num num-muted text-xs">{formatDate(p.dueDate)}</td>
+                    <td className="px-3 py-2.5 font-numeric num num-strong text-sm">{formatMoney(Number(p.amountPaid))} ج</td>
                     <td className="px-3 py-2.5">
                       {isPaid
                         ? <Badge variant="success" dot>مدفوع</Badge>
@@ -183,7 +183,7 @@ function ScheduleTimeline({ contract, onRecord, isRecording }: ScheduleTimelineP
                         ? <Badge variant="brand" dot>التالي</Badge>
                         : <Badge variant="gray">معلق</Badge>}
                     </td>
-                    <td className="px-3 py-2.5 text-xs text-gray-500 font-mono">
+                    <td className="px-3 py-2.5 text-xs font-numeric num num-muted">
                       {p.paidDate ? formatDate(p.paidDate) : '—'}
                     </td>
                     <td className="px-3 py-2.5 text-left">
@@ -324,7 +324,7 @@ function VariantSearchField({ index, register, setValue }: {
             <button key={v.id} type="button" onClick={() => pick(v)}
               className="w-full text-right px-3 py-2 hover:bg-gray-700 flex justify-between text-sm border-b border-gray-700/50 last:border-0">
               <span className="text-gray-100">{v.product.name}</span>
-              <span className="text-gray-500 font-mono text-xs">{v.sku}</span>
+              <span className="num-code text-xs">{v.sku}</span>
             </button>
           ))}
         </div>
@@ -524,9 +524,10 @@ function printContract(c: InstallmentContract) {
 
   const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
     <title>عقد قسط ${c.contractNumber}</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:32px}
+      body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:32px}
       h1{font-size:20px;font-weight:700}
       .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0;padding:14px;background:#f9fafb;border-radius:8px}
       .meta-item label{font-size:11px;color:#6b7280;display:block;margin-bottom:2px}
@@ -541,7 +542,7 @@ function printContract(c: InstallmentContract) {
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div><h1>عقد بيع بالتقسيط</h1><p style="color:#6b7280;font-size:12px">Storify POS</p></div>
       <div style="text-align:left">
-        <p style="font-size:16px;font-weight:700;font-family:monospace">${c.contractNumber}</p>
+        <p style="font-size:16px;font-weight:700;font-family:'IBM Plex Mono',monospace">${c.contractNumber}</p>
         <p style="font-size:12px;color:#6b7280">${formatDate(new Date())}</p>
       </div>
     </div>
@@ -771,7 +772,7 @@ export default function Installments() {
           <div className="flex flex-col gap-6">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div><span className="text-gray-500">العميل</span><p className="text-gray-100 font-medium">{detailContract.customer?.fullName ?? '—'}</p></div>
-              <div><span className="text-gray-500">الهاتف</span><p className="text-gray-100 font-mono">{detailContract.customer?.phone ?? '—'}</p></div>
+              <div><span className="text-gray-500">الهاتف</span><p className="num-code">{detailContract.customer?.phone ?? '—'}</p></div>
               <div><span className="text-gray-500">إجمالي العقد</span><p className="text-gray-100"><Money value={detailContract.totalAmount} /></p></div>
               <div><span className="text-gray-500">المقدم</span><p className="text-gray-100"><Money value={detailContract.downPayment} /></p></div>
               <div><span className="text-gray-500">المتبقي</span><p className="text-gray-100"><Money value={detailContract.remainingAmount} /></p></div>

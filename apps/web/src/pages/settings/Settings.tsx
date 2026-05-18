@@ -1662,17 +1662,17 @@ function CouponsSettings() {
           columns={[
             { key: 'code', header: 'الكود', render: (c) => <span className="font-mono font-bold text-brand-400">{c.code}</span> },
             { key: 'discount', header: 'الخصم', render: (c) => (
-              <span className="font-mono text-gray-300">
+              <span className="font-numeric num num-strong">
                 {c.discountType === 'percentage' ? `${Number(c.discountValue)}%` : `${Number(c.discountValue)} ج`}
               </span>
             )},
             { key: 'uses', header: 'الاستخدامات', render: (c) => (
-              <span className="text-sm text-gray-400 font-mono">
+              <span className="text-sm font-numeric num num-muted">
                 {c.usedCount}{c.maxUses != null ? ` / ${c.maxUses}` : ''}
               </span>
             )},
             { key: 'expiresAt', header: 'الانتهاء', render: (c) => c.expiresAt
-              ? <span className={cn('text-xs font-mono', new Date(c.expiresAt) < new Date() ? 'text-danger-400' : 'text-gray-400')}>{formatDate(c.expiresAt)}</span>
+              ? <span className={cn('text-xs font-numeric num', new Date(c.expiresAt) < new Date() ? 'text-danger-400' : 'text-gray-400')}>{formatDate(c.expiresAt)}</span>
               : <span className="text-gray-600">—</span>
             },
             { key: 'isActive', header: 'الحالة', render: (c) => <Badge variant={c.isActive ? 'success' : 'gray'} dot>{c.isActive ? 'نشط' : 'معطّل'}</Badge> },
@@ -1910,7 +1910,7 @@ function EtaSettings() {
 const DEFAULT_PRINT_TEMPLATE = `<!DOCTYPE html>
 <html dir="rtl">
 <head><meta charset="utf-8"><style>
-  body{font-family:monospace;font-size:12px;width:80mm;margin:0 auto;padding:8px}
+  body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:12px;width:80mm;margin:0 auto;padding:8px}
   .center{text-align:center}table{width:100%;border-collapse:collapse}
   td{padding:2px}.dashed{border-bottom:1px dashed #000;margin:4px 0}
   .total td{font-weight:bold;border-top:1px dashed #000}

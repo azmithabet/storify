@@ -14,9 +14,10 @@
   --brand-800: #3730A3;
 
   /* Typography */
-  --font-display: 'Syne', sans-serif;
+  --font-display: 'IBM Plex Sans Arabic', sans-serif;
   --font-body: 'IBM Plex Sans Arabic', sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  --font-numeric: 'Inter', sans-serif;
+  --font-mono: 'IBM Plex Mono', monospace;
 
   /* Spacing */
   --sp-1: 0.25rem;
@@ -112,12 +113,22 @@
 }
 
 @layer utilities {
-  /* RTL safe number display */
+  /* RTL-safe numeric display — Inter with tabular lining numerals */
   .num {
     direction: ltr;
     display: inline-block;
-    font-family: var(--font-mono);
+    font-family: var(--font-numeric);
+    font-variant-numeric: tabular-nums lining-nums;
   }
+
+  /* Semantic number color tokens */
+  .num-primary { @apply text-gray-50; }
+  .num-strong  { @apply text-gray-200; }
+  .num-muted   { @apply text-gray-400; }
+  .num-income  { @apply text-success-400; }
+  .num-expense { @apply text-danger-400; }
+  .num-warn    { @apply text-warning-400; }
+  .num-code    { @apply text-brand-400 font-mono; }
 }
 
 /* ─── react-day-picker dark theme ───────────────────────────────────────────── */

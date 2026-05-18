@@ -246,7 +246,7 @@ function CreateTransferDrawer({ branches, onClose }: { branches: Branch[]; onClo
                 <button key={v.id} onClick={() => addVariant(v)}
                   className="w-full text-right px-4 py-2 hover:bg-gray-700 flex items-center justify-between text-sm border-b border-gray-700/50 last:border-0">
                   <span className="text-gray-100">{v.product.name}</span>
-                  <span className="text-gray-500 font-mono text-xs">{v.sku}</span>
+                  <span className="num-code text-xs">{v.sku}</span>
                 </button>
               ))}
             </div>
@@ -360,16 +360,16 @@ function StockTab() {
               { key: 'product', header: 'المنتج', render: (s) => (
                 <div>
                   <p className="font-medium text-gray-100">{s.variant.product.name}</p>
-                  <p className="text-xs text-gray-500 font-mono">{s.variant.sku}</p>
+                  <p className="text-xs num-code">{s.variant.sku}</p>
                 </div>
               )},
               { key: 'branch', header: 'الفرع', render: (s) => <span className="text-gray-400 text-sm">{s.branch.name}</span> },
               { key: 'quantity', header: 'الكمية', render: (s) => (
-                <span className={cn('font-mono font-semibold text-base', s.quantity === 0 ? 'text-danger-500' : s.quantity <= s.minQuantity ? 'text-warning-500' : 'text-success-500')}>
+                <span className={cn('font-numeric num font-semibold text-base', s.quantity === 0 ? 'text-danger-500' : s.quantity <= s.minQuantity ? 'text-warning-500' : 'text-success-500')}>
                   {s.quantity}
                 </span>
               )},
-              { key: 'minQuantity', header: 'حد التنبيه', render: (s) => <span className="text-gray-500 font-mono text-sm">{s.minQuantity}</span> },
+              { key: 'minQuantity', header: 'حد التنبيه', render: (s) => <span className="font-numeric num num-muted text-sm">{s.minQuantity}</span> },
               { key: 'status', header: 'الحالة', render: (s) =>
                 s.quantity === 0
                   ? <Badge variant="danger" dot>نفذ</Badge>
@@ -480,7 +480,7 @@ function MovementsTab() {
               { key: 'product', header: 'المنتج', render: (m) => (
                 <div>
                   <p className="font-medium text-gray-100 text-sm">{m.variant.product.name}</p>
-                  <p className="text-xs text-gray-500 font-mono">{m.variant.sku}</p>
+                  <p className="text-xs num-code">{m.variant.sku}</p>
                 </div>
               )},
               { key: 'branch', header: 'الفرع', render: (m) => <span className="text-gray-400 text-sm">{m.branch.name}</span> },
@@ -660,9 +660,9 @@ function TransfersTab() {
                   <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-700 last:border-0 text-sm">
                     <div>
                       <p className="text-gray-100">{item.variant.product.name}</p>
-                      <p className="text-gray-500 text-xs font-mono">{item.variant.sku}</p>
+                      <p className="text-xs num-code">{item.variant.sku}</p>
                     </div>
-                    <span className="font-mono text-gray-300 font-semibold">{item.quantity}</span>
+                    <span className="font-numeric num num-strong font-semibold">{item.quantity}</span>
                   </div>
                 ))}
               </div>

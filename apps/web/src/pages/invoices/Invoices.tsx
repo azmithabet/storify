@@ -88,7 +88,7 @@ function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => vo
             <div key={item.itemId} className="flex items-center gap-3 py-2 border-b border-gray-700 last:border-0">
               <div className="flex-1">
                 <p className="text-sm text-gray-100">{item.productName}</p>
-                <p className="text-xs text-gray-500 font-mono">{item.variantSku} · الكمية المباعة: {item.maxQty}</p>
+                <p className="text-xs num-code">{item.variantSku} · الكمية المباعة: <span className="font-numeric num num-strong">{item.maxQty}</span></p>
               </div>
               <div className="flex items-center gap-2">
                 <button
@@ -331,7 +331,7 @@ export default function Invoices() {
               <div><span className="text-gray-500">العميل</span><p className="text-gray-100 font-medium">{detailInvoice.customer?.fullName ?? 'نقدي'}</p></div>
               <div><span className="text-gray-500">الكاشير</span><p className="text-gray-100">{detailInvoice.cashier?.fullName ?? '—'}</p></div>
               <div><span className="text-gray-500">طريقة الدفع</span><p className="text-gray-100">{detailInvoice.paymentMethod?.name ?? '—'}</p></div>
-              <div><span className="text-gray-500">التاريخ</span><p className="text-gray-100 font-mono text-xs">{formatDateTime(detailInvoice.createdAt)}</p></div>
+              <div><span className="text-gray-500">التاريخ</span><p className="font-numeric num num-strong text-xs">{formatDateTime(detailInvoice.createdAt)}</p></div>
             </div>
 
             <div>
@@ -341,7 +341,7 @@ export default function Invoices() {
                   <div key={item.id} className="flex justify-between text-sm py-2 border-b border-gray-700 last:border-0">
                     <div>
                       <p className="text-gray-100">{item.productName}</p>
-                      <p className="text-gray-500 text-xs font-mono">{item.variantSku} × {item.quantity}</p>
+                      <p className="text-xs"><span className="num-code">{item.variantSku}</span> × <span className="font-numeric num num-muted">{item.quantity}</span></p>
                     </div>
                     <Money value={item.totalPrice} />
                   </div>

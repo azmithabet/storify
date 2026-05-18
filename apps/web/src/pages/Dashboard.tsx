@@ -81,7 +81,7 @@ function PendingCard({ label, count, icon, onClick }: { label: string; count: nu
       <div className="flex-1 min-w-0">
         <p className="text-sm text-gray-300">{label}</p>
       </div>
-      <span className="text-warning-500 font-mono font-bold text-lg">{count}</span>
+      <span className="font-numeric num num-warn font-bold text-lg">{count}</span>
     </button>
   )
 }
@@ -205,7 +205,7 @@ export default function Dashboard() {
         <div className="bg-gray-800 border border-gray-700 rounded-r-xl p-4 mb-6">
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm text-gray-300 font-medium">تقدم هدف اليوم</p>
-            <p className="text-xs font-mono text-gray-400">
+            <p className="text-xs font-numeric num num-strong">
               {formatNumber(todayRevenue, { maximumFractionDigits: 0 })} / {formatNumber(dailyTarget, { maximumFractionDigits: 0 })} ج
             </p>
           </div>
@@ -215,7 +215,7 @@ export default function Dashboard() {
               style={{ width: `${targetProgress}%` }}
             />
           </div>
-          <p className="text-xs text-gray-500 mt-1">{formatNumber(targetProgress, { maximumFractionDigits: 1 })}% من الهدف</p>
+          <p className="text-xs font-numeric num num-muted mt-1">{formatNumber(targetProgress, { maximumFractionDigits: 1 })}% من الهدف</p>
         </div>
       )}
 
@@ -242,7 +242,7 @@ export default function Dashboard() {
                   {salesTrend.map((d) => (
                     <div key={d.date} className="text-center">
                       <p className="text-xs text-gray-500">{formatDate(d.date, { weekday: 'narrow' })}</p>
-                      <p className="text-xs font-mono text-gray-300">{d.revenue > 0 ? formatNumber(d.revenue / 1000, { maximumFractionDigits: 1 }) + 'k' : '—'}</p>
+                      <p className="text-xs font-numeric num num-strong">{d.revenue > 0 ? formatNumber(d.revenue / 1000, { maximumFractionDigits: 1 }) + 'k' : '—'}</p>
                     </div>
                   ))}
                 </div>
@@ -314,11 +314,11 @@ export default function Dashboard() {
                   return (
                     <div key={inv.id} className={cn('flex items-center justify-between py-3', idx < recentInvoices.length - 1 && 'border-b border-gray-700')}>
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-mono text-gray-400">
+                        <div className="w-8 h-8 rounded-full bg-gray-700 flex items-center justify-center text-xs font-mono num-muted">
                           {inv.invoiceNumber.slice(-2)}
                         </div>
                         <div>
-                          <p className="text-sm font-mono text-gray-100">{inv.invoiceNumber}</p>
+                          <p className="text-sm num-code">{inv.invoiceNumber}</p>
                           <p className="text-xs text-gray-500">
                             {inv.customer?.fullName ?? 'نقدي'}
                             {inv.paymentMethod && <span className="mx-1">·</span>}
@@ -359,13 +359,13 @@ export default function Dashboard() {
               <div className="flex flex-col gap-2">
                 {topProducts.map((p, i) => (
                   <div key={p.variantSku} className={cn('flex items-center gap-3 py-2', i < topProducts.length - 1 && 'border-b border-gray-700/50')}>
-                    <span className="w-5 text-center font-mono text-xs text-gray-600">{i + 1}</span>
+                    <span className="w-5 text-center font-numeric num num-muted text-xs">{i + 1}</span>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-gray-200 truncate">{p.productName}</p>
-                      <p className="text-xs text-gray-500 font-mono">{p.variantSku}</p>
+                      <p className="text-xs num-code">{p.variantSku}</p>
                     </div>
                     <div className="text-left">
-                      <p className="text-xs text-gray-500">× {p.totalQty}</p>
+                      <p className="text-xs font-numeric num num-muted">× {p.totalQty}</p>
                       <Money value={p.totalRevenue} />
                     </div>
                   </div>

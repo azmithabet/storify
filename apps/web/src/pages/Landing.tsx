@@ -616,7 +616,7 @@ function Pricing({ plans }: { plans: Plan[] }) {
                       <>
                         <div className="text-xs text-gray-500 mb-1">ابتداءً من</div>
                         <div className="flex items-baseline gap-1">
-                          <span className="font-mono text-4xl font-bold text-gray-50 num">
+                          <span className="font-numeric text-4xl font-bold num num-primary">
                             {ENTERPRISE_ANCHOR_PRICE.toLocaleString()}
                           </span>
                           <span className="text-gray-400 text-sm">جنيه / شهر</span>
@@ -628,7 +628,7 @@ function Pricing({ plans }: { plans: Plan[] }) {
                     ) : (
                       <>
                         <div className="flex items-baseline gap-1">
-                          <span className="font-mono text-4xl font-bold text-gray-50 num">
+                          <span className="font-numeric text-4xl font-bold num num-primary">
                             {Math.round(price)}
                           </span>
                           <span className="text-gray-400 text-sm">جنيه / شهر</span>

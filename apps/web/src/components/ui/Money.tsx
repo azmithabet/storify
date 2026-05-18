@@ -6,6 +6,7 @@ interface MoneyProps {
   currency?: string
   className?: string
   size?: 'sm' | 'base' | 'lg' | 'xl'
+  tone?: 'neutral' | 'income' | 'expense'
 }
 
 const sizeClasses = {
@@ -15,15 +16,22 @@ const sizeClasses = {
   xl: 'text-xl',
 }
 
-export function Money({ value, currency = 'ج.م', className, size = 'base' }: MoneyProps) {
+const toneClasses = {
+  neutral: 'text-gray-50',
+  income: 'text-success-400',
+  expense: 'text-danger-400',
+}
+
+export function Money({ value, currency = 'ج.م', className, size = 'base', tone = 'neutral' }: MoneyProps) {
   const formatted = typeof value === 'number' ? formatMoney(value) : value
 
   return (
     <span
       dir="ltr"
       className={cn(
-        'inline-block font-mono text-brand-300 tabular-nums',
+        'inline-block font-numeric num',
         sizeClasses[size],
+        toneClasses[tone],
         className,
       )}
     >

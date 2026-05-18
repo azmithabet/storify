@@ -65,9 +65,10 @@ const config: Config = {
         app: '#0B1220',
       },
       fontFamily: {
-        display: ['Syne', 'sans-serif'],
+        display: ['IBM Plex Sans Arabic', 'sans-serif'],
         body: ['IBM Plex Sans Arabic', 'sans-serif'],
-        mono: ['JetBrains Mono', 'monospace'],
+        numeric: ['Inter', 'sans-serif'],
+        mono: ['IBM Plex Mono', 'monospace'],
         sans: ['IBM Plex Sans Arabic', 'sans-serif'],
       },
       spacing: {

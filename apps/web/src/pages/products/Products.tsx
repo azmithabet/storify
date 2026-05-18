@@ -246,7 +246,7 @@ export default function Products() {
                 { key: 'variants', header: 'المتغيرات', render: (p) => (
                   p.hasVariants
                     ? <Badge variant="info">{p.variants.length} متغير</Badge>
-                    : <span className="font-mono text-gray-500 text-sm">{p.variants[0]?.sku ?? '—'}</span>
+                    : <span className="num-code text-sm">{p.variants[0]?.sku ?? '—'}</span>
                 )},
                 { key: 'price', header: 'سعر البيع', render: (p) => {
                   const prices = p.variants.map((v) => Number(v.sellPrice))
@@ -260,7 +260,7 @@ export default function Products() {
                 { key: 'stock', header: 'نشط/إجمالي', render: (p) => {
                   const active = p.variants.filter((v) => v.isActive).length
                   const total = p.variants.length
-                  return <span className="font-mono text-gray-400">{active}/{total}</span>
+                  return <span className="font-numeric num num-strong">{active}/{total}</span>
                 }},
                 { key: 'unit', header: 'الوحدة', render: (p) => <span className="text-gray-500 text-sm">{unitLabels[p.unit] ?? p.unit}</span> },
                 { key: 'isActive', header: 'الحالة', render: (p) => <Badge variant={p.isActive ? 'success' : 'gray'} dot>{p.isActive ? 'نشط' : 'معطّل'}</Badge> },
@@ -795,9 +795,9 @@ function VariantRow({ variant, onToggleActive, onEdit }: {
       </div>
       {expanded && (
         <div className="px-3 pb-3 grid grid-cols-3 gap-3 text-xs border-t border-gray-700 pt-2">
-          {variant.barcode && <div><span className="text-gray-500">باركود</span><p className="font-mono text-gray-300">{variant.barcode}</p></div>}
-          <div><span className="text-gray-500">سعر التكلفة</span><p className="font-mono text-gray-300"><Money value={Number(variant.costPrice)} /></p></div>
-          <div><span className="text-gray-500">سعر البيع</span><p className="font-mono text-gray-300"><Money value={Number(variant.sellPrice)} /></p></div>
+          {variant.barcode && <div><span className="text-gray-500">باركود</span><p className="num-code">{variant.barcode}</p></div>}
+          <div><span className="text-gray-500">سعر التكلفة</span><p><Money value={Number(variant.costPrice)} /></p></div>
+          <div><span className="text-gray-500">سعر البيع</span><p><Money value={Number(variant.sellPrice)} /></p></div>
         </div>
       )}
     </div>

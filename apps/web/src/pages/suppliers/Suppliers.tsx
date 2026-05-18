@@ -231,7 +231,7 @@ function SupplierDetailDrawer({ supplier }: { supplier: Supplier }) {
                     <div className="flex items-center gap-2">
                       <p className={cn('text-sm font-medium', tm.color)}>{tm.label}</p>
                       {t.reference && (
-                        <span className="text-[10px] font-mono text-gray-500 bg-gray-900/60 border border-gray-700 px-1.5 py-0.5 rounded" dir="ltr">
+                        <span className="text-[10px] num-code bg-gray-900/60 border border-gray-700 px-1.5 py-0.5 rounded" dir="ltr">
                           {t.reference}
                         </span>
                       )}
@@ -403,9 +403,9 @@ export default function Suppliers() {
                 { key: 'name', header: 'المورد', render: (s) => (
                   <button className="font-medium text-brand-400 hover:underline text-right" onClick={() => setDetailSupplier(s)}>{s.name}</button>
                 )},
-                { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
+                { key: 'phone', header: 'الهاتف', className: 'num-code text-sm' },
                 { key: 'email', header: 'البريد', className: 'text-gray-500 text-sm' },
-                { key: 'totalOrders', header: 'الطلبات', className: 'text-center font-mono' },
+                { key: 'totalOrders', header: 'الطلبات', className: 'text-center font-numeric num num-strong' },
                 { key: 'balance', header: 'الرصيد المستحق', render: (s) => s.balance > 0 ? <Money value={s.balance} /> : <Badge variant="success" dot>مسدد</Badge> },
                 { key: 'actions', header: '', render: (s) => (
                   <div className="flex gap-1">

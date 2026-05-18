@@ -45,7 +45,7 @@ export function StatCard({ label, value, change, accentColor = 'bg-brand-500', i
         <span className="text-xs uppercase tracking-wider text-gray-500 font-medium">{label}</span>
         {icon && <span className="text-gray-500">{icon}</span>}
       </div>
-      <span className="font-mono text-2xl font-bold text-gray-100 num">{value}</span>
+      <span className="font-numeric text-2xl font-bold num num-primary">{value}</span>
       {change && (
         <span className={cn('text-xs', change.positive ? 'text-success-500' : 'text-danger-500')}>
           {change.positive ? '▲' : '▼'} {change.value}

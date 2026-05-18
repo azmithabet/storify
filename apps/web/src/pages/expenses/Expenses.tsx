@@ -233,10 +233,10 @@ function BudgetPanel({ categories }: { categories: Category[] }) {
                     <div className={cn('h-full transition-all duration-slow', tone)} style={{ width: `${pct}%` }} />
                   </div>
                   <div className="flex items-center justify-between text-xs">
-                    <span className={cn('font-mono num', overBudget ? 'text-danger-400 font-semibold' : 'text-gray-300')}>
+                    <span className={cn('font-numeric num', overBudget ? 'text-danger-400 font-semibold' : 'text-gray-300')}>
                       {formatNumber(spent, { maximumFractionDigits: 0 })} / {formatNumber(amount, { maximumFractionDigits: 0 })} ج
                     </span>
-                    <span className={cn('font-mono num', overBudget ? 'text-danger-400 font-semibold' : pct >= 80 ? 'text-warning-400' : 'text-gray-500')}>
+                    <span className={cn('font-numeric num', overBudget ? 'text-danger-400 font-semibold' : pct >= 80 ? 'text-warning-400' : 'text-gray-500')}>
                       {formatNumber(pct, { maximumFractionDigits: 0 })}%
                     </span>
                   </div>
@@ -542,7 +542,7 @@ export default function Expenses() {
               { key: 'description', header: 'الوصف', render: (e) => <span className="font-medium text-gray-100">{e.description}</span> },
               { key: 'category', header: 'الفئة', render: (e) => <span className="text-gray-400">{e.category?.name ?? '—'}</span> },
               { key: 'amount', header: 'المبلغ', render: (e) => <Money value={e.amount} /> },
-              { key: 'expenseDate', header: 'التاريخ', render: (e) => <span className="text-gray-500 text-xs font-mono">{e.expenseDate}</span> },
+              { key: 'expenseDate', header: 'التاريخ', render: (e) => <span className="font-numeric num num-muted text-xs">{e.expenseDate}</span> },
               { key: 'status', header: 'الحالة', render: (e) => {
                 const s = statusMap[e.status]
                 return <Badge variant={s.variant} dot>{s.label}</Badge>

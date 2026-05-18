@@ -40,9 +40,11 @@ export function printReceipt(inv: ReceiptInvoice): void {
   const rows = inv.items.map((i) =>
     `<tr><td>${i.productName}<br/><small style="color:#666">${i.sku} × ${i.quantity}</small></td><td style="text-align:left;white-space:nowrap">${Number(i.lineTotal).toFixed(2)} ج</td></tr>`
   ).join('')
-  const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إيصال ${inv.invoiceNumber}</title><style>
+  const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إيصال ${inv.invoiceNumber}</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:monospace;font-size:12px;width:80mm;margin:0 auto;padding:8px;color:#000}
+    body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:12px;width:80mm;margin:0 auto;padding:8px;color:#000}
     .center{text-align:center}
     h2{font-size:15px;margin:6px 0}
     table{width:100%;border-collapse:collapse}
@@ -99,9 +101,10 @@ export function printInvoice(inv: InvoiceForPrint): void {
 
   const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
     <title>فاتورة ${inv.invoiceNumber}</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:32px}
+      body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:13px;color:#111;background:#fff;padding:32px}
       h1{font-size:22px;font-weight:700;margin-bottom:4px}
       .meta{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0;padding:16px;background:#f9fafb;border-radius:8px}
       .meta-item label{font-size:11px;color:#6b7280;display:block;margin-bottom:2px}
@@ -122,7 +125,7 @@ export function printInvoice(inv: InvoiceForPrint): void {
         <p style="color:#6b7280;font-size:12px">Storify POS</p>
       </div>
       <div style="text-align:left">
-        <p style="font-size:18px;font-weight:700;font-family:monospace">${inv.invoiceNumber}</p>
+        <p style="font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace">${inv.invoiceNumber}</p>
         <p style="font-size:12px;color:#6b7280">${formatDateTime(inv.createdAt)}</p>
       </div>
     </div>
@@ -173,7 +176,7 @@ export function printBarcodeLabels(labels: BarcodeLabel[], copies = 1): void {
     <link href="https://fonts.googleapis.com/css2?family=Libre+Barcode+128+Text&display=swap" rel="stylesheet">
     <style>
       *{box-sizing:border-box;margin:0;padding:0}
-      body{font-family:Arial,sans-serif;background:#fff;padding:8px}
+      body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;background:#fff;padding:8px}
       .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
       .label{border:1px dashed #ccc;border-radius:4px;padding:6px 8px;text-align:center;page-break-inside:avoid}
       .name{font-size:10px;font-weight:bold;color:#111;margin-bottom:4px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -211,8 +214,10 @@ export function printPurchaseOrder(po: PurchaseOrderForPrint, statusLabel: strin
   const rows = (po.items ?? []).map((item) =>
     `<tr><td>${item.variant.product.name}</td><td>${item.variant.sku}</td><td style="text-align:center">${item.quantity}</td><td style="text-align:left">${Number(item.unitCost).toFixed(2)} ج</td><td style="text-align:left">${Number(item.subtotal).toFixed(2)} ج</td></tr>`
   ).join('')
-  const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>أمر شراء ${poRef}</title><style>
-    *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;padding:24px;color:#000}
+  const html = `<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>أمر شراء ${poRef}</title>
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+    *{box-sizing:border-box;margin:0;padding:0}body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:13px;padding:24px;color:#000}
     h1{font-size:20px;margin-bottom:4px}h2{font-size:13px;color:#555;margin-bottom:16px}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:20px}
     .grid div{font-size:12px}.grid div span{color:#777;display:block;font-size:11px}

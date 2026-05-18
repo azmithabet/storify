@@ -971,8 +971,10 @@ export default function POS() {
                 const pmRows = (eodByPM ?? []).map((pm) =>
                   `<tr><td>${pm.paymentMethodName}</td><td>${pm.invoiceCount}</td><td>${formatMoney(pm.totalRevenue)} ج</td></tr>`
                 ).join('')
-                win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إغلاق اليوم</title><style>
-                  *{box-sizing:border-box;margin:0;padding:0}body{font-family:monospace;font-size:13px;padding:16px}
+                win.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="utf-8"><title>إغلاق اليوم</title>
+                  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet">
+                  <style>
+                  *{box-sizing:border-box;margin:0;padding:0}body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:13px;padding:16px}
                   h2{text-align:center;margin-bottom:12px}table{width:100%;border-collapse:collapse;margin:8px 0}
                   th,td{border:1px solid #ccc;padding:6px 8px;text-align:right}th{background:#f5f5f5}
                   .total{font-weight:bold;font-size:15px}.section{margin-bottom:16px}

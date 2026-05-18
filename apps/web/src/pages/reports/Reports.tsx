@@ -286,8 +286,8 @@ export default function Reports() {
             {salesLoading ? <SkeletonTable rows={8} cols={3} /> : (
               <Table
                 columns={[
-                  { key: 'period', header: 'الفترة', render: (r) => <span className="text-gray-400 font-mono text-sm">{r.period}</span> },
-                  { key: 'count', header: 'الفواتير', className: 'font-mono text-center text-gray-300' },
+                  { key: 'period', header: 'الفترة', render: (r) => <span className="font-numeric num num-strong text-sm">{r.period}</span> },
+                  { key: 'count', header: 'الفواتير', className: 'font-numeric num num-strong text-center' },
                   { key: 'revenue', header: 'الإيرادات', render: (r) => <Money value={r.revenue} /> },
                 ]}
                 data={byPeriod} keyExtractor={(r) => r.period} emptyMessage="لا توجد بيانات في هذه الفترة"
@@ -351,7 +351,7 @@ export default function Reports() {
               <Table
                 columns={[
                   { key: 'product', header: 'المنتج', render: (s) => <span className="font-medium text-gray-100">{s.product.name}</span> },
-                  { key: 'sku', header: 'SKU', className: 'font-mono text-gray-500 text-sm' },
+                  { key: 'sku', header: 'SKU', className: 'num-code text-sm' },
                   { key: 'branch', header: 'الفرع', render: (s) => <span className="text-gray-400">{s.branch.name}</span> },
                   { key: 'quantity', header: 'الكمية', render: (s) => (
                     <span className={s.quantity === 0 ? 'text-danger-500 font-bold' : s.isLowStock ? 'text-warning-500' : 'text-success-500'}>{s.quantity}</span>
@@ -546,7 +546,7 @@ export default function Reports() {
                         {r.feeBearer === 'merchant' ? 'التاجر' : 'العميل'}
                       </Badge>
                     )},
-                    { key: 'count', header: 'عدد الفواتير', render: (r) => <span className="font-mono text-gray-400">{r.count}</span> },
+                    { key: 'count', header: 'عدد الفواتير', render: (r) => <span className="font-numeric num num-strong">{r.count}</span> },
                     { key: 'total', header: 'إجمالي الرسوم', render: (r) => <Money value={r.totalFees} /> },
                   ]}
                   data={feesData?.byPaymentMethod ?? []}
@@ -596,10 +596,10 @@ export default function Reports() {
             {topLoading ? <SkeletonTable rows={10} cols={4} /> : (
               <Table
                 columns={[
-                  { key: 'rank', header: '#', render: (r) => <span className="font-mono text-gray-500">{(topData ?? []).indexOf(r) + 1}</span> },
+                  { key: 'rank', header: '#', render: (r) => <span className="font-numeric num num-muted">{(topData ?? []).indexOf(r) + 1}</span> },
                   { key: 'product', header: 'المنتج', render: (r) => <span className="font-medium text-gray-100">{r.productName}</span> },
-                  { key: 'sku', header: 'SKU', render: (r) => <span className="font-mono text-gray-500 text-xs">{r.variantSku}</span> },
-                  { key: 'qty', header: 'الكمية المباعة', render: (r) => <span className="font-mono text-brand-400">{formatNumber(r.totalQty)}</span> },
+                  { key: 'sku', header: 'SKU', render: (r) => <span className="num-code text-xs">{r.variantSku}</span> },
+                  { key: 'qty', header: 'الكمية المباعة', render: (r) => <span className="font-numeric num text-brand-400">{formatNumber(r.totalQty)}</span> },
                   { key: 'revenue', header: 'الإيرادات', render: (r) => <Money value={r.totalRevenue} /> },
                 ]}
                 data={topData ?? []}

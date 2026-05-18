@@ -446,11 +446,11 @@ export default function Customers() {
                 { key: 'fullName', header: 'الاسم', render: (c) => (
                   <button className="font-medium text-brand-400 hover:underline text-right" onClick={() => setDetailCustomer(c)}>{c.fullName}</button>
                 )},
-                { key: 'phone', header: 'الهاتف', className: 'font-mono text-gray-500' },
+                { key: 'phone', header: 'الهاتف', className: 'num-code text-sm' },
                 { key: 'email', header: 'البريد الإلكتروني', className: 'text-gray-500 text-sm' },
-                { key: 'invoices', header: 'الفواتير', render: (c) => <span className="text-center font-mono">{c._count?.invoices ?? 0}</span> },
+                { key: 'invoices', header: 'الفواتير', render: (c) => <span className="text-center font-numeric num num-strong">{c._count?.invoices ?? 0}</span> },
                 { key: 'creditBalance', header: 'الرصيد', render: (c) => c.creditBalance > 0 ? <Money value={c.creditBalance} /> : <span className="text-gray-500">—</span> },
-                { key: 'loyaltyPoints', header: 'النقاط', render: (c) => c.loyaltyPoints > 0 ? <span className="font-mono text-yellow-400">{c.loyaltyPoints} نقطة</span> : <span className="text-gray-500">—</span> },
+                { key: 'loyaltyPoints', header: 'النقاط', render: (c) => c.loyaltyPoints > 0 ? <span className="font-numeric num text-yellow-400">{c.loyaltyPoints} نقطة</span> : <span className="text-gray-500">—</span> },
                 { key: 'actions', header: '', render: (c) => (
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" title="السجل" onClick={(e) => { e.stopPropagation(); setDetailCustomer(c) }}>

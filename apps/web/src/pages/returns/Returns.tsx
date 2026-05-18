@@ -38,11 +38,11 @@ function ReturnDetailDrawer({ ret }: { ret: Return }) {
   return (
     <div className="flex flex-col gap-6">
       <div className="grid grid-cols-2 gap-4 text-sm">
-        <div><span className="text-gray-500">فاتورة</span><p className="font-mono text-gray-100">{ret.invoice.invoiceNumber}</p></div>
+        <div><span className="text-gray-500">فاتورة</span><p className="num-code">{ret.invoice.invoiceNumber}</p></div>
         <div><span className="text-gray-500">العميل</span><p className="text-gray-100">{ret.invoice.customer?.fullName ?? 'نقدي'}</p></div>
         <div><span className="text-gray-500">النوع</span><p><Badge variant={typeMap[ret.returnType].variant}>{typeMap[ret.returnType].label}</Badge></p></div>
         <div><span className="text-gray-500">بواسطة</span><p className="text-gray-100">{ret.processedBy.fullName}</p></div>
-        <div><span className="text-gray-500">التاريخ</span><p className="text-gray-100 font-mono text-xs">{formatDateTime(ret.createdAt)}</p></div>
+        <div><span className="text-gray-500">التاريخ</span><p className="font-numeric num num-strong text-xs">{formatDateTime(ret.createdAt)}</p></div>
         <div><span className="text-gray-500">المبلغ المسترد</span><p><Money value={ret.amount} size="lg" /></p></div>
       </div>
 
@@ -60,9 +60,9 @@ function ReturnDetailDrawer({ ret }: { ret: Return }) {
             <div key={item.id} className="py-2.5 flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-100">{item.variant.product.name}</p>
-                <p className="text-xs text-gray-500 font-mono">{item.variant.sku}</p>
+                <p className="text-xs num-code">{item.variant.sku}</p>
               </div>
-              <span className="font-mono text-sm text-gray-300">× {item.quantity}</span>
+              <span className="font-numeric num num-strong text-sm">× {item.quantity}</span>
             </div>
           ))}
         </div>
@@ -152,7 +152,7 @@ export default function Returns() {
                 )},
                 { key: 'customer', header: 'العميل', render: (r) => r.invoice.customer?.fullName ?? <span className="text-gray-500">نقدي</span> },
                 { key: 'returnType', header: 'النوع', render: (r) => <Badge variant={typeMap[r.returnType].variant}>{typeMap[r.returnType].label}</Badge> },
-                { key: 'items', header: 'الأصناف', render: (r) => <span className="font-mono text-gray-400">{r.items.length} صنف</span> },
+                { key: 'items', header: 'الأصناف', render: (r) => <span className="font-numeric num num-strong">{r.items.length} صنف</span> },
                 { key: 'amount', header: 'المبلغ', render: (r) => <Money value={r.amount} /> },
                 { key: 'processedBy', header: 'الموظف', render: (r) => <span className="text-gray-500 text-sm">{r.processedBy.fullName}</span> },
                 { key: 'createdAt', header: 'التاريخ', render: (r) => <span className="text-gray-500 text-xs">{formatDate(r.createdAt)}</span> },

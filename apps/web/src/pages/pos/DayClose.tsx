@@ -41,8 +41,8 @@ function BreakdownTable({ rows, total, count, label }: { rows: MethodRow[]; tota
             {rows.map((r) => (
               <tr key={r.methodId ?? 'none'} className="border-t border-gray-700/60">
                 <td className="px-4 py-3 text-gray-200">{r.methodName}</td>
-                <td className="px-4 py-3 text-center text-gray-400 font-mono">{r.count}</td>
-                <td className="px-4 py-3 text-left font-mono text-gray-100">{formatMoney(r.total)} ج</td>
+                <td className="px-4 py-3 text-center font-numeric num num-strong">{r.count}</td>
+                <td className="px-4 py-3 text-left font-numeric num num-primary">{formatMoney(r.total)} ج</td>
               </tr>
             ))}
           </tbody>
@@ -78,8 +78,9 @@ export default function DayClose() {
 
     const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
       <title>إغلاق يوم ${date}</title>
+      <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
       <style>
-        *{box-sizing:border-box;margin:0;padding:0}body{font-family:Arial,sans-serif;font-size:13px;padding:32px;color:#111}
+        *{box-sizing:border-box;margin:0;padding:0}body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:13px;padding:32px;color:#111}
         h1{font-size:18px;font-weight:700;margin-bottom:4px}
         h2{font-size:14px;font-weight:600;margin:20px 0 8px}
         table{width:100%;border-collapse:collapse;margin-bottom:16px}

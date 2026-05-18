@@ -131,10 +131,10 @@ function ReceiveModal({ po, onClose, onConfirm, isPending }: { po: PurchaseOrder
                   <tr key={it.id} className="border-t border-gray-700/50">
                     <td className="px-3 py-2">
                       <p className="text-gray-100">{it.variant.product.name}</p>
-                      <p className="text-xs text-gray-500 font-mono">{it.variant.sku}</p>
+                      <p className="text-xs num-code">{it.variant.sku}</p>
                     </td>
-                    <td className="px-3 py-2 text-center font-mono text-gray-400">{it.quantity}</td>
-                    <td className="px-3 py-2 text-center font-mono text-gray-500">{received}</td>
+                    <td className="px-3 py-2 text-center font-numeric num num-strong">{it.quantity}</td>
+                    <td className="px-3 py-2 text-center font-numeric num num-muted">{received}</td>
                     <td className="px-3 py-2 text-center">
                       <input
                         type="number"
@@ -260,7 +260,7 @@ function VariantSearchField({
               className="w-full text-right px-3 py-2 text-sm hover:bg-gray-700 text-gray-200"
               onClick={() => pick(v)}
             >
-              {v.product.name} <span className="text-gray-500 font-mono text-xs mr-1">{v.sku}</span>
+              {v.product.name} <span className="num-code text-xs mr-1">{v.sku}</span>
             </button>
           ))}
         </div>
@@ -461,11 +461,11 @@ export default function PurchaseOrders() {
             }}
             columns={[
               { key: 'id', header: 'رقم الأمر', render: (po) => (
-                <button className="font-mono text-brand-400 hover:underline text-xs" onClick={() => openDetail(po)}>{po.id.slice(0, 8).toUpperCase()}</button>
+                <button className="num-code hover:underline text-xs" onClick={() => openDetail(po)}>{po.id.slice(0, 8).toUpperCase()}</button>
               )},
               { key: 'supplier', header: 'المورد', render: (po) => <span className="text-gray-100">{po.supplier?.name ?? '—'}</span> },
               { key: 'branch', header: 'الفرع', render: (po) => <span className="text-gray-400">{po.branch?.name ?? '—'}</span> },
-              { key: 'items', header: 'الأصناف', render: (po) => <span className="font-mono text-gray-400">{po._count?.items ?? 0}</span> },
+              { key: 'items', header: 'الأصناف', render: (po) => <span className="font-numeric num num-strong">{po._count?.items ?? 0}</span> },
               { key: 'totalAmount', header: 'الإجمالي', render: (po) => <Money value={Number(po.totalAmount)} /> },
               { key: 'status', header: 'الحالة', render: (po) => {
                 const s = getStatus(purchaseOrderStatusMap, po.status)
@@ -633,7 +633,7 @@ export default function PurchaseOrders() {
                   <div key={item.id} className="flex justify-between text-sm py-2 border-b border-gray-700 last:border-0">
                     <div>
                       <p className="text-gray-100">{item.variant?.product?.name ?? '—'}</p>
-                      <p className="text-gray-500 text-xs font-mono">{item.variant?.sku} × {item.quantity}</p>
+                      <p className="text-xs"><span className="num-code">{item.variant?.sku}</span> × <span className="font-numeric num num-muted">{item.quantity}</span></p>
                       {(partial || fullyReceived) && (
                         <p className="text-[10px] mt-0.5">
                           <span className={fullyReceived ? 'text-success-400' : 'text-warning-400'}>

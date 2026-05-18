@@ -184,6 +184,11 @@ app.register(async function apiContext(api) {
       loyaltyPointValue: z.coerce.number().min(0).optional(),
       printTemplate: z.string().optional(),
       dailySalesTarget: z.coerce.number().min(0).optional(),
+      // ETA toggle — owners can opt out if VAT-exempt. The actual taxpayer
+      // credentials (id, client_id, client_secret, signing cert) are handled
+      // by the dedicated ETA enrollment flow because they need encryption
+      // at rest via APP_ENCRYPTION_KEY.
+      etaEnabled: z.boolean().optional(),
     })
     const parsed = schema.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })

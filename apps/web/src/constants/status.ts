@@ -70,4 +70,7 @@ export const etaStatusMap: StatusMap = {
   failed: { label: 'فشل', variant: 'danger' },
   accepted: { label: 'مقبول', variant: 'success' },
   not_required: { label: 'غير مطلوب', variant: 'gray' },
+  // ETA is on for this store, but they haven't entered their taxpayer ID /
+  // client credentials yet — surfaced as a warning so the owner notices.
+  pending_setup: { label: 'بانتظار إعداد ETA', variant: 'warning' },
 }

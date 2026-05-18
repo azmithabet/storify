@@ -1743,6 +1743,15 @@ const etaStatusMap: Record<string, { label: string; variant: 'warning' | 'danger
   failed: { label: 'فشل', variant: 'danger' },
   accepted: { label: 'مقبول', variant: 'success' },
   not_required: { label: 'غير مطلوب', variant: 'gray' },
+  pending_setup: { label: 'بانتظار إعداد ETA', variant: 'warning' },
+}
+
+interface TenantSettings {
+  id: string
+  etaEnabled: boolean
+  etaTaxpayerId?: string | null
+  etaClientId?: string | null
+  etaClientSecret?: string | null
 }
 
 function EtaSettings() {
@@ -1750,6 +1759,25 @@ function EtaSettings() {
   const [statusFilter, setStatusFilter] = useState('failed')
   const [page, setPage] = useState(1)
   const LIMIT = 15
+
+  // Toggle state — load the tenant's current ETA configuration so we can
+  // show owners whether they're enrolled or still pending.
+  const { data: settings } = useQuery<TenantSettings>({
+    queryKey: ['tenant-settings-eta'],
+    queryFn: async () => (await api.get<{ data: TenantSettings }>('/settings')).data.data,
+  })
+
+  const { mutate: toggleEta, isPending: isToggling } = useMutation({
+    mutationFn: async (etaEnabled: boolean) => api.patch('/settings', { etaEnabled }),
+    onSuccess: (_, etaEnabled) => {
+      toast.success(etaEnabled
+        ? 'تم تفعيل إرسال الإيصالات الإلكترونية'
+        : 'تم إيقاف إرسال الإيصالات الإلكترونية')
+      qc.invalidateQueries({ queryKey: ['tenant-settings-eta'] })
+      qc.invalidateQueries({ queryKey: ['tenant-settings'] })
+    },
+    onError: () => toast.error('تعذّر تحديث الإعداد'),
+  })
 
   const { data, isLoading } = useQuery<{ data: EtaInvoice[]; meta: { total: number; page: number; limit: number; pages: number } }>({
     queryKey: ['eta-invoices', statusFilter, page],
@@ -1772,8 +1800,59 @@ function EtaSettings() {
   const invoices = data?.data ?? []
   const meta = data?.meta
 
+  // Three states for the banner: opted-out, enabled-but-unconfigured, fully-set-up.
+  const etaEnabled = settings?.etaEnabled ?? true
+  const hasCredentials = !!(settings?.etaTaxpayerId && settings?.etaClientId && settings?.etaClientSecret)
+
   return (
     <div className="flex flex-col gap-6">
+      {/* Enable/disable toggle + setup status */}
+      <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h3 className="text-base font-semibold text-gray-100">إرسال الإيصالات الإلكترونية (ETA)</h3>
+            <p className="text-xs text-gray-500 mt-1">
+              مصلحة الضرائب المصرية تشترط على الشركات المسجلة لضريبة القيمة المضافة إرسال إيصالات إلكترونية. أوقفه فقط إذا كنت غير مسجل لضريبة القيمة المضافة.
+            </p>
+          </div>
+          <label className="inline-flex items-center gap-2 cursor-pointer shrink-0">
+            <input
+              type="checkbox"
+              checked={etaEnabled}
+              disabled={isToggling}
+              onChange={(e) => toggleEta(e.target.checked)}
+              className="w-5 h-5 rounded accent-brand-500"
+            />
+            <span className="text-sm text-gray-200">{etaEnabled ? 'مفعّل' : 'موقوف'}</span>
+          </label>
+        </div>
+
+        {etaEnabled && !hasCredentials && (
+          <div className="bg-warning-500/10 border border-warning-500/30 rounded-md px-4 py-3 text-sm text-warning-200">
+            <p className="font-semibold mb-1">بانتظار إكمال إعداد ETA</p>
+            <p className="text-warning-200/80 text-xs leading-relaxed">
+              متجرك مفعّل لإرسال الإيصالات الإلكترونية لكن لم يتم إدخال بيانات الاعتماد بعد
+              (رقم الممول، Client ID، Client Secret، الشهادة الرقمية). الفواتير الجديدة ستبقى
+              في حالة «بانتظار إعداد ETA» حتى تكتمل البيانات. تواصل مع الدعم لإكمال التسجيل بعد
+              التسجيل على بوابة ETA.
+            </p>
+          </div>
+        )}
+
+        {!etaEnabled && (
+          <div className="bg-gray-800/40 border border-gray-700 rounded-md px-4 py-3 text-xs text-gray-400 leading-relaxed">
+            الإرسال الإلكتروني موقوف لهذا المتجر. الفواتير الجديدة ستُسجّل كـ «غير مطلوب».
+            تأكد أن متجرك معفى من ضريبة القيمة المضافة قبل الإيقاف.
+          </div>
+        )}
+
+        {etaEnabled && hasCredentials && (
+          <div className="bg-success-500/10 border border-success-500/30 rounded-md px-4 py-3 text-xs text-success-200 leading-relaxed">
+            تم إعداد ETA — الفواتير تُرسَل تلقائياً إلى مصلحة الضرائب.
+          </div>
+        )}
+      </div>
+
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-100">حالة إرسال الإيصالات الإلكترونية (ETA)</h3>
         <Select
@@ -1783,6 +1862,7 @@ function EtaSettings() {
           <option value="">الكل</option>
           <option value="failed">فشل</option>
           <option value="pending">معلق</option>
+          <option value="pending_setup">بانتظار إعداد ETA</option>
           <option value="accepted">مقبول</option>
           <option value="not_required">غير مطلوب</option>
         </Select>

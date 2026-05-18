@@ -123,7 +123,10 @@ model TenantSetting {
   dailySalesTarget Decimal @default(0) @db.Decimal(15, 4) @map("daily_sales_target")
 
   // ETA configuration — v1.2
-  etaEnabled      Boolean  @default(false)     @map("eta_enabled")
+  // Default on because Egyptian VAT-registered businesses are required to
+  // submit e-invoices to ETA. Stores that are VAT-exempt can disable from
+  // Settings → Taxes.
+  etaEnabled      Boolean  @default(true)      @map("eta_enabled")
   etaEnvironment  String   @default("preprod") @db.VarChar(20) @map("eta_environment")
   etaTaxpayerId   String?  @db.VarChar(50)     @map("eta_taxpayer_id")
   etaActivityCode String?  @db.VarChar(20)     @map("eta_activity_code")

@@ -165,12 +165,15 @@ async function seedTenantDefaults(
   })
 
   // 8. Tenant settings (single row)
+  // ETA on by default: VAT-registered businesses must submit e-invoices to
+  // ETA per Egyptian law. The store owner can opt out from Settings → Taxes
+  // if VAT-exempt. Credentials are blank until they complete ETA enrollment.
   await db.tenantSetting.create({
     data: {
       language: 'ar',
       timezone: 'Africa/Cairo',
       currencyDefault: 'EGP',
-      etaEnabled: false,
+      etaEnabled: true,
     },
   })
 }

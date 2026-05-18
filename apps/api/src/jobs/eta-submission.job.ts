@@ -74,9 +74,21 @@ export function startEtaWorker() {
       if (!invoiceRows.length) throw new Error(`Invoice ${invoiceId} not found`)
       const inv = invoiceRows[0]
 
-      if (!inv.eta_enabled || !inv.eta_taxpayer_id || !inv.eta_client_id || !inv.eta_client_secret) {
+      // Three distinct outcomes when ETA can't submit:
+      //   - eta_enabled=false  → store opted out (VAT-exempt) → 'not_required'
+      //   - eta_enabled=true but credentials missing → 'pending_setup'
+      //     (the store must finish ETA enrollment; the cashier should see this)
+      //   - everything set → submit normally below
+      if (!inv.eta_enabled) {
         await db.$executeRawUnsafe(
           `UPDATE invoices SET eta_status = 'not_required' WHERE id = $1`,
+          invoiceId,
+        )
+        return
+      }
+      if (!inv.eta_taxpayer_id || !inv.eta_client_id || !inv.eta_client_secret) {
+        await db.$executeRawUnsafe(
+          `UPDATE invoices SET eta_status = 'pending_setup' WHERE id = $1`,
           invoiceId,
         )
         return

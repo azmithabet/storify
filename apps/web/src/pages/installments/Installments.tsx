@@ -829,7 +829,7 @@ export default function Installments() {
             <Button variant="secondary" onClick={() => setRecordModal(null)}>إلغاء</Button>
             <Button
               loading={isRecording}
-              disabled={!recordPM}
+              disabled={!recordPM || recordDate > new Date().toISOString().slice(0, 10)}
               onClick={() => recordModal && recordPayment({ ...recordModal, paymentMethodId: recordPM, paidDate: recordDate })}
             >
               تسجيل الدفعة
@@ -846,7 +846,13 @@ export default function Installments() {
             label="تاريخ الدفع"
             type="date"
             value={recordDate}
+            max={new Date().toISOString().slice(0, 10)}
             onChange={(e) => setRecordDate(e.target.value)}
+            error={
+              recordDate > new Date().toISOString().slice(0, 10)
+                ? 'لا يمكن تسجيل دفعة بتاريخ مستقبلي'
+                : undefined
+            }
           />
         </div>
       </Modal>

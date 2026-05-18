@@ -83,7 +83,10 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   // ─── POST /api/auth/refresh ───────────────────────────────────────────────
-  app.post('/refresh', async (request, reply) => {
+  // Rate-limited so an attacker who scrapes a refresh cookie can't churn it.
+  app.post('/refresh', {
+    config: { rateLimit: { max: 30, timeWindow: 60_000 } },
+  }, async (request, reply) => {
     const token = request.cookies[REFRESH_COOKIE]
     if (!token) {
       return reply.status(401).send({
@@ -98,6 +101,26 @@ export async function authRoutes(app: FastifyInstance) {
       return reply.status(401).send({
         success: false,
         error: { code: 'invalid_refresh_token', message: 'الجلسة منتهية، يرجى تسجيل الدخول مجدداً' },
+      })
+    }
+
+    // Refuse to refresh sessions when the subscription is past the grace
+    // period. The tenant middleware exempts /api/auth/* from this check (so
+    // users can still log in to pay), but for refresh we want a stricter
+    // gate — otherwise a SUSPENDED/CANCELLED tenant can extend its session
+    // indefinitely off a still-valid refresh token.
+    const { masterDb } = await import('../../config/database')
+    const subscription = await masterDb.subscription.findFirst({
+      where: { tenantId: request.tenant.id },
+      orderBy: { createdAt: 'desc' },
+      select: { status: true },
+    })
+    if (subscription && (subscription.status === 'SUSPENDED' || subscription.status === 'CANCELLED')) {
+      await invalidateRefreshToken(token)
+      reply.clearCookie(REFRESH_COOKIE, { path: '/' })
+      return reply.status(402).send({
+        success: false,
+        error: { code: 'subscription_inactive', message: 'الاشتراك غير نشط' },
       })
     }
 
@@ -142,7 +165,12 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   // ─── POST /api/auth/forgot-password ──────────────────────────────────────
-  app.post('/forgot-password', async (request, reply) => {
+  // Per-IP cap on top of the per-email rate limit so an attacker can't pivot
+  // through many emails. The per-email Redis-backed limit lives inside
+  // checkForgotPasswordRateLimit.
+  app.post('/forgot-password', {
+    config: { rateLimit: { max: 20, timeWindow: 60_000 } },
+  }, async (request, reply) => {
     const parsed = forgotSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.status(200).send({ success: true }) // never reveal anything
@@ -169,7 +197,11 @@ export async function authRoutes(app: FastifyInstance) {
   })
 
   // ─── POST /api/auth/reset-password ───────────────────────────────────────
-  app.post('/reset-password', async (request, reply) => {
+  // Tight rate limit — without this, leaked reset URLs become token-guessing
+  // surfaces and brute force is cheap.
+  app.post('/reset-password', {
+    config: { rateLimit: { max: 5, timeWindow: 5 * 60_000 } },
+  }, async (request, reply) => {
     const parsed = resetSchema.safeParse(request.body)
     if (!parsed.success) {
       return reply.status(400).send({

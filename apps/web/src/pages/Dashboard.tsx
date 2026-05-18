@@ -98,7 +98,7 @@ export default function Dashboard() {
   sevenDaysAgo.setDate(today.getDate() - 6)
   const fmt = (d: Date) => d.toISOString().slice(0, 10)
 
-  const { data, isLoading, error } = useQuery<DashboardData>({
+  const { data, isLoading, error, refetch: refetchDashboard, isFetching: isRefetching } = useQuery<DashboardData>({
     queryKey: ['dashboard'],
     queryFn: async () => (await api.get<{ data: DashboardData }>('/reports/dashboard')).data.data,
     refetchInterval: 2 * 60 * 1000,
@@ -145,7 +145,19 @@ export default function Dashboard() {
   return (
     <AppShell title="لوحة التحكم">
       {error && (
-        <Alert variant="warning" className="mb-6">تعذّر تحميل بيانات اللوحة.</Alert>
+        <Alert variant="warning" className="mb-6">
+          <div className="flex items-center justify-between gap-4">
+            <span>تعذّر تحميل بيانات اللوحة.</span>
+            <button
+              type="button"
+              onClick={() => refetchDashboard()}
+              disabled={isRefetching}
+              className="text-sm font-medium text-brand-300 hover:text-brand-200 disabled:opacity-50"
+            >
+              {isRefetching ? 'جارٍ المحاولة…' : 'إعادة المحاولة'}
+            </button>
+          </div>
+        </Alert>
       )}
 
       <UsageBanner />

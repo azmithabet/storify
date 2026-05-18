@@ -2,6 +2,19 @@ import { masterDb } from '@/config/database'
 import { PaymobClient, type PaymobBillingData } from './paymob.client'
 import { sendEmail } from '@/shared/utils/email'
 import Decimal from 'decimal.js'
+import { Prisma } from '@storify/database'
+import dayjs from 'dayjs'
+
+/**
+ * Adds one billing cycle to `start` using calendar math, not raw setMonth /
+ * setFullYear. dayjs handles the Jan-31 → Feb-28 edge case correctly so a
+ * subscription that started on a month-end doesn't drift back a day on every
+ * rollover.
+ */
+function addPeriod(start: Date, cycle: 'MONTHLY' | 'YEARLY' | string): Date {
+  if (cycle === 'YEARLY') return dayjs(start).add(1, 'year').toDate()
+  return dayjs(start).add(1, 'month').toDate()
+}
 
 const paymob = new PaymobClient()
 
@@ -59,51 +72,54 @@ export async function handleWebhookSuccess(params: {
   const tenantId = merchantOrderId.split('_')[1]
   if (!tenantId) return
 
-  // Idempotency: skip if transaction already recorded
-  const existing = await masterDb.paymentAttempt.findFirst({
-    where: { providerTransactionId: String(transactionId) },
-  })
-  if (existing) return
-
   const sub = await masterDb.subscription.findFirst({ where: { tenantId } })
   if (!sub) return
 
   const periodStart = new Date()
-  // Period length must match billing cycle — yearly subs renew yearly, not in 30 days.
-  const periodEnd = new Date(periodStart)
-  if (sub.billingCycle === 'YEARLY') {
-    periodEnd.setFullYear(periodEnd.getFullYear() + 1)
-  } else {
-    periodEnd.setMonth(periodEnd.getMonth() + 1)
-  }
+  // Period length must match billing cycle — yearly subs renew yearly, not
+  // in 30 days. Use date-arithmetic that handles month-end edge cases
+  // (Jan 31 → Feb 28) rather than naive setMonth.
+  const periodEnd = addPeriod(periodStart, sub.billingCycle)
 
-  await masterDb.$transaction([
-    masterDb.paymentAttempt.create({
-      data: {
-        subscriptionId: sub.id,
-        providerTransactionId: String(transactionId),
-        amount: new Decimal(amountCents).dividedBy(100),
-        currency: 'EGP',
-        status: 'SUCCESS',
-        attemptType: 'initial',
-        provider: 'paymob',
-        providerResponse: { orderId, transactionId },
-      },
-    }),
-    masterDb.subscription.update({
-      where: { id: sub.id },
-      data: {
-        status: 'ACTIVE',
-        failedAttempts: 0,
-        lastFailureReason: null,
-        lastPaymentAt: periodStart,
-        nextBillingAt: periodEnd,
-        currentPeriodStart: periodStart,
-        currentPeriodEnd: periodEnd,
-        providerCardToken: cardToken,
-      },
-    }),
-  ])
+  // Idempotency: the up-front findFirst can race with another concurrent
+  // webhook. Rely on the @unique on providerTransactionId to make the
+  // create the source of truth — catch the P2002 violation and exit
+  // cleanly so we don't double-update the subscription.
+  try {
+    await masterDb.$transaction([
+      masterDb.paymentAttempt.create({
+        data: {
+          subscriptionId: sub.id,
+          providerTransactionId: String(transactionId),
+          amount: new Decimal(amountCents).dividedBy(100),
+          currency: 'EGP',
+          status: 'SUCCESS',
+          attemptType: 'initial',
+          provider: 'paymob',
+          providerResponse: { orderId, transactionId },
+        },
+      }),
+      masterDb.subscription.update({
+        where: { id: sub.id },
+        data: {
+          status: 'ACTIVE',
+          failedAttempts: 0,
+          lastFailureReason: null,
+          lastPaymentAt: periodStart,
+          nextBillingAt: periodEnd,
+          currentPeriodStart: periodStart,
+          currentPeriodEnd: periodEnd,
+          providerCardToken: cardToken,
+        },
+      }),
+    ])
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      // Already recorded by a concurrent webhook delivery — safe no-op.
+      return
+    }
+    throw err
+  }
 
   const tenant = await masterDb.tenant.findUnique({ where: { id: tenantId } })
   if (tenant) {
@@ -125,11 +141,6 @@ export async function handleWebhookFailure(params: {
   const tenantId = merchantOrderId.split('_')[1]
   if (!tenantId) return
 
-  const existing = await masterDb.paymentAttempt.findFirst({
-    where: { providerTransactionId: String(transactionId) },
-  })
-  if (existing) return
-
   const sub = await masterDb.subscription.findFirst({ where: { tenantId } })
   if (!sub) return
 
@@ -144,29 +155,36 @@ export async function handleWebhookFailure(params: {
     newStatus = 'PAST_DUE'
   }
 
-  await masterDb.$transaction([
-    masterDb.paymentAttempt.create({
-      data: {
-        subscriptionId: sub.id,
-        providerTransactionId: String(transactionId),
-        amount: new Decimal(amountCents).dividedBy(100),
-        currency: 'EGP',
-        status: 'FAILED',
-        attemptType: 'initial',
-        provider: 'paymob',
-        providerResponse: { errorMessage },
-      },
-    }),
-    masterDb.subscription.update({
-      where: { id: sub.id },
-      data: {
-        failedAttempts: newFailedAttempts,
-        lastFailureReason: errorMessage ?? 'payment_failed',
-        status: newStatus,
-        ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date() } : {}),
-      },
-    }),
-  ])
+  try {
+    await masterDb.$transaction([
+      masterDb.paymentAttempt.create({
+        data: {
+          subscriptionId: sub.id,
+          providerTransactionId: String(transactionId),
+          amount: new Decimal(amountCents).dividedBy(100),
+          currency: 'EGP',
+          status: 'FAILED',
+          attemptType: 'initial',
+          provider: 'paymob',
+          providerResponse: { errorMessage },
+        },
+      }),
+      masterDb.subscription.update({
+        where: { id: sub.id },
+        data: {
+          failedAttempts: newFailedAttempts,
+          lastFailureReason: errorMessage ?? 'payment_failed',
+          status: newStatus,
+          ...(newStatus === 'CANCELLED' ? { cancelledAt: new Date() } : {}),
+        },
+      }),
+    ])
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2002') {
+      return
+    }
+    throw err
+  }
 
   const emailTemplate =
     newStatus === 'CANCELLED'

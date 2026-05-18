@@ -11,6 +11,7 @@ import { Queue, Worker, type Job } from 'bullmq'
 import { redis } from '@/config/redis'
 import { masterDb, getTenantDb } from '@/config/database'
 import { sendInstallmentReminderEmail } from '@/shared/utils/email'
+import { withLock } from '@/shared/utils/lock'
 
 export const REMINDERS_QUEUE = 'installment-reminders'
 
@@ -29,7 +30,11 @@ export function startReminderWorker() {
   const worker = new Worker(
     REMINDERS_QUEUE,
     async (_job: Job) => {
-      const summary = await runReminderCycle()
+      const summary = await withLock('installment-reminders-cycle', 25 * 60_000, () => runReminderCycle())
+      if (summary === null) {
+        console.info('[Reminders] another instance holds the lock — skipping')
+        return
+      }
       console.info(`[Reminders] cycle complete:`, summary)
     },
     { connection: redis },

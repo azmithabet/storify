@@ -1,6 +1,7 @@
 import Fastify from 'fastify'
 import cors from '@fastify/cors'
 import rateLimit from '@fastify/rate-limit'
+import helmet from '@fastify/helmet'
 import fastifyStatic from '@fastify/static'
 import { join } from 'path'
 import { config } from './config/env'
@@ -51,9 +52,57 @@ const app = Fastify({
 app.register(sentryPlugin)
 app.register(jwtPlugin)
 app.register(cookiePlugin)
+// Security headers. CSP is disabled because we serve the Vite-built SPA from
+// the same origin and inline styles/scripts are unavoidable without rework.
+app.register(helmet, { contentSecurityPolicy: false })
 app.register(rateLimit, {
   global: false, // opt-in per-route via config.rateLimit
   redis,
+})
+
+// Global error handler — never leak stack traces or internal messages in
+// production. Fastify validation errors keep their message; other errors are
+// normalized to `{ success: false, error: { code, message } }`.
+app.setErrorHandler((error, request, reply) => {
+  const status =
+    typeof error.statusCode === 'number' && error.statusCode >= 400 && error.statusCode < 600
+      ? error.statusCode
+      : 500
+
+  if (status >= 500) {
+    request.log.error({ err: error, url: request.url }, 'unhandled_error')
+  }
+
+  // Fastify schema validation errors come back with a `validation` array.
+  if ((error as { validation?: unknown[] }).validation) {
+    return reply.status(400).send({
+      success: false,
+      error: { code: 'validation_error', message: error.message },
+    })
+  }
+
+  // Rate-limit plugin reports 429 with its own message.
+  if (status === 429) {
+    return reply.status(429).send({
+      success: false,
+      error: { code: 'rate_limited', message: error.message || 'Too many requests' },
+    })
+  }
+
+  if (status >= 500) {
+    return reply.status(status).send({
+      success: false,
+      error: {
+        code: 'internal_error',
+        message: config.NODE_ENV === 'production' ? 'Internal server error' : error.message,
+      },
+    })
+  }
+
+  return reply.status(status).send({
+    success: false,
+    error: { code: (error as { code?: string }).code ?? 'error', message: error.message },
+  })
 })
 
 // ─── Public routes (no tenant required) ──────────────────────────────────────

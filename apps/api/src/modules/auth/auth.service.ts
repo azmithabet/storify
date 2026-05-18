@@ -167,10 +167,36 @@ export async function resetPassword(
   const { hashPassword } = await import('../../shared/utils/password')
   const passwordHash = await hashPassword(newPassword)
 
-  await db.$transaction([
-    db.user.update({ where: { id: record.userId }, data: { passwordHash } }),
-    db.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } }),
-  ])
+  // Atomic single-use: updateMany with `usedAt: null` filter only succeeds the
+  // first time. Two concurrent reset requests with the same token race on
+  // this update — the loser sees count=0 and aborts. Without this, the up-
+  // front `record.usedAt` check is a TOCTOU window.
+  await db.$transaction(async (tx) => {
+    const claim = await tx.passwordResetToken.updateMany({
+      where: { id: record.id, usedAt: null, expiresAt: { gt: new Date() } },
+      data: { usedAt: new Date() },
+    })
+    if (claim.count === 0) {
+      const err = new Error('invalid_or_expired_token') as Error & { statusCode: number }
+      err.statusCode = 400
+      throw err
+    }
+    await tx.user.update({ where: { id: record.userId }, data: { passwordHash } })
+  })
+
+  // Best-effort: drop any active sessions for this user so a leaked
+  // refresh token can't outlive the reset.
+  const keys = await redis.keys('refresh:*').catch(() => [] as string[])
+  for (const k of keys) {
+    const raw = await redis.get(k).catch(() => null)
+    if (!raw) continue
+    try {
+      const parsed = JSON.parse(raw) as RefreshTokenData
+      if (parsed.userId === record.userId) await redis.del(k)
+    } catch {
+      // ignore corrupt entries
+    }
+  }
 }
 
 // ─── Rate limit: forgot-password (5/hour/email, Redis-backed) ────────────────

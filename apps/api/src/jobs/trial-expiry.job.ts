@@ -2,6 +2,7 @@ import { Queue, Worker, type Job } from 'bullmq'
 import { redis } from '@/config/redis'
 import { masterDb } from '@/config/database'
 import { sendEmail } from '@/shared/utils/email'
+import { withLock } from '@/shared/utils/lock'
 
 export const TRIAL_EXPIRY_QUEUE = 'trial-expiry'
 
@@ -16,7 +17,8 @@ export function startTrialExpiryWorker() {
   const worker = new Worker(
     TRIAL_EXPIRY_QUEUE,
     async (_job: Job) => {
-      await runTrialExpiry()
+      const result = await withLock('trial-expiry-cycle', 10 * 60_000, () => runTrialExpiry())
+      if (result === null) console.info('[TrialExpiry] another instance holds the lock — skipping')
     },
     { connection: redis },
   )

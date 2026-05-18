@@ -10,6 +10,12 @@ export function verifyPaymobWebhook(
   payload: PaymobWebhookPayload,
   receivedHmac: string,
 ): boolean {
+  // Fail closed: never accept a webhook when the HMAC secret isn't configured —
+  // signing against an empty key would let anyone forge requests.
+  const secret = config.PAYMOB_HMAC_SECRET
+  if (!secret) return false
+  if (!receivedHmac) return false
+
   const obj = payload.obj
   const concatenated = [
     obj.amount_cents,
@@ -37,11 +43,15 @@ export function verifyPaymobWebhook(
     .join('')
 
   const hmac = crypto
-    .createHmac('sha512', config.PAYMOB_HMAC_SECRET ?? '')
+    .createHmac('sha512', secret)
     .update(concatenated)
     .digest('hex')
 
-  return hmac === receivedHmac
+  // Constant-time comparison to avoid timing oracles.
+  const a = Buffer.from(hmac, 'hex')
+  const b = Buffer.from(receivedHmac, 'hex')
+  if (a.length !== b.length) return false
+  return crypto.timingSafeEqual(a, b)
 }
 
 export interface PaymobWebhookPayload {

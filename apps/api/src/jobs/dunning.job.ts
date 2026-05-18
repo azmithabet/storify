@@ -3,6 +3,7 @@ import { redis } from '@/config/redis'
 import { masterDb } from '@/config/database'
 import { PaymobClient } from '@/modules/billing/paymob.client'
 import { handleWebhookSuccess, handleWebhookFailure } from '@/modules/billing/billing.service'
+import { withLock } from '@/shared/utils/lock'
 import Decimal from 'decimal.js'
 
 export const DUNNING_QUEUE = 'dunning'
@@ -12,7 +13,12 @@ const paymob = new PaymobClient()
 export function getDunningQueue() {
   return new Queue(DUNNING_QUEUE, {
     connection: redis,
-    defaultJobOptions: { removeOnComplete: true, removeOnFail: { count: 100 } },
+    defaultJobOptions: {
+      removeOnComplete: true,
+      removeOnFail: { count: 100 },
+      attempts: 3,
+      backoff: { type: 'exponential', delay: 60_000 },
+    },
   })
 }
 
@@ -23,7 +29,10 @@ export function startDunningWorker() {
   const worker = new Worker(
     DUNNING_QUEUE,
     async (_job: Job) => {
-      await runDunningCycle()
+      // 25 minutes — comfortably longer than any realistic cycle, shorter
+      // than the 24h scheduled interval.
+      const result = await withLock('dunning-cycle', 25 * 60_000, () => runDunningCycle())
+      if (result === null) console.info('[Dunning] another instance holds the lock — skipping')
     },
     { connection: redis },
   )
@@ -57,6 +66,7 @@ async function runDunningCycle() {
     include: { plan: true, tenant: true },
   })
 
+  let transientFailures = 0
   for (const sub of subs) {
     const daysSinceLastPayment = sub.lastPaymentAt
       ? Math.floor((now.getTime() - sub.lastPaymentAt.getTime()) / (24 * 3600 * 1000))
@@ -115,8 +125,16 @@ async function runDunningCycle() {
         })
       }
     } catch (err) {
+      // Per-subscription failures shouldn't abort the whole cycle (we still
+      // want to retry other tenants), but we count them so the job can
+      // re-throw once the loop ends, letting BullMQ retry the cycle.
+      transientFailures += 1
       console.error(`[Dunning] Failed to retry subscription ${sub.id}:`, err)
     }
+  }
+
+  if (transientFailures > 0) {
+    throw new Error(`dunning_cycle_partial_failure:${transientFailures}`)
   }
 }
 

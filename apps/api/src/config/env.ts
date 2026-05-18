@@ -61,3 +61,17 @@ if (!parsed.success) {
 }
 
 export const config = parsed.data
+
+// Production-only required secrets. In dev they're optional so contributors
+// can boot the API without setting up Paymob/ETA, but production must fail
+// fast if any of these are missing — otherwise we silently fall back to
+// insecure defaults (encryption keys, webhook signing).
+if (config.NODE_ENV === 'production') {
+  const missing: string[] = []
+  if (!config.APP_ENCRYPTION_KEY || config.APP_ENCRYPTION_KEY.length < 32) missing.push('APP_ENCRYPTION_KEY')
+  if (!config.PAYMOB_HMAC_SECRET) missing.push('PAYMOB_HMAC_SECRET')
+  if (missing.length > 0) {
+    console.error(`Missing required production env vars: ${missing.join(', ')}`)
+    process.exit(1)
+  }
+}

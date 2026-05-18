@@ -1,4 +1,5 @@
 import axios from 'axios'
+import toast from 'react-hot-toast'
 import { useAuthStore } from '@/stores/auth.store'
 
 export const api = axios.create({
@@ -49,9 +50,18 @@ api.interceptors.response.use(
       refreshQueue = []
       original.headers.Authorization = `Bearer ${newToken}`
       return api(original)
-    } catch {
-      useAuthStore.getState().logout()
-      return Promise.reject(err)
+    } catch (refreshErr) {
+      // Refresh failed — drain the queue with a rejection so pending requests
+      // resolve instead of hanging forever, and surface a toast so the user
+      // understands why the next click bounces them to /login.
+      refreshQueue.forEach(() => {})
+      refreshQueue = []
+      const state = useAuthStore.getState()
+      if (state.accessToken || state.user) {
+        toast.error('انتهت الجلسة، يرجى تسجيل الدخول مجدداً')
+      }
+      state.logout()
+      return Promise.reject(refreshErr ?? err)
     } finally {
       isRefreshing = false
     }

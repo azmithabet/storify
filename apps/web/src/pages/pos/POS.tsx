@@ -931,8 +931,18 @@ export default function POS() {
             <label className="block text-xs text-gray-500 uppercase tracking-wide mb-2">جرد الدرج النقدي الفعلي (ج)</label>
             <input
               type="number"
+              inputMode="decimal"
+              min={0}
+              step="0.01"
               value={actualCash}
-              onChange={(e) => setActualCash(e.target.value)}
+              onChange={(e) => {
+                // Clamp to a sensible range so the discrepancy badge doesn't
+                // show nonsense when someone fat-fingers an extra zero.
+                const v = e.target.value
+                if (v === '' || (parseFloat(v) >= 0 && parseFloat(v) < 1_000_000_000)) {
+                  setActualCash(v)
+                }
+              }}
               placeholder="0.00"
               className="w-full bg-gray-800 border border-gray-700 rounded-md px-3 py-2 text-lg font-mono text-gray-100 placeholder-gray-600 focus:outline-none focus:border-brand-500 text-left"
               dir="ltr"

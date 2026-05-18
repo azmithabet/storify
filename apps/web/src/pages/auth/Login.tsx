@@ -25,7 +25,23 @@ export default function Login() {
   const navigate = useNavigate()
   const location = useLocation()
   const { setAuth } = useAuthStore()
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/pos'
+  const requestedFrom = (location.state as { from?: { pathname: string } })?.from?.pathname
+
+  /**
+   * Pick the first page the user actually has permission for. Without this,
+   * a clerk-only role who can't access POS would land on /pos and bounce to
+   * a forbidden screen on every login. Order goes from most-likely-default
+   * to fallback.
+   */
+  function landingFor(user: AuthUser): string {
+    const can = (r: string, a: string) => user.permissions?.[r]?.includes(a) ?? false
+    if (can('invoices', 'create')) return '/pos'
+    if (can('invoices', 'read')) return '/invoices'
+    if (can('products', 'read')) return '/products'
+    if (can('customers', 'read')) return '/customers'
+    if (can('reports', 'read')) return '/reports'
+    return '/dashboard'
+  }
 
   const {
     register,
@@ -47,7 +63,7 @@ export default function Login() {
       setAuth(user, accessToken, subdomain)
       track('login_success', { role: user.roleSlug })
       toast.success('تم تسجيل الدخول بنجاح')
-      navigate(from, { replace: true })
+      navigate(requestedFrom ?? landingFor(user), { replace: true })
     },
     onError: (err: unknown) => {
       const e = err as { response?: { status?: number; data?: { error?: { code?: string } } } }

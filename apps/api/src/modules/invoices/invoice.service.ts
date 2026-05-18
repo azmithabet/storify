@@ -345,12 +345,20 @@ export async function createInvoice(
       })
     }
 
-    // Increment coupon usage
+    // Increment coupon usage atomically. Two concurrent invoices could both
+    // pass the up-front check at line 149 (used_count < max_uses) and then
+    // both increment, overshooting the limit. A single conditional UPDATE
+    // closes the window — Prisma's query builder can't express the
+    // column-to-column comparison, so we go to raw SQL. updated count = 0
+    // means the row was already at the limit by the time we tried.
     if (couponId) {
-      await tx.coupon.update({
-        where: { id: couponId },
-        data: { usedCount: { increment: 1 } },
-      })
+      const incremented = await tx.$executeRaw`
+        UPDATE coupons
+        SET used_count = used_count + 1
+        WHERE id = ${couponId}::uuid
+          AND (max_uses IS NULL OR used_count < max_uses)
+      `
+      if (incremented === 0) throw badRequest('coupon_exhausted')
     }
 
     // Auto fee expense when merchant bears it

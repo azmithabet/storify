@@ -76,5 +76,15 @@ if (config.NODE_ENV === 'production') {
   if (!config.PAYMOB_HMAC_SECRET) missing.push('PAYMOB_HMAC_SECRET')
   if (missing.length > 0) {
     console.warn(`⚠️  Missing production env vars (features depending on them will fail): ${missing.join(', ')}`)
+
+    // Diagnostic: list keys (NOT values) reaching the container that match
+    // the patterns we care about, so we can tell whether Railway is dropping
+    // the variable vs. it being named differently in the UI. Remove once
+    // resolved.
+    const relevantKeys = Object.keys(process.env)
+      .filter((k) => /APP_|PAYMOB|ENCRYPT|HMAC/i.test(k))
+      .sort()
+    console.warn(`[env diagnostic] keys matching APP_|PAYMOB|ENCRYPT|HMAC: ${JSON.stringify(relevantKeys)}`)
+    console.warn(`[env diagnostic] process.env.APP_ENCRYPTION_KEY defined=${process.env.APP_ENCRYPTION_KEY !== undefined} length=${(process.env.APP_ENCRYPTION_KEY ?? '').length}`)
   }
 }

@@ -8,8 +8,58 @@ export const api = axios.create({
   withCredentials: true,
 })
 
-// Attach access token + tenant subdomain to every request
-api.interceptors.request.use((config) => {
+// Decode the JWT exp claim. Treats anything malformed or within 30s of expiry
+// as expired — that grace window avoids a request racing the network and
+// arriving at the server after the token has flipped to invalid.
+function isAccessTokenExpired(token: string | null): boolean {
+  if (!token) return true
+  try {
+    const [, payloadB64] = token.split('.')
+    if (!payloadB64) return true
+    const json = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'))
+    const exp = JSON.parse(json).exp
+    if (typeof exp !== 'number') return true
+    return Date.now() + 30_000 >= exp * 1000
+  } catch {
+    return true
+  }
+}
+
+let prefetchPromise: Promise<void> | null = null
+
+// Cold-load helper: if we have a persisted user but the stored access token
+// is missing or expired, swap it out before any protected request goes out.
+// Without this, every page reload triggers a noisy 401 → refresh → retry
+// cycle on each query the dashboard fans out in parallel.
+async function ensureFreshAccessToken(): Promise<void> {
+  const { user, accessToken } = useAuthStore.getState()
+  if (!user) return
+  if (!isAccessTokenExpired(accessToken)) return
+  if (prefetchPromise) return prefetchPromise
+
+  prefetchPromise = (async () => {
+    try {
+      const subdomain = useAuthStore.getState().tenantSubdomain
+      const { data } = await axios.post<{ success: boolean; data: { accessToken: string } }>(
+        '/api/auth/refresh',
+        {},
+        { withCredentials: true, headers: subdomain ? { 'X-Tenant-Subdomain': subdomain } : {} },
+      )
+      useAuthStore.getState().setAccessToken(data.data.accessToken)
+    } catch {
+      // Let the response interceptor handle the failure surface (toast + logout)
+      // when the next protected request still comes back 401.
+    } finally {
+      prefetchPromise = null
+    }
+  })()
+  return prefetchPromise
+}
+
+// Attach access token + tenant subdomain to every request. If the stored token
+// is stale, refresh it inline so the request goes out already authenticated.
+api.interceptors.request.use(async (config) => {
+  await ensureFreshAccessToken()
   const { accessToken, tenantSubdomain } = useAuthStore.getState()
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
   if (tenantSubdomain) config.headers['X-Tenant-Subdomain'] = tenantSubdomain

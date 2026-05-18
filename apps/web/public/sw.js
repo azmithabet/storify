@@ -1,7 +1,7 @@
 // Bump CACHE on every shell change. The activate handler nukes any cache
-// whose name doesn't match — so v2 wipes the v1 entries that captured the
-// old "/" HTML (when "/" was AuthGuard → Dashboard → redirect to /login).
-const CACHE = 'storify-shell-v2'
+// whose name doesn't match — so v3 wipes the older entries.
+const CACHE = 'storify-shell-v3'
+const SHELL_URL = '/'
 
 self.addEventListener('install', (e) => {
   // No precache — let the fetch handler populate naturally with fresh content.
@@ -41,7 +41,25 @@ self.addEventListener('fetch', (e) => {
           }
           return res
         })
-        .catch(() => caches.match(req).then((cached) => cached ?? new Response('Offline', { status: 503 }))),
+        .catch(async () => {
+          // For SPA navigations, any cached HTML response works as a fallback:
+          // the client-side router will resolve the real URL once the bundle
+          // boots. Prefer an exact cache hit, then the "/" shell, then a final
+          // sweep across the cache. Synthetic 503 is the last resort.
+          const cache = await caches.open(CACHE)
+          const exact = await cache.match(req)
+          if (exact) return exact
+          const shell = await cache.match(SHELL_URL)
+          if (shell) return shell
+          const all = await cache.keys()
+          for (const key of all) {
+            if (isHtml(key)) {
+              const hit = await cache.match(key)
+              if (hit) return hit
+            }
+          }
+          return new Response('Offline', { status: 503 })
+        }),
     )
     return
   }

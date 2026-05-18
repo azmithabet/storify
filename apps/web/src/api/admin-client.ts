@@ -11,7 +11,48 @@ export const adminApi = axios.create({
   withCredentials: true,
 })
 
-adminApi.interceptors.request.use((config) => {
+function isAccessTokenExpired(token: string | null): boolean {
+  if (!token) return true
+  try {
+    const [, payloadB64] = token.split('.')
+    if (!payloadB64) return true
+    const json = atob(payloadB64.replace(/-/g, '+').replace(/_/g, '/'))
+    const exp = JSON.parse(json).exp
+    if (typeof exp !== 'number') return true
+    return Date.now() + 30_000 >= exp * 1000
+  } catch {
+    return true
+  }
+}
+
+let prefetchPromise: Promise<void> | null = null
+
+async function ensureFreshAdminAccessToken(): Promise<void> {
+  const { admin, accessToken } = useAdminAuthStore.getState()
+  if (!admin) return
+  if (!isAccessTokenExpired(accessToken)) return
+  if (prefetchPromise) return prefetchPromise
+
+  prefetchPromise = (async () => {
+    try {
+      const { data } = await axios.post<{ success: boolean; data: { accessToken: string } }>(
+        '/api/admin/refresh',
+        {},
+        { withCredentials: true },
+      )
+      useAdminAuthStore.getState().setAccessToken(data.data.accessToken)
+    } catch {
+      // Let the response interceptor handle the surface (logout) when the next
+      // request still 401s.
+    } finally {
+      prefetchPromise = null
+    }
+  })()
+  return prefetchPromise
+}
+
+adminApi.interceptors.request.use(async (config) => {
+  await ensureFreshAdminAccessToken()
   const { accessToken } = useAdminAuthStore.getState()
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`
   return config

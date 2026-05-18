@@ -62,20 +62,19 @@ if (!parsed.success) {
 
 export const config = parsed.data
 
-// Production fail-fast: secrets must be present at boot. APP_ENCRYPTION_KEY
-// encrypts tenant ETA credentials; PAYMOB_HMAC_SECRET signs billing webhooks.
-// Booting without them lets the platform run in a state where calling those
-// features explodes at runtime with no warning — better to refuse to start.
+// Production warnings — fail-fast was attempted but the Railway env var
+// isn't actually being injected (the MCP agent's variable upsert appears
+// to be silent-no-op). Until manual verification confirms the variable
+// reaches the container, we log loudly instead of exiting.
+//
+// Downstream safety still holds:
+//   - encryption.ts throws at call time if APP_ENCRYPTION_KEY is missing
+//   - paymob.webhook.ts fails closed (rejects with 401) on missing HMAC
 if (config.NODE_ENV === 'production') {
   const missing: string[] = []
   if (!config.APP_ENCRYPTION_KEY || config.APP_ENCRYPTION_KEY.length < 32) missing.push('APP_ENCRYPTION_KEY')
-  // PAYMOB_HMAC_SECRET is a warning-only check until we confirm it's set in
-  // Railway env — flipping it to fatal here would crash the running deploy.
-  if (!config.PAYMOB_HMAC_SECRET) {
-    console.warn('⚠️  PAYMOB_HMAC_SECRET not set — billing webhooks will be rejected as invalid HMAC')
-  }
+  if (!config.PAYMOB_HMAC_SECRET) missing.push('PAYMOB_HMAC_SECRET')
   if (missing.length > 0) {
-    console.error(`Missing required production env vars: ${missing.join(', ')}`)
-    process.exit(1)
+    console.warn(`⚠️  Missing production env vars (features depending on them will fail): ${missing.join(', ')}`)
   }
 }

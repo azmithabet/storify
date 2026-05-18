@@ -125,9 +125,9 @@
   .num-primary { @apply text-gray-50; }
   .num-strong  { @apply text-gray-200; }
   .num-muted   { @apply text-gray-400; }
-  .num-income  { @apply text-success-400; }
-  .num-expense { @apply text-danger-400; }
-  .num-warn    { @apply text-warning-400; }
+  .num-income  { @apply text-success-500; }
+  .num-expense { @apply text-danger-500; }
+  .num-warn    { @apply text-warning-500; }
   .num-code    { @apply text-brand-400 font-mono; }
 }
 

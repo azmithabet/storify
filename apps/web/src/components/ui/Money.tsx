@@ -18,8 +18,8 @@ const sizeClasses = {
 
 const toneClasses = {
   neutral: 'text-gray-50',
-  income: 'text-success-400',
-  expense: 'text-danger-400',
+  income: 'text-success-500',
+  expense: 'text-danger-500',
 }
 
 export function Money({ value, currency = 'ج.م', className, size = 'base', tone = 'neutral' }: MoneyProps) {

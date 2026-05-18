@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useEffect } from 'react'
 import { Sidebar } from './Sidebar'
 import { TopBar } from './TopBar'
+import { SubscriptionBanner } from '@/components/SubscriptionBanner'
 
 interface AppShellProps {
   children: ReactNode
@@ -39,6 +40,7 @@ export function AppShell({ children, title }: AppShellProps) {
       )}
 
       <div className="lg:mr-60 flex flex-col min-h-dvh">
+        <SubscriptionBanner />
         <TopBar title={title} onMenuClick={() => setSidebarOpen(true)} />
         <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 animate-fade-in">{children}</main>
       </div>

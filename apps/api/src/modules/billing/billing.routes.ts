@@ -102,6 +102,35 @@ export async function billingRoutes(app: FastifyInstance) {
     },
   )
 
+  // Lightweight status endpoint for the in-app subscription banner. Every
+  // authenticated user in the tenant can call it (banner is purely informational
+  // even for users without billing permission) — heavier portal data and
+  // payment history stay behind /billing/portal.
+  app.get(
+    '/billing/status',
+    { preHandler: [authenticate] },
+    async (request, reply) => {
+      const tenantId = request.tenant!.id
+      const sub = await masterDb.subscription.findFirst({
+        where: { tenantId },
+        include: { plan: { select: { name: true, slug: true } } },
+        orderBy: { createdAt: 'desc' },
+      })
+      if (!sub) return reply.send({ subscription: null })
+
+      return reply.send({
+        subscription: {
+          status: sub.status,
+          trialEndsAt: sub.trialEndsAt?.toISOString() ?? null,
+          currentPeriodEnd: sub.currentPeriodEnd.toISOString(),
+          cancelAtPeriodEnd: sub.cancelAtPeriodEnd,
+          planName: sub.plan.name,
+          billingCycle: sub.billingCycle,
+        },
+      })
+    },
+  )
+
   app.post(
     '/billing/cancel',
     { preHandler: [authenticate] },

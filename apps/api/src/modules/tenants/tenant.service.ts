@@ -2,6 +2,7 @@ import { masterDb } from '../../config/database'
 import { getTenantDb } from '../../config/database'
 import { runTenantMigrations } from '@storify/database'
 import { hashPassword } from '../../shared/utils/password'
+import { startTrial } from '../billing/billing.service'
 import type { RegisterTenantInput } from './tenant.schema'
 
 // ─── System roles ─────────────────────────────────────────────────────────────
@@ -256,6 +257,12 @@ export async function provisionTenant(data: RegisterTenantInput) {
       where: { id: tenant.id },
       data: { status: 'ACTIVE' },
     })
+
+    // 8. Start 14-day trial — without this, the tenant has no Subscription row,
+    // the trial-expiry job has nothing to act on, and the in-app banner sees
+    // null and stays hidden. Inside the same try/catch so a billing-row
+    // failure rolls back the half-provisioned tenant.
+    await startTrial(tenant.id, plan.id)
   } catch (err) {
     // Roll back master row on provisioning failure
     await masterDb.tenant.delete({ where: { id: tenant.id } }).catch(() => {})

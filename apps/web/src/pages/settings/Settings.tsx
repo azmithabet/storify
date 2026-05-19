@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw, Check, Trash2, Download, Eye, EyeOff } from 'lucide-react'
+import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw, Check, Trash2, Download, Eye, EyeOff, Sparkles, XCircle, Receipt } from 'lucide-react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -14,9 +14,13 @@ import type { PaginationMeta } from '@/types/api'
 import { exportRowsToExcel } from '@/lib/export'
 import { formatDate, formatDateTime } from '@/lib/format'
 import { getApiErrorMessage, getApiErrorCode } from '@/lib/api-error'
+import { useMe } from '@/hooks/useMe'
+import { useSubscriptionStatus, type SubscriptionStatus as SubStatus } from '@/hooks/useSubscription'
+import type { BadgeVariant } from '@/components/ui/Badge'
 
 const tabs = [
   { id: 'store', label: 'بيانات المتجر' },
+  { id: 'billing', label: 'الفوترة والاشتراك' },
   { id: 'branches', label: 'الفروع' },
   { id: 'payment', label: 'طرق الدفع' },
   { id: 'categories', label: 'فئات المنتجات' },
@@ -30,8 +34,21 @@ const tabs = [
   { id: 'password', label: 'كلمة المرور' },
 ]
 
+const validTabIds = new Set(tabs.map((t) => t.id))
+
 export default function Settings() {
-  const [tab, setTab] = useState('store')
+  // Read the active tab from ?tab=… so external CTAs (banner, UsageBanner) can
+  // deep-link straight into a section. Falls back to "store" for unknown values
+  // so a stray query param can't blank out the page.
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlTab = searchParams.get('tab')
+  const tab = urlTab && validTabIds.has(urlTab) ? urlTab : 'store'
+  const setTab = (id: string) => {
+    const next = new URLSearchParams(searchParams)
+    if (id === 'store') next.delete('tab')
+    else next.set('tab', id)
+    setSearchParams(next, { replace: true })
+  }
   return (
     <AppShell title="الإعدادات">
       <div className="flex gap-6">
@@ -46,6 +63,7 @@ export default function Settings() {
         </nav>
         <div className="flex-1 bg-gray-800 rounded-r-xl border border-gray-700 p-6">
           {tab === 'store' && <StoreSettings />}
+          {tab === 'billing' && <BillingSettings />}
           {tab === 'branches' && <BranchesSettings />}
           {tab === 'payment' && <PaymentMethodsSettings />}
           {tab === 'categories' && <ProductCategoriesSettings />}
@@ -214,6 +232,292 @@ function StoreSettings() {
         <Button type="submit" loading={isPending} className="w-fit">حفظ الإعدادات</Button>
       </div>
     </form>
+  )
+}
+
+// ─── Billing Settings ─────────────────────────────────────────────────────────
+
+interface PaymentAttempt {
+  id: string
+  amount: string | number
+  currency: string
+  status: 'SUCCESS' | 'FAILED' | 'PENDING'
+  attemptType: string
+  attemptedAt: string
+  providerTransactionId?: string | null
+}
+
+interface PortalResponse {
+  subscription: {
+    id: string
+    status: SubStatus
+    priceAtSubscription: string | number
+    plan: { name: string; priceMonthly: string | number; priceYearly: string | number }
+  } | null
+  history: PaymentAttempt[]
+}
+
+const STATUS_LABEL: Record<SubStatus, { label: string; variant: BadgeVariant }> = {
+  ACTIVE: { label: 'نشط', variant: 'success' },
+  TRIALING: { label: 'تجريبي', variant: 'brand' },
+  PAST_DUE: { label: 'متأخر السداد', variant: 'warning' },
+  SUSPENDED: { label: 'معلَّق', variant: 'danger' },
+  CANCELLED: { label: 'ملغى', variant: 'gray' },
+}
+
+const ATTEMPT_STATUS_LABEL: Record<PaymentAttempt['status'], { label: string; variant: BadgeVariant }> = {
+  SUCCESS: { label: 'ناجح', variant: 'success' },
+  FAILED: { label: 'فاشل', variant: 'danger' },
+  PENDING: { label: 'قيد المعالجة', variant: 'warning' },
+}
+
+function splitName(fullName: string): { firstName: string; lastName: string } {
+  const parts = fullName.trim().split(/\s+/)
+  if (parts.length <= 1) return { firstName: parts[0] ?? '', lastName: parts[0] ?? '' }
+  return { firstName: parts.slice(0, -1).join(' '), lastName: parts[parts.length - 1] }
+}
+
+const checkoutSchema = z.object({
+  firstName: z.string().min(1, 'الاسم الأول مطلوب'),
+  lastName: z.string().min(1, 'اسم العائلة مطلوب'),
+  email: z.string().email('بريد إلكتروني غير صحيح'),
+  phone: z.string().min(8, 'رقم الهاتف مطلوب'),
+})
+type CheckoutFormData = z.infer<typeof checkoutSchema>
+
+function UpgradeModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { data: me } = useMe()
+  const prefill = me?.user.fullName ? splitName(me.user.fullName) : { firstName: '', lastName: '' }
+
+  const { register, handleSubmit, formState: { errors } } = useForm<CheckoutFormData>({
+    resolver: zodResolver(checkoutSchema),
+    defaultValues: {
+      firstName: prefill.firstName,
+      lastName: prefill.lastName,
+      email: me?.user.email ?? '',
+      phone: '',
+    },
+  })
+
+  const { mutate: startCheckout, isPending } = useMutation({
+    mutationFn: async (data: CheckoutFormData) => {
+      const res = await api.post<{ iframeUrl: string }>('/billing/checkout', data)
+      return res.data
+    },
+    onSuccess: ({ iframeUrl }) => {
+      // Redirect into Paymob's hosted iframe. The webhook flips the
+      // subscription to ACTIVE once the user completes payment.
+      window.location.href = iframeUrl
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
+  })
+
+  return (
+    <Modal
+      open={open}
+      onClose={onClose}
+      title="تأكيد بيانات الدفع"
+      size="md"
+      footer={
+        <>
+          <Button variant="secondary" onClick={onClose}>إلغاء</Button>
+          <Button type="submit" form="upgrade-form" loading={isPending}>المتابعة إلى الدفع</Button>
+        </>
+      }
+    >
+      <form id="upgrade-form" onSubmit={handleSubmit((d) => startCheckout(d))} className="flex flex-col gap-4">
+        <p className="text-xs text-gray-400">
+          سيتم تحويلك إلى صفحة الدفع الآمنة (Paymob) لإتمام الاشتراك. لن تُحفظ بيانات بطاقتك على خوادمنا.
+        </p>
+        <div className="grid grid-cols-2 gap-3">
+          <Input label="الاسم الأول" error={errors.firstName?.message} {...register('firstName')} />
+          <Input label="اسم العائلة" error={errors.lastName?.message} {...register('lastName')} />
+        </div>
+        <Input label="البريد الإلكتروني" type="email" error={errors.email?.message} {...register('email')} />
+        <Input label="رقم الهاتف" type="tel" placeholder="01XXXXXXXXX" error={errors.phone?.message} {...register('phone')} />
+      </form>
+    </Modal>
+  )
+}
+
+function BillingSettings() {
+  const qc = useQueryClient()
+  const { data: status, isLoading: statusLoading } = useSubscriptionStatus()
+  const { data: portal } = useQuery<PortalResponse>({
+    queryKey: ['billing', 'portal'],
+    queryFn: async () => {
+      const res = await api.get<PortalResponse>('/billing/portal')
+      return res.data
+    },
+    // Skip the call (and its 404) when there's no subscription to look up.
+    enabled: !!status,
+  })
+  const [upgradeOpen, setUpgradeOpen] = useState(false)
+
+  const { mutate: cancelSub, isPending: cancelling } = useMutation({
+    mutationFn: () => api.post('/billing/cancel'),
+    onSuccess: () => {
+      toast.success('تم جدولة إلغاء الاشتراك في نهاية الفترة الحالية')
+      qc.invalidateQueries({ queryKey: ['subscription'] })
+      qc.invalidateQueries({ queryKey: ['billing'] })
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
+  })
+
+  const { mutate: resumeSub, isPending: resuming } = useMutation({
+    mutationFn: () => api.post('/billing/resume'),
+    onSuccess: () => {
+      toast.success('تم استئناف الاشتراك')
+      qc.invalidateQueries({ queryKey: ['subscription'] })
+      qc.invalidateQueries({ queryKey: ['billing'] })
+    },
+    onError: (err: unknown) => toast.error(getApiErrorMessage(err)),
+  })
+
+  if (statusLoading) return <div className="h-48 bg-gray-900/40 rounded-md animate-pulse" />
+
+  if (!status) {
+    return (
+      <Alert variant="warning">
+        لا يوجد اشتراك مرتبط بحسابك حالياً. الرجاء التواصل مع الدعم لإعداد اشتراكك.
+      </Alert>
+    )
+  }
+
+  const isTrialing = status.status === 'TRIALING'
+  const needsPayment = isTrialing || status.status === 'PAST_DUE' || status.status === 'SUSPENDED' || status.status === 'CANCELLED'
+  const canCancel = status.status === 'ACTIVE' && !status.cancelAtPeriodEnd
+  const canResume = status.cancelAtPeriodEnd && status.status !== 'CANCELLED'
+  const periodEndLabel = status.cancelAtPeriodEnd ? 'سينتهي في' : 'يتجدد في'
+
+  return (
+    <div className="flex flex-col gap-6">
+      <div>
+        <h3 className="text-lg font-semibold text-gray-100">الفوترة والاشتراك</h3>
+        <p className="text-xs text-gray-500 mt-1">إدارة الاشتراك والمدفوعات</p>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-gray-900/40 border border-gray-700 rounded-md p-4">
+          <p className="text-xs text-gray-500 mb-2">الحالة</p>
+          <Badge variant={STATUS_LABEL[status.status].variant} dot>
+            {STATUS_LABEL[status.status].label}
+          </Badge>
+        </div>
+        <div className="bg-gray-900/40 border border-gray-700 rounded-md p-4">
+          <p className="text-xs text-gray-500 mb-2">الباقة</p>
+          <p className="text-sm text-gray-100 font-medium">{status.planName}</p>
+        </div>
+        <div className="bg-gray-900/40 border border-gray-700 rounded-md p-4">
+          <p className="text-xs text-gray-500 mb-2">دورة الفوترة</p>
+          <p className="text-sm text-gray-100">{status.billingCycle === 'YEARLY' ? 'سنوية' : 'شهرية'}</p>
+        </div>
+        <div className="bg-gray-900/40 border border-gray-700 rounded-md p-4">
+          <p className="text-xs text-gray-500 mb-2">
+            {isTrialing ? 'تنتهي الفترة التجريبية' : periodEndLabel}
+          </p>
+          <p className="text-sm text-gray-100">
+            {formatDate(isTrialing ? (status.trialEndsAt ?? status.currentPeriodEnd) : status.currentPeriodEnd)}
+          </p>
+        </div>
+      </div>
+
+      {status.cancelAtPeriodEnd && (
+        <Alert variant="warning">
+          اشتراكك مجدول للإلغاء بتاريخ {formatDate(status.currentPeriodEnd)}. يمكنك استئنافه قبل ذلك في أي وقت.
+        </Alert>
+      )}
+      {status.status === 'PAST_DUE' && (
+        <Alert variant="danger">
+          تأخر دفع الاشتراك. جدّد الدفع لتجنب تعليق الحساب.
+        </Alert>
+      )}
+      {status.status === 'SUSPENDED' && (
+        <Alert variant="danger">
+          تم تعليق الاشتراك بسبب فشل الدفع المتكرر. حدّث طريقة الدفع لاستئناف الخدمة.
+        </Alert>
+      )}
+
+      <div className="flex flex-wrap gap-3">
+        {needsPayment && (
+          <Button onClick={() => setUpgradeOpen(true)}>
+            <Sparkles className="w-4 h-4" />
+            {isTrialing ? 'الاشتراك الآن' : 'تجديد الدفع'}
+          </Button>
+        )}
+        {canResume && (
+          <Button loading={resuming} onClick={() => resumeSub()}>
+            <RefreshCw className="w-4 h-4" />
+            استئناف الاشتراك
+          </Button>
+        )}
+        {canCancel && (
+          <Button
+            variant="secondary"
+            loading={cancelling}
+            onClick={() => {
+              if (window.confirm('سيستمر الاشتراك حتى نهاية الفترة الحالية ثم يُلغى. هل تريد المتابعة؟')) {
+                cancelSub()
+              }
+            }}
+          >
+            <XCircle className="w-4 h-4" />
+            إلغاء الاشتراك
+          </Button>
+        )}
+      </div>
+
+      <div>
+        <h4 className="text-sm font-semibold text-gray-200 mb-3 flex items-center gap-2">
+          <Receipt className="w-4 h-4 text-gray-400" />
+          سجل المدفوعات
+        </h4>
+        {portal && portal.history.length > 0 ? (
+          <Table<PaymentAttempt>
+            columns={[
+              {
+                key: 'attemptedAt',
+                header: 'التاريخ',
+                render: (p) => <span className="text-sm text-gray-300">{formatDateTime(p.attemptedAt)}</span>,
+              },
+              {
+                key: 'amount',
+                header: 'المبلغ',
+                render: (p) => (
+                  <span className="num num-strong text-sm">
+                    {Number(p.amount).toFixed(2)} {p.currency}
+                  </span>
+                ),
+              },
+              {
+                key: 'status',
+                header: 'الحالة',
+                render: (p) => (
+                  <Badge variant={ATTEMPT_STATUS_LABEL[p.status].variant} dot>
+                    {ATTEMPT_STATUS_LABEL[p.status].label}
+                  </Badge>
+                ),
+              },
+              {
+                key: 'providerTransactionId',
+                header: 'رقم العملية',
+                render: (p) => (
+                  <span className="text-xs text-gray-500 font-mono">
+                    {p.providerTransactionId ?? '—'}
+                  </span>
+                ),
+              },
+            ]}
+            data={portal.history}
+            keyExtractor={(p) => p.id}
+          />
+        ) : (
+          <p className="text-sm text-gray-500">لا توجد عمليات دفع سابقة.</p>
+        )}
+      </div>
+
+      <UpgradeModal open={upgradeOpen} onClose={() => setUpgradeOpen(false)} />
+    </div>
   )
 }
 

@@ -33,6 +33,7 @@ import { startEtaWorker } from './jobs/eta-submission.job'
 import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
 import { startReminderWorker, scheduleReminders } from './jobs/installment-reminders.job'
 import { startTrialExpiryWorker, scheduleTrialExpiry } from './jobs/trial-expiry.job'
+import { startRenewalWorker, scheduleRenewal } from './jobs/renewal.job'
 
 const app = Fastify({
   logger: {
@@ -270,6 +271,8 @@ const start = async () => {
     await scheduleReminders()
     startTrialExpiryWorker()
     await scheduleTrialExpiry()
+    startRenewalWorker()
+    await scheduleRenewal()
   } catch (err) {
     app.log.error(err)
     process.exit(1)

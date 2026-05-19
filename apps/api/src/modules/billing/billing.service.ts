@@ -62,30 +62,29 @@ export async function startTrial(tenantId: string, planId: string) {
 }
 
 /**
- * Build the URLs Paymob needs for a checkout:
- *   • redirectUrl: where the customer's browser lands after the iframe shows
- *     the success/failure screen. Tenant-aware — points to that tenant's
- *     subdomain when APP_BASE_DOMAIN is set, otherwise the platform URL.
- *   • notificationUrl: server-to-server webhook target. Always the platform
- *     domain — the webhook is shared across all tenants and routes by
- *     merchant_order_id, so tenant subdomain doesn't matter here.
+ * Build the URLs Paymob needs for a checkout. Both intentionally use
+ * FRONTEND_URL (the platform domain) and NOT a per-tenant subdomain:
  *
- * Setting these on the payment_keys call avoids relying on merchants
- * remembering to fill them in on every Paymob integration in the dashboard.
+ *   • redirectUrl: even when APP_BASE_DOMAIN is set, per-tenant subdomains
+ *     aren't actually resolvable in DNS — tenants are identified by an
+ *     `x-tenant-subdomain` header from the SPA served on the main domain.
+ *     Redirecting to a phantom subdomain produces DNS_PROBE_FINISHED_NXDOMAIN
+ *     in the browser; even if it resolved, the user would lose their session
+ *     because localStorage tokens are scoped per-origin.
+ *
+ *   • notificationUrl: webhook is platform-wide, routes by merchant_order_id,
+ *     and Paymob's servers need a publicly resolvable host — only the
+ *     platform domain qualifies.
+ *
+ * Setting both per-transaction means merchants don't have to remember to
+ * fill in the same URLs in every Paymob integration's dashboard config.
  */
-async function buildPaymobCallbacks(tenantId: string): Promise<{
+function buildPaymobCallbacks(): {
   redirectUrl: string
   notificationUrl: string
-}> {
-  const tenant = await masterDb.tenant.findUnique({
-    where: { id: tenantId },
-    select: { subdomain: true },
-  })
-  const tenantBase = tenant && config.APP_BASE_DOMAIN
-    ? `https://${tenant.subdomain}.${config.APP_BASE_DOMAIN}`
-    : config.FRONTEND_URL
+} {
   return {
-    redirectUrl: `${tenantBase}/settings?tab=billing`,
+    redirectUrl: `${config.FRONTEND_URL}/settings?tab=billing`,
     notificationUrl: `${config.FRONTEND_URL}/api/billing/paymob/webhook`,
   }
 }
@@ -103,7 +102,7 @@ export async function startCheckout(
     .toDecimalPlaces(0)
     .toNumber()
 
-  const callbacks = await buildPaymobCallbacks(tenantId)
+  const callbacks = buildPaymobCallbacks()
 
   const result = await paymob.startCheckoutSession({
     amountCents,

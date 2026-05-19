@@ -1,5 +1,6 @@
 import { masterDb } from '@/config/database'
 import { redis } from '@/config/redis'
+import { config } from '@/config/env'
 import { PaymobClient, type PaymobBillingData } from './paymob.client'
 import { sendEmail } from '@/shared/utils/email'
 import Decimal from 'decimal.js'
@@ -60,6 +61,35 @@ export async function startTrial(tenantId: string, planId: string) {
   })
 }
 
+/**
+ * Build the URLs Paymob needs for a checkout:
+ *   • redirectUrl: where the customer's browser lands after the iframe shows
+ *     the success/failure screen. Tenant-aware — points to that tenant's
+ *     subdomain when APP_BASE_DOMAIN is set, otherwise the platform URL.
+ *   • notificationUrl: server-to-server webhook target. Always the platform
+ *     domain — the webhook is shared across all tenants and routes by
+ *     merchant_order_id, so tenant subdomain doesn't matter here.
+ *
+ * Setting these on the payment_keys call avoids relying on merchants
+ * remembering to fill them in on every Paymob integration in the dashboard.
+ */
+async function buildPaymobCallbacks(tenantId: string): Promise<{
+  redirectUrl: string
+  notificationUrl: string
+}> {
+  const tenant = await masterDb.tenant.findUnique({
+    where: { id: tenantId },
+    select: { subdomain: true },
+  })
+  const tenantBase = tenant && config.APP_BASE_DOMAIN
+    ? `https://${tenant.subdomain}.${config.APP_BASE_DOMAIN}`
+    : config.FRONTEND_URL
+  return {
+    redirectUrl: `${tenantBase}/settings?tab=billing`,
+    notificationUrl: `${config.FRONTEND_URL}/api/billing/paymob/webhook`,
+  }
+}
+
 export async function startCheckout(
   tenantId: string,
   billing: PaymobBillingData,
@@ -73,10 +103,14 @@ export async function startCheckout(
     .toDecimalPlaces(0)
     .toNumber()
 
+  const callbacks = await buildPaymobCallbacks(tenantId)
+
   const result = await paymob.startCheckoutSession({
     amountCents,
     tenantId,
     billingData: billing,
+    redirectUrl: callbacks.redirectUrl,
+    notificationUrl: callbacks.notificationUrl,
   })
   return { iframeUrl: result.iframeUrl }
 }

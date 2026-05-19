@@ -67,6 +67,10 @@ export class PaymobClient {
     expiration?: number
     currency?: string
     cardToken?: string
+    /** Where Paymob redirects the customer's browser after the iframe. */
+    redirectUrl?: string
+    /** Server-to-server webhook URL Paymob POSTs to after the transaction. */
+    notificationUrl?: string
   }): Promise<string> {
     const token = await this.authToken()
     const data = await paymobFetch<PaymobPaymentKeyResponse>('/acceptance/payment_keys', {
@@ -78,6 +82,13 @@ export class PaymobClient {
       currency: params.currency ?? 'EGP',
       integration_id: params.integrationId ?? config.PAYMOB_INTEGRATION_ID_CARD,
       token: params.cardToken,
+      // Per-transaction overrides — Paymob's legacy /acceptance/payment_keys
+      // accepts both. Setting them here means we don't depend on a merchant
+      // remembering to fill in the same URLs in the dashboard for every
+      // integration. Paymob still appends ?hmac=<sig> automatically to the
+      // notification URL using the integration's HMAC secret.
+      redirect_url: params.redirectUrl,
+      notification_url: params.notificationUrl,
     })
     return data.token
   }
@@ -86,6 +97,8 @@ export class PaymobClient {
     amountCents: number
     tenantId: string
     billingData: PaymobBillingData
+    redirectUrl?: string
+    notificationUrl?: string
   }): Promise<PaymobCheckoutResult> {
     const order = await this.createOrder({
       amountCents: params.amountCents,
@@ -95,6 +108,8 @@ export class PaymobClient {
       amountCents: params.amountCents,
       orderId: order.id,
       billingData: params.billingData,
+      redirectUrl: params.redirectUrl,
+      notificationUrl: params.notificationUrl,
     })
     const iframeUrl = `https://accept.paymob.com/api/acceptance/iframes/${config.PAYMOB_IFRAME_ID}?payment_token=${paymentKey}`
     return { orderId: order.id, iframeUrl, paymentKey }

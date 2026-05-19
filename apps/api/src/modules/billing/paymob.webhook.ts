@@ -17,13 +17,19 @@ export function verifyPaymobWebhook(
   if (!receivedHmac) return false
 
   const obj = payload.obj
+  // Paymob's HMAC string is the concatenation of these transaction fields in
+  // this exact order (alphabetical by field name). The `id` here is the
+  // TRANSACTION id (obj.id) — not the webhook envelope id. The earlier
+  // version of this code used `payload.id`, which is undefined on Paymob's
+  // standard payload (no top-level id), so the concatenation included the
+  // literal string "undefined" and HMAC verification always failed with 401.
   const concatenated = [
     obj.amount_cents,
     obj.created_at,
     obj.currency,
     obj.error_occured,
     obj.has_parent_transaction,
-    payload.id,
+    obj.id,
     obj.integration_id,
     obj.is_3d_secure,
     obj.is_auth,

@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
+import { requireFeature } from '../../shared/middleware/feature.middleware'
 import { auditLog } from '../../shared/utils/audit'
 import { contentDispositionAttachment } from '../../shared/utils/content-disposition'
 import {
@@ -19,6 +20,9 @@ const BALANCE_DELTA: Record<string, 1 | -1> = {
 
 export async function supplierRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate)
+  // Plan-gate the entire module. Mirrors the frontend FeatureGate on /suppliers/*
+  // so API calls can't bypass the gate by hitting endpoints directly.
+  app.addHook('preHandler', requireFeature('suppliers'))
 
   // ─── GET /api/suppliers ──────────────────────────────────────────────────────
   app.get('/', { preHandler: requirePermission('suppliers', 'read') }, async (request, reply) => {

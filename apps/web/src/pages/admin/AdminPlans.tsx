@@ -29,21 +29,21 @@ interface Plan {
   _count: { tenants: number; subscriptions: number }
 }
 
-// Known feature flags consumed by `requireFeature()` on the backend and by
-// frontend gates. Keep this in sync with `packages/database/src/seeds/master.seed.ts`.
+// Feature flags that have real backend enforcement via requireFeature() or requireUnderLimit().
+// ─ suppliers / expenses : enforced by requireFeature() on the API routes.
+// ─ max_branches         : enforced by requireUnderLimit('branches') on POST /api/branches.
+// NOTE: installments is gated by maxInstallmentPlansMonthly (set it to 0 to disable, 999999 for unlimited).
+//       multi_currency / advanced_reports / offline_mode / api_access are not yet implemented —
+//       excluded from the editor until the backend enforcement exists.
 const BOOLEAN_FEATURES: { key: string; label: string; hint?: string }[] = [
-  { key: 'installments', label: 'الأقساط', hint: 'إنشاء خطط أقساط للعملاء' },
-  { key: 'multi_currency', label: 'تعدد العملات' },
   { key: 'suppliers', label: 'الموردون' },
   { key: 'expenses', label: 'المصروفات' },
-  { key: 'advanced_reports', label: 'تقارير متقدمة' },
-  { key: 'offline_mode', label: 'الوضع غير المتصل' },
-  { key: 'api_access', label: 'الوصول للـ API' },
 ]
 
+// max_users is intentionally absent — user quota is controlled by the `maxUsers` column above,
+// enforced by requireUnderLimit('users'). A separate features.max_users would drift silently.
 const NUMERIC_FEATURES: { key: string; label: string; hint?: string }[] = [
   { key: 'max_branches', label: 'حد الفروع', hint: '-1 = بدون حد' },
-  { key: 'max_users', label: 'حد المستخدمين (ميزة)', hint: '-1 = بدون حد' },
 ]
 
 const planSchema = z.object({
@@ -240,15 +240,9 @@ function PlanFormModal({
           maxStorage: 1024,
           maxInstallmentPlansMonthly: 0,
           features: {
-            installments: true,
-            multi_currency: false,
             suppliers: false,
             expenses: false,
-            advanced_reports: false,
-            offline_mode: false,
-            api_access: false,
             max_branches: 1,
-            max_users: 3,
           },
         },
   })
@@ -300,7 +294,7 @@ function PlanFormModal({
         <Input label="حد الطلبات" type="number" error={errors.maxOrders?.message} {...register('maxOrders')} />
         <Input label="حد المستخدمين" type="number" error={errors.maxUsers?.message} {...register('maxUsers')} />
         <Input label="حد التخزين (MB)" type="number" error={errors.maxStorage?.message} {...register('maxStorage')} />
-        <Input label="عقود قسط/شهر" type="number" error={errors.maxInstallmentPlansMonthly?.message} {...register('maxInstallmentPlansMonthly')} />
+        <Input label="عقود قسط/شهر (0 = معطّل، 999999 = بلا حد)" type="number" error={errors.maxInstallmentPlansMonthly?.message} {...register('maxInstallmentPlansMonthly')} />
         <Input label="ترتيب العرض" type="number" {...register('sortOrder')} />
         <label className="sm:col-span-2 inline-flex items-center gap-2 text-sm text-gray-300 cursor-pointer">
           <input type="checkbox" className="w-4 h-4 accent-brand-500" {...register('isActive')} />
@@ -310,7 +304,12 @@ function PlanFormModal({
         <div className="sm:col-span-2 border-t border-gray-700 pt-3 mt-2">
           <h4 className="text-sm font-semibold text-gray-200 mb-1">الميزات</h4>
           <p className="text-xs text-gray-500 mb-3">
-            تتحكم في ما يُسمح للمتاجر باستخدامه — تُقرأ من <code className="font-mono">requireFeature()</code> في الخلفية.
+            كل ميزة هنا مُطبَّقة في الخلفية فعلًا —{' '}
+            <strong className="text-gray-400">الموردون</strong> و<strong className="text-gray-400">المصروفات</strong> عبر{' '}
+            <code className="font-mono">requireFeature()</code>،{' '}
+            <strong className="text-gray-400">حد الفروع</strong> عبر{' '}
+            <code className="font-mono">requireUnderLimit()</code>.{' '}
+            الأقساط يتحكم فيها حقل «عقود قسط/شهر» أعلاه.
           </p>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {BOOLEAN_FEATURES.map((f) => (

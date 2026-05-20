@@ -1,12 +1,16 @@
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
+import { requireFeature } from '../../shared/middleware/feature.middleware'
 import { auditLog } from '../../shared/utils/audit'
 import { toDecimal } from '../../shared/utils/decimal'
 import { createPoSchema, updatePoSchema, receivePoSchema, poPaymentSchema, listPoSchema } from './po.schema'
 
 export async function purchaseOrderRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate)
+  // POs live under the suppliers feature — the Sidebar gates /purchase-orders on
+  // the same flag, and you can't have POs without suppliers.
+  app.addHook('preHandler', requireFeature('suppliers'))
 
   // ─── GET /api/purchase-orders ────────────────────────────────────────────────
   app.get('/', { preHandler: requirePermission('purchase_orders', 'read') }, async (request, reply) => {

@@ -18,7 +18,7 @@ import type { FastifyRequest, FastifyReply } from 'fastify'
  * with the existing seed where some plans intentionally have no cap. If you
  * want a true zero-quota tier, model that with requireFeature() instead.
  */
-export type LimitResource = 'products' | 'users' | 'invoices'
+export type LimitResource = 'products' | 'users' | 'invoices' | 'branches'
 
 export function requireUnderLimit(resource: LimitResource) {
   return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
@@ -56,6 +56,18 @@ export function requireUnderLimit(resource: LimitResource) {
         }
         messageRes = 'فاتورة'
         break
+      case 'branches': {
+        // max_branches lives in the features JSON, not as a column. The Admin UI
+        // uses -1 to mean "unlimited" (Enterprise); 0 also means no cap to stay
+        // consistent with the back-compat rule used by the column-based cases.
+        const features = plan.features as Record<string, unknown> | null
+        const raw = features?.max_branches
+        limit = typeof raw === 'number' ? raw : 0
+        if (limit <= 0) return
+        used = await request.tenantDb.branch.count()
+        messageRes = 'فرع'
+        break
+      }
     }
 
     if (used >= limit) {

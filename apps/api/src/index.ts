@@ -29,6 +29,7 @@ import { billingRoutes } from './modules/billing/billing.routes'
 import { adminRoutes } from './modules/admin/admin.routes'
 import { seedOwnerFromEnv } from './modules/admin/admin.auth.service'
 import { authenticate } from './shared/middleware/auth.middleware'
+import { requireUnderLimit } from './shared/middleware/limit.middleware'
 import { startEtaWorker } from './jobs/eta-submission.job'
 import { startDunningWorker, scheduleDunning } from './jobs/dunning.job'
 import { startReminderWorker, scheduleReminders } from './jobs/installment-reminders.job'
@@ -216,7 +217,7 @@ app.register(async function apiContext(api) {
     return reply.send({ success: true, data: branches })
   })
 
-  sub.post('/api/branches', { preHandler: [authenticate] }, async (request, reply) => {
+  sub.post('/api/branches', { preHandler: [authenticate, requireUnderLimit('branches')] }, async (request, reply) => {
     const { z } = await import('zod')
     const schema = z.object({ name: z.string().min(1), address: z.string().optional(), phone: z.string().optional() })
     const parsed = schema.safeParse(request.body)

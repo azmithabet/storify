@@ -2,11 +2,14 @@ import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
+import { requireFeature } from '../../shared/middleware/feature.middleware'
 import { auditLog } from '../../shared/utils/audit'
 import { createExpenseSchema, updateExpenseSchema, listExpensesSchema } from './expense.schema'
 
 export async function expenseRoutes(app: FastifyInstance) {
   app.addHook('onRequest', authenticate)
+  // Plan-gate the entire module. Mirrors the frontend FeatureGate on /expenses/*.
+  app.addHook('preHandler', requireFeature('expenses'))
 
   // ─── GET /api/expenses/categories ────────────────────────────────────────────
   app.get('/categories', { preHandler: requirePermission('expenses', 'read') }, async (request, reply) => {

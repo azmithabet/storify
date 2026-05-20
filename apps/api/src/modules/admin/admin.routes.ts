@@ -39,6 +39,18 @@ async function invalidateTenantCache(subdomain: string, tenantId: string) {
   ])
 }
 
+// Bust the tenant cache for every tenant on a given plan. Used after a plan
+// edit because tenantMiddleware caches the tenant *with its plan embedded*,
+// so feature/limit changes wouldn't take effect until the 5-min TTL expires.
+async function invalidateCacheForPlan(planId: string) {
+  const tenants = await masterDb.tenant.findMany({
+    where: { planId },
+    select: { id: true, subdomain: true },
+  })
+  if (tenants.length === 0) return
+  await Promise.all(tenants.map((t) => invalidateTenantCache(t.subdomain, t.id)))
+}
+
 export async function adminRoutes(app: FastifyInstance) {
   // ─── POST /login ─────────────────────────────────────────────────────────
   const loginSchema = z.object({
@@ -401,6 +413,7 @@ export async function adminRoutes(app: FastifyInstance) {
           ...(features !== undefined ? { features: features as Prisma.InputJsonValue } : {}),
         },
       })
+      await invalidateCacheForPlan(updated.id)
       await platformAudit({
         actorId: request.platformAdmin!.id,
         entity: 'plan',

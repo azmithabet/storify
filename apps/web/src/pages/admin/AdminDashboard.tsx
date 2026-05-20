@@ -1,10 +1,12 @@
-import { useQuery } from '@tanstack/react-query'
-import { Building2, CreditCard, TrendingUp, Users, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react'
+import { useState } from 'react'
+import { useQuery, useMutation } from '@tanstack/react-query'
+import { Building2, CreditCard, TrendingUp, Users, AlertTriangle, CheckCircle2, XCircle, Database } from 'lucide-react'
 import { AdminShell } from '@/components/admin/AdminShell'
-import { StatCard, Card, Skeleton, Alert } from '@/components/ui'
+import { StatCard, Card, Skeleton, Alert, Button } from '@/components/ui'
 import { adminApi } from '@/api/admin-client'
 import { formatMoney, formatNumber } from '@/lib/format'
 import { getApiErrorMessage } from '@/lib/api-error'
+import toast from 'react-hot-toast'
 
 interface RevenueData {
   mrr: number
@@ -21,13 +23,33 @@ interface RevenueData {
   failedPaymentsLast30Days: number
 }
 
+interface MigrationResult { ok: number; failed: number; errors: Array<{ tenantId: string; err: string }> }
+
 export default function AdminDashboard() {
+  const [migrationResult, setMigrationResult] = useState<MigrationResult | null>(null)
+
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'revenue'],
     queryFn: async () => {
       const res = await adminApi.get<{ success: true; data: RevenueData }>('/revenue')
       return res.data.data
     },
+  })
+
+  const { mutate: runMigrations, isPending: migratingDb } = useMutation({
+    mutationFn: async () => {
+      const res = await adminApi.post<{ success: true; data: MigrationResult }>('/run-migrations', {})
+      return res.data.data
+    },
+    onSuccess: (result) => {
+      setMigrationResult(result)
+      if (result.failed === 0) {
+        toast.success(`✅ ${result.ok} متجر — تمت الترقية بنجاح`)
+      } else {
+        toast.error(`${result.failed} متجر فشل — راجع التفاصيل أدناه`)
+      }
+    },
+    onError: (e) => toast.error(getApiErrorMessage(e, 'فشل تشغيل الترقيات')),
   })
 
   return (
@@ -93,6 +115,26 @@ export default function AdminDashboard() {
               accentColor="bg-danger-500"
               icon={<XCircle className="w-4 h-4" />}
             />
+          </div>
+
+          {/* DB Migrations panel */}
+          <div className="mt-6 bg-gray-800 border border-gray-700 rounded-xl p-4 flex items-start gap-4">
+            <Database className="w-5 h-5 text-brand-400 mt-0.5 shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-semibold text-gray-100 mb-1">ترقيات قاعدة البيانات (Tenant Migrations)</h3>
+              <p className="text-xs text-gray-500 mb-3">تطبيق أي ملفات SQL جديدة على جميع المتاجر — آمن للتشغيل مرات متعددة (idempotent).</p>
+              {migrationResult && (
+                <div className={`text-xs rounded-lg px-3 py-2 mb-3 ${migrationResult.failed === 0 ? 'bg-success-900/30 text-success-300' : 'bg-danger-900/30 text-danger-300'}`}>
+                  ✅ {migrationResult.ok} متجر نجح · {migrationResult.failed > 0 ? `❌ ${migrationResult.failed} فشل` : '0 فشل'}
+                  {migrationResult.errors.map((e) => (
+                    <div key={e.tenantId} className="mt-1 text-danger-400 font-mono truncate">{e.tenantId}: {e.err}</div>
+                  ))}
+                </div>
+              )}
+              <Button size="sm" loading={migratingDb} onClick={() => runMigrations()}>
+                <Database className="w-3 h-3" /> تشغيل الترقيات الآن
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-6">

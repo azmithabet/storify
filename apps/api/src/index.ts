@@ -30,6 +30,7 @@ import { etaRoutes } from './modules/eta/eta.routes'
 import { billingRoutes } from './modules/billing/billing.routes'
 import { adminRoutes } from './modules/admin/admin.routes'
 import { seedOwnerFromEnv } from './modules/admin/admin.auth.service'
+import { migrateAllTenants } from '@storify/database'
 import { authenticate } from './shared/middleware/auth.middleware'
 import { requireUnderLimit } from './shared/middleware/limit.middleware'
 import { startEtaWorker } from './jobs/eta-submission.job'
@@ -267,6 +268,15 @@ const start = async () => {
 
     await app.listen({ port: config.API_PORT, host: config.API_HOST })
     console.log(`Server running on port ${config.API_PORT}`)
+
+    // Run any pending tenant migrations in the background. Idempotent: the
+    // runner skips versions already <= schemaVersion. Fire-and-forget so a slow
+    // migration doesn't delay startup health checks; per-tenant errors are
+    // logged but never thrown. New SQL files in packages/database/migrations/tenant
+    // are picked up automatically on the next boot.
+    migrateAllTenants()
+      .then((r) => app.log.info({ result: r }, 'tenant_migrations_applied'))
+      .catch((err) => app.log.error({ err }, 'tenant_migrations_failed'))
 
     // Start background workers
     startEtaWorker()

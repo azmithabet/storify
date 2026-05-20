@@ -38,6 +38,7 @@ export async function getDashboard(db: TenantPrismaClient, tenantId: string, bra
     lowStockCount,
     pendingExpenses,
     todayFeeExpenses,
+    todayServicesAgg,
   ] = await Promise.all([
     // Today's revenue
     db.invoice.aggregate({
@@ -69,6 +70,15 @@ export async function getDashboard(db: TenantPrismaClient, tenantId: string, bra
       where: { ...branchFilter, createdAt: { gte: start, lte: end } },
       _sum: { feeAmount: true },
     }),
+    // Today's work-order revenue (services). Filtered by paidAt so payments
+    // *received* today land here, regardless of when the ticket was opened.
+    // Tenants without the services feature simply get 0 rows back — the query
+    // is harmless on empty tables.
+    db.workOrder.aggregate({
+      where: { ...branchFilter, paidAt: { gte: start, lte: end } },
+      _sum: { paidAmount: true },
+      _count: true,
+    }).catch(() => ({ _sum: { paidAmount: null }, _count: 0 } as const)),
   ])
 
   const result = {
@@ -76,6 +86,8 @@ export async function getDashboard(db: TenantPrismaClient, tenantId: string, bra
       revenue: toDecimal(todaySalesAgg._sum.totalAmount ?? 0).toNumber(),
       invoiceCount: todayInvoiceCount,
       feeExpenses: toDecimal(todayFeeExpenses._sum.feeAmount ?? 0).toNumber(),
+      servicesRevenue: toDecimal(todayServicesAgg._sum.paidAmount ?? 0).toNumber(),
+      servicesCount: todayServicesAgg._count as number,
     },
     pending: {
       installmentApprovals: pendingInstallments,
@@ -376,6 +388,21 @@ export async function getProfitLoss(
     _count: true,
   })
 
+  // Work-order revenue collected in the same window (by paidAt). Counted as
+  // top-line revenue alongside invoices because work orders don't go through
+  // the Invoice table in v1. NOTE: paidAmount on a work order is the cumulative
+  // amount paid; for tickets with multiple payments spread across days, the
+  // full cumulative paid amount is attributed to the day of the LAST payment.
+  // Acceptable approximation for now — proper per-payment ledger is Phase 2.
+  const woRevenueAgg = await db.workOrder.aggregate({
+    where: {
+      ...branchFilter,
+      ...(dateFilter ? { paidAt: dateFilter } : { paidAt: { not: null } }),
+    },
+    _sum: { paidAmount: true },
+    _count: true,
+  }).catch(() => ({ _sum: { paidAmount: null }, _count: 0 } as const))
+
   // COGS — cost_price × quantity for all sold items in the period
   const soldItems = await db.invoiceItem.findMany({
     where: { invoice: invoiceWhere },
@@ -404,7 +431,9 @@ export async function getProfitLoss(
     _sum: { amount: true },
   })
 
-  const revenue = toDecimal(revenueAgg._sum.totalAmount ?? 0).toNumber()
+  const invoiceRevenue = toDecimal(revenueAgg._sum.totalAmount ?? 0).toNumber()
+  const servicesRevenue = toDecimal(woRevenueAgg._sum.paidAmount ?? 0).toNumber()
+  const revenue = invoiceRevenue + servicesRevenue
   const refunds = toDecimal(returnAgg._sum.amount ?? 0).toNumber()
   const netRevenue = revenue - refunds
   const grossProfit = netRevenue - cogs
@@ -414,6 +443,8 @@ export async function getProfitLoss(
 
   return {
     revenue,
+    invoiceRevenue,
+    servicesRevenue,
     refunds,
     netRevenue,
     cogs,
@@ -425,6 +456,7 @@ export async function getProfitLoss(
     netProfit,
     netMarginPct: netRevenue > 0 ? Number(((netProfit / netRevenue) * 100).toFixed(2)) : 0,
     invoiceCount: revenueAgg._count,
+    workOrderCount: woRevenueAgg._count as number,
   }
 }
 
@@ -544,7 +576,7 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
   const end = new Date(`${date}T23:59:59.999`)
   const branchFilter = branchId ? { branchId } : {}
 
-  const [posTotals, posByPM, instPayments] = await Promise.all([
+  const [posTotals, posByPM, instPayments, woTotals, woByPM] = await Promise.all([
     db.invoice.aggregate({
       where: { status: 'completed', createdAt: { gte: start, lte: end }, ...branchFilter },
       _sum: { totalAmount: true },
@@ -561,9 +593,25 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
       _sum: { amountPaid: true },
       _count: { id: true },
     }),
+    // Work-order revenue collected today (by paidAt).
+    db.workOrder.aggregate({
+      where: { paidAt: { gte: start, lte: end }, ...branchFilter },
+      _sum: { paidAmount: true },
+      _count: true,
+    }).catch(() => ({ _sum: { paidAmount: null }, _count: 0 } as const)),
+    db.workOrder.groupBy({
+      by: ['paymentMethodId'],
+      where: { paidAt: { gte: start, lte: end }, ...branchFilter, paymentMethodId: { not: null } },
+      _sum: { paidAmount: true },
+      _count: true,
+    }).catch(() => [] as Array<{ paymentMethodId: string | null; _sum: { paidAmount: unknown }; _count: number }>),
   ])
 
-  const pmIds = posByPM.map((r) => r.paymentMethodId)
+  // Build a combined PM id list so we look up names in a single query.
+  const pmIds = [
+    ...posByPM.map((r) => r.paymentMethodId),
+    ...woByPM.map((r) => r.paymentMethodId).filter((id): id is string => id != null),
+  ]
   const paymentMethods = await db.paymentMethod.findMany({
     where: { id: { in: pmIds } },
     select: { id: true, name: true },
@@ -583,6 +631,13 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
     ? [{ methodId: null, methodName: 'أقساط', total: instTotal, count: instCount }]
     : []
 
+  const woBreakdown = woByPM.map((r) => ({
+    methodId: r.paymentMethodId,
+    methodName: pmMap[r.paymentMethodId as string] ?? 'غير محدد',
+    total: Number(r._sum.paidAmount ?? 0),
+    count: r._count as number,
+  }))
+
   return {
     date,
     pos: {
@@ -594,6 +649,11 @@ export async function getDayClose(db: TenantPrismaClient, date: string, branchId
       byMethod: instBreakdown,
       total: instBreakdown.reduce((s, m) => s + m.total, 0),
       count: instBreakdown.reduce((s, m) => s + m.count, 0),
+    },
+    services: {
+      byMethod: woBreakdown,
+      total: Number(woTotals._sum.paidAmount ?? 0),
+      count: woTotals._count as number,
     },
   }
 }

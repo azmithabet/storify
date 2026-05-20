@@ -32,6 +32,7 @@ const plans = [
       advanced_reports: false,
       offline_mode: false,
       api_access: false,
+      services: false,
     },
   },
   {
@@ -56,6 +57,7 @@ const plans = [
       advanced_reports: true,
       offline_mode: false,
       api_access: false,
+      services: false,
     },
   },
   {
@@ -80,6 +82,7 @@ const plans = [
       advanced_reports: true,
       offline_mode: true,
       api_access: true,
+      services: true,
     },
   },
 ]

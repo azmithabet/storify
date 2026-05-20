@@ -29,6 +29,8 @@ const Reports = lazy(() => import('@/pages/reports/Reports'))
 const PurchaseOrders = lazy(() => import('@/pages/purchase-orders/PurchaseOrders'))
 const Settings = lazy(() => import('@/pages/settings/Settings'))
 const Returns = lazy(() => import('@/pages/returns/Returns'))
+const Services = lazy(() => import('@/pages/services/Services'))
+const WorkOrders = lazy(() => import('@/pages/services/WorkOrders'))
 
 // ─── Platform-owner admin panel (cross-tenant) ────────────────────────────
 const AdminLogin = lazy(() => import('@/pages/admin/AdminLogin'))
@@ -88,6 +90,8 @@ export default function App() {
           <Route path="/installments/*" element={<AuthGuard><RoleGuard resource="installments" action="read"><Installments /></RoleGuard></AuthGuard>} />
           <Route path="/suppliers/*" element={<AuthGuard><RoleGuard resource="suppliers" action="read"><FeatureGate feature="suppliers" title="الموردين"><Suppliers /></FeatureGate></RoleGuard></AuthGuard>} />
           <Route path="/expenses/*" element={<AuthGuard><RoleGuard resource="expenses" action="read"><FeatureGate feature="expenses" title="المصروفات"><Expenses /></FeatureGate></RoleGuard></AuthGuard>} />
+          <Route path="/services/*" element={<AuthGuard><RoleGuard resource="services" action="read"><FeatureGate feature="services" title="الخدمات"><Services /></FeatureGate></RoleGuard></AuthGuard>} />
+          <Route path="/work-orders/*" element={<AuthGuard><RoleGuard resource="work_orders" action="read"><FeatureGate feature="services" title="طلبات العمل"><WorkOrders /></FeatureGate></RoleGuard></AuthGuard>} />
           <Route path="/reports/*" element={<AuthGuard><RoleGuard resource="reports" action="read"><Reports /></RoleGuard></AuthGuard>} />
           <Route path="/purchase-orders/*" element={<AuthGuard><RoleGuard resource="purchase_orders" action="read"><PurchaseOrders /></RoleGuard></AuthGuard>} />
           <Route path="/settings/*" element={<AuthGuard><RoleGuard resource="settings" action="read"><Settings /></RoleGuard></AuthGuard>} />

@@ -17,6 +17,7 @@ interface DayCloseData {
   date: string
   pos: { byMethod: MethodRow[]; total: number; count: number }
   installments: { byMethod: MethodRow[]; total: number; count: number }
+  services: { byMethod: MethodRow[]; total: number; count: number }
 }
 
 function BreakdownTable({ rows, total, count, label }: { rows: MethodRow[]; total: number; count: number; label: string }) {
@@ -68,13 +69,23 @@ export default function DayClose() {
     queryFn: async () => (await api.get<{ data: DayCloseData }>('/reports/day-close', { params: { date } })).data.data,
   })
 
-  const grandTotal = (data?.pos.total ?? 0) + (data?.installments.total ?? 0)
+  const grandTotal =
+    (data?.pos.total ?? 0) + (data?.installments.total ?? 0) + (data?.services.total ?? 0)
+  const hasServices = (data?.services.count ?? 0) > 0
 
   const print = () => {
     const posRows = (data?.pos.byMethod ?? []).map((r) => `
       <tr><td>${r.methodName}</td><td style="text-align:center">${r.count}</td><td style="text-align:left">${formatMoney(r.total)} ج</td></tr>`).join('')
     const instRows = (data?.installments.byMethod ?? []).map((r) => `
       <tr><td>${r.methodName}</td><td style="text-align:center">${r.count}</td><td style="text-align:left">${formatMoney(r.total)} ج</td></tr>`).join('')
+    const svcRows = (data?.services.byMethod ?? []).map((r) => `
+      <tr><td>${r.methodName}</td><td style="text-align:center">${r.count}</td><td style="text-align:left">${formatMoney(r.total)} ج</td></tr>`).join('')
+    const servicesSection = hasServices ? `
+      <h2>الخدمات المحصلة (${data?.services.count ?? 0} طلب)</h2>
+      <table><thead><tr><th>طريقة الدفع</th><th style="text-align:center">عدد</th><th style="text-align:left">الإجمالي</th></tr></thead>
+      <tbody>${svcRows}</tbody>
+      <tfoot><tr class="total-row"><td>الإجمالي</td><td style="text-align:center">${data?.services.count ?? 0}</td><td style="text-align:left">${formatMoney(data?.services.total ?? 0)} ج</td></tr></tfoot>
+      </table>` : ''
 
     const html = `<!DOCTYPE html><html dir="rtl" lang="ar"><head><meta charset="UTF-8">
       <title>إغلاق يوم ${date}</title>
@@ -102,6 +113,7 @@ export default function DayClose() {
       <tbody>${instRows}</tbody>
       <tfoot><tr class="total-row"><td>الإجمالي</td><td style="text-align:center">${data?.installments.count ?? 0}</td><td style="text-align:left">${formatMoney(data?.installments.total ?? 0)} ج</td></tr></tfoot>
       </table>
+      ${servicesSection}
       <p class="grand">الإجمالي الكلي: ${formatMoney(grandTotal)} ج</p>
     </body></html>`
 
@@ -152,6 +164,16 @@ export default function DayClose() {
               total={data?.installments.total ?? 0}
               count={data?.installments.count ?? 0}
             />
+            {/* Services table only renders when there's something to show — keeps
+                the page clean for tenants without the services feature. */}
+            {hasServices && (
+              <BreakdownTable
+                label="الخدمات — طلبات العمل المدفوعة"
+                rows={data?.services.byMethod ?? []}
+                total={data?.services.total ?? 0}
+                count={data?.services.count ?? 0}
+              />
+            )}
 
             {/* Grand total */}
             <div className="bg-brand-500/10 border border-brand-500/30 rounded-xl px-5 py-4 flex items-center justify-between">

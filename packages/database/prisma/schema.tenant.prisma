@@ -36,6 +36,7 @@ model Branch {
   supplierTransactions SupplierTransaction[]
   purchaseOrders      PurchaseOrder[]
   paymentFeeExpenses  PaymentFeeExpense[]
+  workOrders          WorkOrder[]
 
   @@map("branches")
 }
@@ -85,6 +86,9 @@ model User {
   auditLogs           AuditLog[]
   supplierTransactions SupplierTransaction[]
   returns             Return[]
+  workOrdersAssigned  WorkOrder[]              @relation("WorkOrderAssigned")
+  workOrdersCreated   WorkOrder[]              @relation("WorkOrderCreatedBy")
+  workOrderStatusChanges WorkOrderStatusHistory[] @relation("StatusChangedBy")
 
   @@index([email], name: "idx_users_email")
   @@index([roleId], name: "idx_users_role")
@@ -312,6 +316,7 @@ model PaymentMethod {
   invoices            Invoice[]           @relation("InvoicePM")
   splitInvoices       Invoice[]           @relation("InvoiceSplitPM")
   paymentFeeExpenses  PaymentFeeExpense[]
+  workOrders          WorkOrder[]
 
   @@map("payment_methods")
 }
@@ -334,6 +339,7 @@ model Customer {
   documents            CustomerDocument[]
   invoices             Invoice[]
   installmentContracts InstallmentContract[]
+  workOrders           WorkOrder[]
 
   @@map("customers")
 }
@@ -821,4 +827,120 @@ model EtaSubmission {
   @@index([invoiceId, attemptNumber], name: "idx_eta_invoice")
   @@index([status, submittedAt], name: "idx_eta_status")
   @@map("eta_submissions")
+}
+
+// ─── Services & Work Orders ──────────────────────────────────────────────────
+// Gated by the `services` plan feature. Service is the catalog; WorkOrder is
+// the instance (a job for a specific customer with a status workflow).
+//
+// Payment is tracked on the work order itself for v1 — no invoice integration
+// yet because that would require threading service items through POS, returns,
+// ETA, and reports. Phase 2.
+
+model ServiceCategory {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String   @db.VarChar(100)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  services Service[]
+
+  @@map("service_categories")
+}
+
+model Service {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                     String   @db.VarChar(200)
+  description              String?  @db.Text
+  categoryId               String?  @db.Uuid @map("category_id")
+  defaultPrice             Decimal  @db.Decimal(15, 4) @map("default_price")
+  estimatedDurationMinutes Int?     @map("estimated_duration_minutes")
+  isActive                 Boolean  @default(true) @map("is_active")
+  createdAt                DateTime @default(now()) @map("created_at")
+  updatedAt                DateTime @updatedAt     @map("updated_at")
+
+  category          ServiceCategory?   @relation(fields: [categoryId], references: [id])
+  workOrderServices WorkOrderService[]
+
+  @@map("services")
+}
+
+model WorkOrder {
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ticketNumber    String  @unique @db.VarChar(50) @map("ticket_number")
+  branchId        String  @db.Uuid @map("branch_id")
+  customerId      String? @db.Uuid @map("customer_id")
+  assignedUserId  String? @db.Uuid @map("assigned_user_id")
+  createdById     String  @db.Uuid @map("created_by_id")
+
+  // itemType drives which itemDetails JSON shape applies. Kept as a string
+  // (not an enum) so new business types can be added without a migration.
+  // Values: 'device' | 'vehicle' | 'appointment' | 'other'
+  itemType    String @db.VarChar(30) @map("item_type")
+  itemDetails Json   @default("{}")  @map("item_details")
+
+  // received|scheduled|diagnosed|quoted|approved|in_progress|ready|delivered|cancelled
+  status String @default("received") @db.VarChar(30)
+
+  scheduledAt    DateTime? @map("scheduled_at")
+  deposit        Decimal   @default(0) @db.Decimal(15, 4)
+  estimatedTotal Decimal?  @db.Decimal(15, 4) @map("estimated_total")
+  finalTotal     Decimal?  @db.Decimal(15, 4) @map("final_total")
+
+  // Payment is self-contained on the work order in v1. Invoice integration: Phase 2.
+  paymentMethodId String?   @db.Uuid @map("payment_method_id")
+  paidAmount      Decimal   @default(0) @db.Decimal(15, 4) @map("paid_amount")
+  paidAt          DateTime? @map("paid_at")
+
+  diagnosisNotes String? @db.Text @map("diagnosis_notes")
+  workNotes      String? @db.Text @map("work_notes")
+  customerNotes  String? @db.Text @map("customer_notes")
+
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt      @map("updated_at")
+  closedAt  DateTime? @map("closed_at")
+
+  branch        Branch         @relation(fields: [branchId], references: [id])
+  customer      Customer?      @relation(fields: [customerId], references: [id])
+  assignedUser  User?          @relation("WorkOrderAssigned", fields: [assignedUserId], references: [id])
+  createdBy     User           @relation("WorkOrderCreatedBy", fields: [createdById], references: [id])
+  paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+
+  services      WorkOrderService[]
+  statusHistory WorkOrderStatusHistory[]
+
+  @@index([branchId, createdAt(sort: Desc)], name: "idx_workorder_branch")
+  @@index([customerId, createdAt(sort: Desc)], name: "idx_workorder_customer")
+  @@index([status], name: "idx_workorder_status")
+  @@map("work_orders")
+}
+
+model WorkOrderService {
+  id          String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workOrderId String  @db.Uuid @map("work_order_id")
+  serviceId   String  @db.Uuid @map("service_id")
+  quantity    Int     @default(1)
+  unitPrice   Decimal @db.Decimal(15, 4) @map("unit_price")
+  notes       String? @db.Text
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  service   Service   @relation(fields: [serviceId], references: [id])
+
+  @@map("work_order_services")
+}
+
+model WorkOrderStatusHistory {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workOrderId String   @db.Uuid @map("work_order_id")
+  oldStatus   String?  @db.VarChar(30) @map("old_status")
+  newStatus   String   @db.VarChar(30) @map("new_status")
+  changedById String   @db.Uuid @map("changed_by_id")
+  note        String?  @db.Text
+  changedAt   DateTime @default(now()) @map("changed_at")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  changedBy User      @relation("StatusChangedBy", fields: [changedById], references: [id])
+
+  @@index([workOrderId, changedAt(sort: Desc)], name: "idx_workorder_history_wo")
+  @@map("work_order_status_history")
 }

@@ -22,6 +22,8 @@ import { installmentRoutes } from './modules/installments/installment.routes'
 import { supplierRoutes } from './modules/suppliers/supplier.routes'
 import { purchaseOrderRoutes } from './modules/purchase-orders/po.routes'
 import { expenseRoutes } from './modules/expenses/expense.routes'
+import { serviceRoutes } from './modules/services/service.routes'
+import { workOrderRoutes } from './modules/services/workOrder.routes'
 import { reportRoutes } from './modules/reports/report.routes'
 import { couponRoutes } from './modules/coupons/coupon.routes'
 import { etaRoutes } from './modules/eta/eta.routes'
@@ -162,6 +164,8 @@ app.register(async function apiContext(api) {
   sub.register(supplierRoutes, { prefix: '/api/suppliers' })
   sub.register(purchaseOrderRoutes, { prefix: '/api/purchase-orders' })
   sub.register(expenseRoutes, { prefix: '/api/expenses' })
+  sub.register(serviceRoutes, { prefix: '/api/services' })
+  sub.register(workOrderRoutes, { prefix: '/api/work-orders' })
   sub.register(reportRoutes, { prefix: '/api/reports' })
   sub.register(couponRoutes, { prefix: '/api/coupons' })
   sub.register(etaRoutes, { prefix: '/api' })

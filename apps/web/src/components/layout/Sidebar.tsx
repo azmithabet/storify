@@ -15,6 +15,8 @@ import {
   ClipboardList,
   RotateCcw,
   CalendarCheck,
+  Wrench,
+  Hammer,
 } from 'lucide-react'
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
@@ -44,6 +46,8 @@ const navItems: Array<{
   { to: '/suppliers', icon: Truck, label: 'الموردون', permission: { resource: 'suppliers', action: 'read' }, feature: 'suppliers' },
   { to: '/purchase-orders', icon: ClipboardList, label: 'أوامر الشراء', permission: { resource: 'purchase_orders', action: 'read' }, feature: 'suppliers' },
   { to: '/expenses', icon: Receipt, label: 'المصروفات', permission: { resource: 'expenses', action: 'read' }, feature: 'expenses' },
+  { to: '/services', icon: Wrench, label: 'الخدمات', permission: { resource: 'services', action: 'read' }, feature: 'services' },
+  { to: '/work-orders', icon: Hammer, label: 'طلبات العمل', permission: { resource: 'work_orders', action: 'read' }, feature: 'services' },
   { to: '/reports', icon: BarChart3, label: 'التقارير', permission: { resource: 'reports', action: 'read' } },
   // Settings is split — most pages need settings.read, but every user can
   // still reach the password tab via direct URL. Filter on settings.read

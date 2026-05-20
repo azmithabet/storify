@@ -30,14 +30,15 @@ interface Plan {
 }
 
 // Feature flags that have real backend enforcement via requireFeature() or requireUnderLimit().
-// ─ suppliers / expenses : enforced by requireFeature() on the API routes.
-// ─ max_branches         : enforced by requireUnderLimit('branches') on POST /api/branches.
+// ─ suppliers / expenses / services : enforced by requireFeature() on the API routes.
+// ─ max_branches                    : enforced by requireUnderLimit('branches') on POST /api/branches.
 // NOTE: installments is gated by maxInstallmentPlansMonthly (set it to 0 to disable, 999999 for unlimited).
 //       multi_currency / advanced_reports / offline_mode / api_access are not yet implemented —
 //       excluded from the editor until the backend enforcement exists.
 const BOOLEAN_FEATURES: { key: string; label: string; hint?: string }[] = [
   { key: 'suppliers', label: 'الموردون' },
   { key: 'expenses', label: 'المصروفات' },
+  { key: 'services', label: 'الخدمات والصيانة', hint: 'كتالوج الخدمات + طلبات العمل (مناسب لمحلات الصيانة)' },
 ]
 
 // max_users is intentionally absent — user quota is controlled by the `maxUsers` column above,
@@ -242,6 +243,7 @@ function PlanFormModal({
           features: {
             suppliers: false,
             expenses: false,
+            services: false,
             max_branches: 1,
           },
         },

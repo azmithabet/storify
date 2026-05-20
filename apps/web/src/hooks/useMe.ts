@@ -7,6 +7,7 @@ export interface PlanFeatures {
   multi_currency?: boolean
   suppliers?: boolean
   expenses?: boolean
+  services?: boolean
   advanced_reports?: boolean
   offline_mode?: boolean
   api_access?: boolean

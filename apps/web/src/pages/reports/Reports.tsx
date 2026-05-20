@@ -25,7 +25,17 @@ interface StockReport { summary: StockSummary; items: StockItem[] }
 interface InstallmentSummary { active: number; overdue: number; completed: number; pendingApproval: number; totalReceivables: number }
 interface InstallmentReport { summary: InstallmentSummary }
 
-interface PnLReport { revenue: number; cogs: number; grossProfit: number; grossMargin: number; operatingExpenses: number; netProfit: number; netMargin: number }
+interface PnLReport {
+  revenue: number
+  invoiceRevenue: number
+  servicesRevenue: number
+  cogs: number
+  grossProfit: number
+  grossMargin: number
+  operatingExpenses: number
+  netProfit: number
+  netMargin: number
+}
 
 interface FeeSummary { totalMerchantFees: number; totalCustomerFees: number; totalFees: number }
 interface FeeByPM { paymentMethod: { id: string; name?: string; type?: string }; feeBearer: string; totalFees: number; count: number }
@@ -456,23 +466,47 @@ export default function Reports() {
             )}
             {pnlLoading ? <SkeletonTable rows={6} cols={2} /> : (
               <div className="max-w-lg bg-gray-800 rounded-xl border border-gray-700 divide-y divide-gray-700">
-                {[
-                  { label: 'الإيرادات', value: pnlData?.revenue ?? 0, cls: 'text-success-400' },
-                  { label: 'تكلفة المبيعات (COGS)', value: -(pnlData?.cogs ?? 0), cls: 'text-danger-400' },
-                  { label: 'إجمالي الربح', value: pnlData?.grossProfit ?? 0, cls: 'text-brand-400 font-semibold', margin: pnlData?.grossMargin },
-                  { label: 'مصروفات التشغيل', value: -(pnlData?.operatingExpenses ?? 0), cls: 'text-danger-400' },
-                  { label: 'صافي الربح', value: pnlData?.netProfit ?? 0, cls: 'text-success-300 font-bold text-base', margin: pnlData?.netMargin },
-                ].map((row) => (
-                  <div key={row.label} className="flex justify-between items-center px-6 py-4">
-                    <div>
-                      <span className="text-sm text-gray-300">{row.label}</span>
-                      {row.margin !== undefined && (
-                        <span className="text-xs text-gray-500 mr-2">({formatNumber(row.margin, { maximumFractionDigits: 1 })}%)</span>
-                      )}
+                {(() => {
+                  // The revenue row is followed by two indented sub-rows breaking
+                  // it into Invoices vs Services, but only when services revenue
+                  // is non-zero — keeps the P&L clean for retail-only tenants.
+                  const hasServicesRev = (pnlData?.servicesRevenue ?? 0) > 0
+                  const rows: Array<{
+                    label: string
+                    value: number
+                    cls: string
+                    margin?: number
+                    indent?: boolean
+                  }> = [
+                    { label: 'الإيرادات', value: pnlData?.revenue ?? 0, cls: 'text-success-400' },
+                    ...(hasServicesRev
+                      ? [
+                          { label: '— مبيعات (فواتير)', value: pnlData?.invoiceRevenue ?? 0, cls: 'text-success-400/70', indent: true },
+                          { label: '— خدمات (طلبات عمل)', value: pnlData?.servicesRevenue ?? 0, cls: 'text-cyan-400/80', indent: true },
+                        ]
+                      : []),
+                    { label: 'تكلفة المبيعات (COGS)', value: -(pnlData?.cogs ?? 0), cls: 'text-danger-400' },
+                    { label: 'إجمالي الربح', value: pnlData?.grossProfit ?? 0, cls: 'text-brand-400 font-semibold', margin: pnlData?.grossMargin },
+                    { label: 'مصروفات التشغيل', value: -(pnlData?.operatingExpenses ?? 0), cls: 'text-danger-400' },
+                    { label: 'صافي الربح', value: pnlData?.netProfit ?? 0, cls: 'text-success-300 font-bold text-base', margin: pnlData?.netMargin },
+                  ]
+                  return rows.map((row) => (
+                    <div
+                      key={row.label}
+                      className={`flex justify-between items-center px-6 py-4 ${row.indent ? 'bg-gray-900/30 py-2.5 pr-10' : ''}`}
+                    >
+                      <div>
+                        <span className={`text-sm ${row.indent ? 'text-gray-500' : 'text-gray-300'}`}>{row.label}</span>
+                        {row.margin !== undefined && (
+                          <span className="text-xs text-gray-500 mr-2">({formatNumber(row.margin, { maximumFractionDigits: 1 })}%)</span>
+                        )}
+                      </div>
+                      <span className={`font-mono ${row.cls} ${row.indent ? 'text-xs' : ''}`}>
+                        {formatNumber(row.value)} ج
+                      </span>
                     </div>
-                    <span className={`font-mono ${row.cls}`}>{formatNumber(row.value)} ج</span>
-                  </div>
-                ))}
+                  ))
+                })()}
               </div>
             )}
           </>

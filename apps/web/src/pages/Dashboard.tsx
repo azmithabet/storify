@@ -1,18 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
-import { TrendingUp, ShoppingBag, AlertTriangle, Clock, PackageOpen, FileX } from 'lucide-react'
+import { TrendingUp, ShoppingBag, AlertTriangle, Clock, PackageOpen, FileX, Wrench } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { StatCard, Badge, Alert, Skeleton, Money } from '@/components/ui'
 import { UsageBanner } from '@/components/UsageBanner'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import { formatNumber, formatDate, formatTime } from '@/lib/format'
+import { useFeature } from '@/hooks/useMe'
 import { invoiceStatusMap, getStatus } from '@/constants/status'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface DashboardData {
-  today: { revenue: number; invoiceCount: number; feeExpenses: number }
+  today: {
+    revenue: number
+    invoiceCount: number
+    feeExpenses: number
+    servicesRevenue: number
+    servicesCount: number
+  }
   pending: { installmentApprovals: number; overdueInstallmentPayments: number; expenseApprovals: number }
   lowStockAlerts: number
   etaFailures?: number
@@ -92,6 +99,7 @@ function PendingCard({ label, count, icon, onClick }: { label: string; count: nu
 
 export default function Dashboard() {
   const navigate = useNavigate()
+  const servicesEnabled = useFeature('services')
 
   const today = new Date()
   const sevenDaysAgo = new Date(today)
@@ -168,7 +176,10 @@ export default function Dashboard() {
           {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
         </div>
       ) : (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+        <div className={cn(
+          'grid grid-cols-2 gap-4 mb-6',
+          servicesEnabled ? 'md:grid-cols-3 xl:grid-cols-5' : 'md:grid-cols-4',
+        )}>
           <StatCard
             label="مبيعات اليوم"
             value={`${formatNumber(data?.today.revenue ?? 0, { maximumFractionDigits: 0 })} ج`}
@@ -183,6 +194,15 @@ export default function Dashboard() {
             icon={<ShoppingBag className="w-4 h-4" />}
             onClick={() => navigate(`/invoices?from=${fmt(today)}&to=${fmt(today)}`)}
           />
+          {servicesEnabled && (
+            <StatCard
+              label="خدمات اليوم"
+              value={`${formatNumber(data?.today.servicesRevenue ?? 0, { maximumFractionDigits: 0 })} ج`}
+              accentColor="bg-cyan-500"
+              icon={<Wrench className="w-4 h-4" />}
+              onClick={() => navigate('/work-orders')}
+            />
+          )}
           <StatCard
             label="تنبيهات مخزون"
             value={data?.lowStockAlerts ?? 0}

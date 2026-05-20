@@ -61,6 +61,8 @@ const RESOURCE_LABEL: Record<string, string> = {
   payment_methods: 'طرق الدفع',
   billing: 'الاشتراك',
   coupons: 'الكوبونات',
+  services: 'الخدمات',
+  work_orders: 'طلبات العمل',
 }
 const ACTION_LABEL: Record<string, string> = {
   read: 'عرض',

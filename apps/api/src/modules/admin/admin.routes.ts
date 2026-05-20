@@ -5,6 +5,7 @@ import { config } from '../../config/env'
 import { masterDb, getTenantDb } from '../../config/database'
 import { redis } from '../../config/redis'
 import { hashPassword } from '../../shared/utils/password'
+import { migrateAllTenants } from '@storify/database'
 import {
   authenticatePlatformAdmin,
   requireOwner,
@@ -872,6 +873,14 @@ export async function adminRoutes(app: FastifyInstance) {
         masterDb.platformAuditLog.count({ where }),
       ])
       return reply.send({ success: true, data: logs, meta: { total, page, limit, pages: Math.ceil(total / limit) } })
+    })
+
+    // ─── Manual migration trigger (OWNER only) ────────────────────────────────
+    // Safety valve: run pending tenant SQL migrations on-demand without
+    // needing a full redeploy. Idempotent — safe to call multiple times.
+    scoped.post('/run-migrations', { preHandler: [requireOwner] }, async (_request, reply) => {
+      const result = await migrateAllTenants()
+      return reply.send({ success: true, data: result })
     })
   })
 }

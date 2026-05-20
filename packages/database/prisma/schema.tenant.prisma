@@ -444,6 +444,7 @@ model Invoice {
   installmentContract InstallmentContract?
   externalFinancing   ExternalFinancing?
   etaSubmissions EtaSubmission[]
+  workOrder      WorkOrder?           // set when generated from a work order
 
   @@index([branchId, createdAt(sort: Desc)], name: "idx_invoice_branch")
   @@index([customerId, createdAt(sort: Desc)], name: "idx_invoice_customer")
@@ -451,19 +452,26 @@ model Invoice {
 }
 
 model InvoiceItem {
-  id             String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  invoiceId      String  @db.Uuid @map("invoice_id")
-  variantId      String  @db.Uuid @map("variant_id")
-  taxRateId      String? @db.Uuid @map("tax_rate_id")
-  quantity       Int
-  unitPrice      Decimal @db.Decimal(15, 4) @map("unit_price")
-  discountAmount Decimal @default(0) @db.Decimal(15, 4) @map("discount_amount")
-  taxAmount      Decimal @default(0) @db.Decimal(15, 4) @map("tax_amount")
-  subtotal       Decimal @db.Decimal(15, 4)
+  id              String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  invoiceId       String  @db.Uuid @map("invoice_id")
+  // variantId is null for service-based line items (work order invoices).
+  // Always non-null for product (POS) invoices — that invariant is enforced
+  // at the application layer, not the DB layer, to keep migrations clean.
+  variantId       String? @db.Uuid @map("variant_id")
+  // Service-line fields — only set when variantId is null.
+  serviceId       String? @db.Uuid @map("service_id")
+  lineDescription String? @db.VarChar(500) @map("line_description")
+  taxRateId       String? @db.Uuid @map("tax_rate_id")
+  quantity        Int
+  unitPrice       Decimal @db.Decimal(15, 4) @map("unit_price")
+  discountAmount  Decimal @default(0) @db.Decimal(15, 4) @map("discount_amount")
+  taxAmount       Decimal @default(0) @db.Decimal(15, 4) @map("tax_amount")
+  subtotal        Decimal @db.Decimal(15, 4)
 
-  invoice Invoice        @relation(fields: [invoiceId], references: [id])
-  variant ProductVariant @relation(fields: [variantId], references: [id])
-  taxRate TaxRate?       @relation(fields: [taxRateId], references: [id])
+  invoice Invoice         @relation(fields: [invoiceId], references: [id])
+  variant ProductVariant? @relation(fields: [variantId], references: [id])
+  service Service?        @relation(fields: [serviceId], references: [id])
+  taxRate TaxRate?        @relation(fields: [taxRateId], references: [id])
 
   @@map("invoice_items")
 }
@@ -861,6 +869,7 @@ model Service {
 
   category          ServiceCategory?   @relation(fields: [categoryId], references: [id])
   workOrderServices WorkOrderService[]
+  invoiceItems      InvoiceItem[]      // invoice items generated from this service
 
   @@map("services")
 }
@@ -896,6 +905,9 @@ model WorkOrder {
   workNotes      String? @db.Text @map("work_notes")
   customerNotes  String? @db.Text @map("customer_notes")
 
+  // Phase 2a: set once an invoice is generated from this work order (one-to-one).
+  invoiceId String? @unique @db.Uuid @map("invoice_id")
+
   createdAt DateTime  @default(now()) @map("created_at")
   updatedAt DateTime  @updatedAt      @map("updated_at")
   closedAt  DateTime? @map("closed_at")
@@ -905,6 +917,7 @@ model WorkOrder {
   assignedUser  User?          @relation("WorkOrderAssigned", fields: [assignedUserId], references: [id])
   createdBy     User           @relation("WorkOrderCreatedBy", fields: [createdById], references: [id])
   paymentMethod PaymentMethod? @relation(fields: [paymentMethodId], references: [id])
+  invoice       Invoice?       @relation(fields: [invoiceId], references: [id])
 
   services      WorkOrderService[]
   statusHistory WorkOrderStatusHistory[]

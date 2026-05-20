@@ -247,3 +247,85 @@ export function printPurchaseOrder(po: PurchaseOrderForPrint, statusLabel: strin
   </body></html>`
   openPrintWindow(html, 800, 700, 300)
 }
+
+// ─── Work Order Receipt ───────────────────────────────────────────────────────
+export interface WorkOrderReceiptData {
+  ticketNumber: string
+  invoiceNumber?: string
+  createdAt: string
+  customerName?: string
+  paymentMethodName?: string
+  status: string
+  services: { name: string; quantity: number; unitPrice: number; lineTotal: number }[]
+  estimatedTotal?: number
+  finalTotal?: number
+  paidAmount: number
+  diagnosisNotes?: string
+  workNotes?: string
+}
+
+export function printWorkOrderReceipt(wo: WorkOrderReceiptData): void {
+  const rows = wo.services.map((s) =>
+    `<tr>
+      <td>${s.name}</td>
+      <td style="text-align:center">${s.quantity}</td>
+      <td style="text-align:left">${fmt2(s.unitPrice)}</td>
+      <td style="text-align:left">${fmt2(s.lineTotal)}</td>
+    </tr>`
+  ).join('')
+
+  const total = wo.finalTotal ?? wo.estimatedTotal ?? wo.paidAmount
+
+  const html = `<!DOCTYPE html><html dir="rtl" lang="ar">
+  <head><meta charset="UTF-8">
+  <title>إيصال طلب عمل ${wo.ticketNumber}</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'IBM Plex Sans Arabic',Arial,sans-serif;font-size:13px;padding:32px;color:#111;max-width:600px;margin:auto}
+    .header{border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
+    h1{font-size:18px;font-weight:700}
+    h2{font-size:13px;font-weight:600;margin:16px 0 6px;color:#374151}
+    .meta{display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:12px;margin-bottom:16px}
+    .meta span{color:#6b7280}
+    table{width:100%;border-collapse:collapse;margin-bottom:12px}
+    th{background:#f3f4f6;padding:7px 8px;text-align:right;font-size:11px}
+    td{padding:6px 8px;border-bottom:1px solid #e5e7eb}
+    .total-row td{font-weight:700;background:#f9fafb;font-size:14px}
+    .notes{background:#fafafa;border:1px solid #e5e7eb;border-radius:6px;padding:10px;font-size:12px;color:#374151;margin-top:12px}
+    .paid{text-align:left;font-size:16px;font-weight:700;margin-top:16px}
+    @media print{body{padding:16px}}
+  </style></head>
+  <body>
+    <div class="header">
+      <h1>إيصال خدمة — ${wo.ticketNumber}</h1>
+      ${wo.invoiceNumber ? `<p style="font-size:12px;color:#6b7280">فاتورة رقم: ${wo.invoiceNumber}</p>` : ''}
+      <p style="font-size:12px;color:#6b7280">التاريخ: ${formatDate(wo.createdAt)} — Storify Services</p>
+    </div>
+
+    <div class="meta">
+      <div><span>العميل</span><br/>${wo.customerName ?? 'عميل غير محدد'}</div>
+      <div><span>طريقة الدفع</span><br/>${wo.paymentMethodName ?? '—'}</div>
+    </div>
+
+    <h2>الخدمات المنجزة</h2>
+    ${rows.length > 0 ? `
+    <table>
+      <thead><tr><th>الخدمة</th><th style="text-align:center">الكمية</th><th style="text-align:left">سعر الوحدة</th><th style="text-align:left">الإجمالي</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr class="total-row"><td colspan="3">الإجمالي</td><td style="text-align:left">${fmt2(total)} ج</td></tr></tfoot>
+    </table>` : `<p style="color:#6b7280;font-size:12px">لا توجد خدمات مسجلة</p>`}
+
+    ${wo.diagnosisNotes ? `<div class="notes"><strong>ملاحظات التشخيص:</strong> ${wo.diagnosisNotes}</div>` : ''}
+    ${wo.workNotes ? `<div class="notes" style="margin-top:8px"><strong>ملاحظات العمل:</strong> ${wo.workNotes}</div>` : ''}
+
+    <p class="paid">المبلغ المدفوع: ${fmt2(wo.paidAmount)} ج</p>
+
+    <div style="margin-top:32px;display:flex;justify-content:space-between">
+      <div style="width:45%;text-align:center"><div style="border-top:1px solid #000;margin-top:40px;padding-top:8px;font-size:11px">توقيع العميل</div></div>
+      <div style="width:45%;text-align:center"><div style="border-top:1px solid #000;margin-top:40px;padding-top:8px;font-size:11px">توقيع الفني</div></div>
+    </div>
+  </body></html>`
+
+  openPrintWindow(html, 650, 850, 300)
+}

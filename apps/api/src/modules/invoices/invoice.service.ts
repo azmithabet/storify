@@ -108,6 +108,8 @@ export async function getInvoice(db: TenantPrismaClient, invoiceId: string) {
           variant: {
             include: { product: { select: { id: true, name: true, unit: true } } },
           },
+          // service is set when the item was generated from a work order line
+          service: { select: { id: true, name: true } },
           taxRate: { select: { id: true, name: true, rate: true } },
         },
       },
@@ -486,17 +488,19 @@ export async function returnInvoice(
   if (!invoice) throw notFound()
   if (invoice.status === 'cancelled') throw badRequest('invoice_cancelled')
 
-  // Validate return quantities don't exceed sold quantities
+  // Validate return quantities don't exceed sold quantities.
+  // Service items (variantId === null) cannot be returned via this flow.
+  const productItems = invoice.items.filter((i) => i.variantId !== null)
   for (const ri of input.items) {
-    const invoiceItem = invoice.items.find((i) => i.variantId === ri.variantId)
+    const invoiceItem = productItems.find((i) => i.variantId === ri.variantId)
     if (!invoiceItem) throw badRequest(`item_not_in_invoice:${ri.variantId}`)
     if (ri.quantity > invoiceItem.quantity) throw badRequest(`return_qty_exceeds_sold:${ri.variantId}`)
   }
 
-  // Calculate return amount proportionally
+  // Calculate return amount proportionally (service items have no stock to restock)
   const returnAmount = roundMoney(
     input.items.reduce((sum, ri) => {
-      const invoiceItem = invoice.items.find((i) => i.variantId === ri.variantId)!
+      const invoiceItem = productItems.find((i) => i.variantId === ri.variantId)!
       const itemTotal = toDecimal(invoiceItem.subtotal)
         .plus(toDecimal(invoiceItem.taxAmount))
         .minus(toDecimal(invoiceItem.discountAmount))
@@ -595,8 +599,9 @@ export async function cancelInvoice(
   if (invoice.status === 'returned') throw badRequest('invoice_returned')
 
   return db.$transaction(async (tx) => {
-    // 1. Restore stock + log movements for every item
+    // 1. Restore stock + log movements for product items only (service items have no stock)
     for (const item of invoice.items) {
+      if (!item.variantId) continue // skip service line items
       await tx.stock.updateMany({
         where: { variantId: item.variantId, branchId: invoice.branchId },
         data: { quantity: { increment: item.quantity }, updatedAt: new Date() },

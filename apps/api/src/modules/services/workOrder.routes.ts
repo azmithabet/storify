@@ -381,6 +381,150 @@ export async function workOrderRoutes(app: FastifyInstance) {
     },
   )
 
+  // ─── POST /api/work-orders/:id/invoice ───────────────────────────────────
+  // Generate a completed invoice from the work order's service lines. Marks the
+  // work order as invoiced (sets invoiceId). Can only be called once per WO.
+  // Payment method is taken from the WO if already recorded; otherwise it must
+  // be supplied in the request body.
+  app.post<{ Params: { id: string } }>(
+    '/:id/invoice',
+    { preHandler: requirePermission('work_orders', 'update') },
+    async (request, reply) => {
+      const { z } = await import('zod')
+      const schema = z.object({ paymentMethodId: z.string().uuid().optional() })
+      const parsed = schema.safeParse(request.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+      }
+
+      const wo = await request.tenantDb.workOrder.findUnique({
+        where: { id: request.params.id },
+        include: {
+          services: {
+            include: { service: { select: { id: true, name: true } } },
+          },
+        },
+      })
+      if (!wo) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الطلب غير موجود' } })
+      if (wo.invoiceId) {
+        return reply.status(409).send({ success: false, error: { code: 'already_invoiced', message: 'تم إنشاء فاتورة لهذا الطلب من قبل' } })
+      }
+
+      const paymentMethodId = parsed.data.paymentMethodId ?? wo.paymentMethodId
+      if (!paymentMethodId) {
+        return reply.status(400).send({ success: false, error: { code: 'no_payment_method', message: 'حدد طريقة الدفع لإنشاء الفاتورة' } })
+      }
+
+      const [pm, baseCurrency, settings] = await Promise.all([
+        request.tenantDb.paymentMethod.findUnique({ where: { id: paymentMethodId } }),
+        request.tenantDb.currency.findFirst({ where: { isBase: true } }),
+        request.tenantDb.tenantSetting.findFirst(),
+      ])
+      if (!pm || !pm.isActive) return reply.status(400).send({ success: false, error: { code: 'payment_method_not_found', message: 'طريقة الدفع غير موجودة أو معطلة' } })
+      if (!baseCurrency) return reply.status(400).send({ success: false, error: { code: 'no_base_currency', message: 'لا توجد عملة أساسية' } })
+
+      // Compute totals from service lines. Fall back to finalTotal/estimatedTotal
+      // when there are no lines (walk-in diagnosis without services attached yet).
+      const vatRate = settings?.vatEnabled && Number(settings.vatRate) > 0
+        ? new Prisma.Decimal(settings.vatRate).dividedBy(100)
+        : new Prisma.Decimal(0)
+
+      let subtotal: Prisma.Decimal
+      let lines: Array<{ serviceId: string; name: string; qty: number; price: Prisma.Decimal; lineTotal: Prisma.Decimal }>
+
+      if (wo.services.length > 0) {
+        lines = wo.services.map((l) => {
+          const price = new Prisma.Decimal(l.unitPrice)
+          return { serviceId: l.serviceId, name: l.service?.name ?? '—', qty: l.quantity, price, lineTotal: price.mul(l.quantity) }
+        })
+        subtotal = lines.reduce((s, l) => s.add(l.lineTotal), new Prisma.Decimal(0))
+      } else {
+        // No line items — use the WO's locked total as a single "service" line
+        const total = wo.finalTotal ?? wo.estimatedTotal ?? new Prisma.Decimal(0)
+        subtotal = vatRate.greaterThan(0)
+          ? new Prisma.Decimal(total).dividedBy(new Prisma.Decimal(1).add(vatRate))
+          : new Prisma.Decimal(total)
+        lines = [{ serviceId: wo.id, name: `طلب عمل ${wo.ticketNumber}`, qty: 1, price: subtotal, lineTotal: subtotal }]
+      }
+
+      const taxTotal = subtotal.mul(vatRate).toDecimalPlaces(4)
+      const totalAmount = subtotal.add(taxTotal).toDecimalPlaces(4)
+
+      const actor = request.user as JWTPayload
+
+      const invoice = await request.tenantDb.$transaction(async (tx) => {
+        const inv = await tx.invoice.create({
+          data: {
+            branchId: wo.branchId,
+            customerId: wo.customerId ?? null,
+            cashierId: actor.userId,
+            paymentMethodId,
+            currencyId: baseCurrency.id,
+            exchangeRate: 1,
+            subtotal,
+            discountAmount: 0,
+            taxTotal,
+            feePercentage: 0,
+            feeFixed: 0,
+            feeAmount: 0,
+            feeBearer: 'merchant',
+            feeAddedToTotal: false,
+            totalAmount,
+            paidAmount: totalAmount,
+            status: 'completed',
+            // Service invoices skip ETA in v1; ETA for services is Phase 3.
+            etaStatus: 'not_required',
+            notes: `طلب عمل: ${wo.ticketNumber}`,
+          },
+        })
+
+        // Build line items
+        const totalSubtotalNum = subtotal.toNumber()
+        for (const line of lines) {
+          // Distribute tax proportionally across lines
+          const lineTax = totalSubtotalNum > 0
+            ? taxTotal.mul(line.lineTotal).dividedBy(subtotal).toDecimalPlaces(4)
+            : new Prisma.Decimal(0)
+          await tx.invoiceItem.create({
+            data: {
+              invoiceId: inv.id,
+              variantId: null,
+              serviceId: line.serviceId === wo.id ? null : line.serviceId, // null for the generic line
+              lineDescription: line.name,
+              quantity: line.qty,
+              unitPrice: line.price,
+              discountAmount: 0,
+              taxAmount: lineTax,
+              subtotal: line.lineTotal,
+            },
+          })
+        }
+
+        // Generate invoice number: SVC-YYYYMMDD-{last6 of UUID}
+        const datePart = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+        const suffix = inv.id.replace(/-/g, '').slice(-6).toUpperCase()
+        const invoiceNumber = `SVC-${datePart}-${suffix}`
+        const finalInv = await tx.invoice.update({ where: { id: inv.id }, data: { invoiceNumber } })
+
+        // Link the work order to its invoice
+        await tx.workOrder.update({ where: { id: wo.id }, data: { invoiceId: inv.id } })
+
+        return { ...finalInv, invoiceNumber }
+      })
+
+      await auditLog({
+        db: request.tenantDb,
+        actorId: actor.userId,
+        entity: 'work_order',
+        entityId: wo.id,
+        action: 'invoice',
+        after: { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, totalAmount: totalAmount.toString() },
+        ip: request.ip,
+      })
+      return reply.status(201).send({ success: true, data: invoice })
+    },
+  )
+
   // ─── POST /api/work-orders/:id/payment ────────────────────────────────────
   // Record payment against the work order. Doesn't change status — the cashier
   // then transitions to 'delivered' explicitly. Allows partial payments.

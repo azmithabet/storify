@@ -126,6 +126,8 @@ export async function reportRoutes(app: FastifyInstance) {
     const rows = await request.tenantDb.invoiceItem.groupBy({
       by: ['variantId'],
       where: {
+        // Only product items (service items have variantId = null)
+        variantId: { not: null },
         invoice: { status: 'completed', ...(branchId ? { branchId } : {}), ...dateFilter },
       },
       _sum: { quantity: true, subtotal: true },
@@ -133,7 +135,8 @@ export async function reportRoutes(app: FastifyInstance) {
       take: limit,
     })
 
-    const variantIds = rows.map((r) => r.variantId)
+    // variantId is non-null here because of the filter above
+    const variantIds = rows.map((r) => r.variantId as string)
     const variants = await request.tenantDb.productVariant.findMany({
       where: { id: { in: variantIds } },
       select: { id: true, sku: true, product: { select: { name: true } } },
@@ -141,9 +144,10 @@ export async function reportRoutes(app: FastifyInstance) {
     const vMap = new Map(variants.map((v) => [v.id, v]))
 
     const data = rows.map((r) => {
-      const v = vMap.get(r.variantId)
+      const vid = r.variantId as string
+      const v = vMap.get(vid)
       return {
-        variantSku: v?.sku ?? r.variantId.slice(0, 8),
+        variantSku: v?.sku ?? vid.slice(0, 8),
         productName: v?.product.name ?? '—',
         totalQty: Number(r._sum?.quantity ?? 0),
         totalRevenue: Number(r._sum?.subtotal ?? 0),

@@ -309,8 +309,9 @@ export async function approveContract(
       data: { status: 'completed', paidAmount: contract.downPayment },
     })
 
-    // Atomic stock decrement for each item (same gate as regular invoices)
+    // Atomic stock decrement for product items only (service items have no stock)
     for (const item of contract.invoice.items) {
+      if (!item.variantId) continue // skip service line items
       const result = await tx.stock.updateMany({
         where: {
           variantId: item.variantId,

@@ -408,8 +408,9 @@ export async function getProfitLoss(
     where: { invoice: invoiceWhere },
     include: { variant: { select: { costPrice: true } } },
   })
+  // Service items (variantId === null) have no product cost — skip them.
   const cogs = soldItems.reduce(
-    (sum, item) => sum + toDecimal(item.variant.costPrice).times(item.quantity).toNumber(),
+    (sum, item) => item.variant ? sum + toDecimal(item.variant.costPrice).times(item.quantity).toNumber() : sum,
     0,
   )
 

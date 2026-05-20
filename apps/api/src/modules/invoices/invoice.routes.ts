@@ -190,7 +190,10 @@ export async function invoiceRoutes(app: FastifyInstance) {
           customer: { select: { id: true, fullName: true, email: true } },
           paymentMethod: { select: { id: true, name: true } },
           items: {
-            include: { variant: { include: { product: { select: { name: true } } } } },
+            include: {
+              variant: { include: { product: { select: { name: true } } } },
+              service: { select: { name: true } },
+            },
           },
         },
       })
@@ -221,7 +224,8 @@ export async function invoiceRoutes(app: FastifyInstance) {
           feeAmount: invoice.feeAmount.toString(),
           totalAmount: invoice.totalAmount.toString(),
           items: invoice.items.map((it) => ({
-            productName: it.variant.product.name,
+            // Fallback chain: product variant → service name → line description → '—'
+            productName: it.variant?.product.name ?? it.service?.name ?? it.lineDescription ?? '—',
             quantity: it.quantity,
             unitPrice: it.unitPrice.toString(),
             totalPrice: it.subtotal.toString(),

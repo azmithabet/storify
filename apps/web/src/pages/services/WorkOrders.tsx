@@ -13,12 +13,15 @@ import {
   Package,
   CircleDollarSign,
   Trash2,
+  FileText,
+  Printer,
 } from 'lucide-react'
 import { AppShell } from '@/components/layout/AppShell'
 import { Table, Money, SkeletonTable, Badge, Button, Drawer, Modal, Input, Select, Pagination } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import { formatMoney, formatDateTime } from '@/lib/format'
+import { printWorkOrderReceipt } from '@/lib/print'
 import { cn } from '@/lib/cn'
 import type { PaginationMeta } from '@/types/api'
 import type { BadgeVariant } from '@/components/ui'
@@ -58,6 +61,8 @@ interface WorkOrderListItem {
 }
 
 interface WorkOrderDetail extends WorkOrderListItem {
+  invoiceId: string | null
+  invoice?: { id: string; invoiceNumber: string } | null
   createdBy: { id: string; fullName: string }
   paymentMethod: { id: string; name: string } | null
   scheduledAt: string | null
@@ -298,10 +303,22 @@ function WorkOrderDetail({ id }: { id: string }) {
   const [transitionTarget, setTransitionTarget] = useState<WorkOrderStatus | null>(null)
   const [addServiceOpen, setAddServiceOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
+  const [issuingInvoice, setIssuingInvoice] = useState(false)
 
   const { data: wo, isLoading } = useQuery<WorkOrderDetail>({
     queryKey: ['work-order', id],
     queryFn: async () => (await api.get<{ data: WorkOrderDetail }>(`/work-orders/${id}`)).data.data,
+  })
+
+  const { mutate: issueInvoice, isPending: invoicePending } = useMutation({
+    mutationFn: () => api.post(`/work-orders/${id}/invoice`, {}),
+    onSuccess: () => {
+      toast.success('تم إنشاء الفاتورة')
+      setIssuingInvoice(false)
+      qc.invalidateQueries({ queryKey: ['work-order', id] })
+      qc.invalidateQueries({ queryKey: ['work-orders'] })
+    },
+    onError: (e) => toast.error(getApiErrorMessage(e, 'فشل إنشاء الفاتورة')),
   })
 
   if (isLoading || !wo) return <div className="p-6"><SkeletonTable rows={5} cols={1} /></div>
@@ -388,9 +405,11 @@ function WorkOrderDetail({ id }: { id: string }) {
       <section>
         <div className="flex items-center justify-between mb-2">
           <h3 className="text-xs uppercase tracking-wider text-gray-500">الدفع</h3>
-          <Button size="sm" variant="ghost" onClick={() => setPaymentOpen(true)}>
-            <CircleDollarSign className="w-3 h-3" /> تسجيل دفعة
-          </Button>
+          <div className="flex items-center gap-1">
+            <Button size="sm" variant="ghost" onClick={() => setPaymentOpen(true)}>
+              <CircleDollarSign className="w-3 h-3" /> تسجيل دفعة
+            </Button>
+          </div>
         </div>
         <div className="grid grid-cols-3 gap-2">
           <SmallStat label="الإجمالي" value={`${formatMoney(total)} ج`} color="text-gray-100" />
@@ -403,6 +422,53 @@ function WorkOrderDetail({ id }: { id: string }) {
             {wo.paidAt && <> · {formatDateTime(wo.paidAt, { dateStyle: 'short', timeStyle: 'short' })}</>}
           </p>
         )}
+
+        {/* Invoice generation + print receipt */}
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-700">
+          {wo.invoiceId ? (
+            <div className="flex items-center gap-2 flex-1">
+              <Badge variant="success" dot>
+                فاتورة {wo.invoice?.invoiceNumber ?? wo.invoiceId.slice(0, 8)}
+              </Badge>
+            </div>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="flex-1 border-cyan-600 text-cyan-400 hover:bg-cyan-900/30"
+              loading={invoicePending}
+              disabled={wo.status === 'cancelled' || wo.status === 'received'}
+              onClick={() => setIssuingInvoice(true)}
+            >
+              <FileText className="w-3 h-3" /> إصدار فاتورة
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => printWorkOrderReceipt({
+              ticketNumber: wo.ticketNumber,
+              invoiceNumber: wo.invoice?.invoiceNumber,
+              createdAt: wo.createdAt,
+              customerName: wo.customer?.fullName,
+              paymentMethodName: wo.paymentMethod?.name,
+              status: wo.status,
+              services: wo.services.map((l) => ({
+                name: l.service.name,
+                quantity: l.quantity,
+                unitPrice: Number(l.unitPrice),
+                lineTotal: Number(l.unitPrice) * l.quantity,
+              })),
+              estimatedTotal: wo.estimatedTotal ? Number(wo.estimatedTotal) : undefined,
+              finalTotal: wo.finalTotal ? Number(wo.finalTotal) : undefined,
+              paidAmount: Number(wo.paidAmount),
+              diagnosisNotes: wo.diagnosisNotes ?? undefined,
+              workNotes: wo.workNotes ?? undefined,
+            })}
+          >
+            <Printer className="w-3 h-3" /> طباعة
+          </Button>
+        </div>
       </section>
 
       {/* Notes */}
@@ -437,6 +503,37 @@ function WorkOrderDetail({ id }: { id: string }) {
           ))}
         </div>
       </section>
+
+      {/* Invoice confirmation */}
+      {issuingInvoice && (
+        <Modal
+          open
+          title="إصدار فاتورة"
+          onClose={() => setIssuingInvoice(false)}
+          footer={
+            <div className="flex gap-2 justify-end">
+              <Button variant="secondary" onClick={() => setIssuingInvoice(false)} disabled={invoicePending}>إلغاء</Button>
+              <Button
+                className="bg-cyan-600 hover:bg-cyan-500 text-white"
+                loading={invoicePending}
+                onClick={() => issueInvoice()}
+              >
+                <FileText className="w-4 h-4" /> إصدار الفاتورة
+              </Button>
+            </div>
+          }
+        >
+          <div className="text-sm text-gray-300 space-y-2">
+            <p>سيتم إنشاء فاتورة مكتملة (<span className="font-mono text-cyan-400">SVC-…</span>) بناءً على الخدمات المسجلة في هذا الطلب.</p>
+            {wo.paymentMethod ? (
+              <p>طريقة الدفع: <span className="text-gray-100 font-medium">{wo.paymentMethod.name}</span></p>
+            ) : (
+              <p className="text-warning-400">⚠️ لا توجد طريقة دفع مسجلة — سجّل دفعة أولاً ثم أصدر الفاتورة.</p>
+            )}
+            <p className="text-xs text-gray-500">لا يمكن التراجع عن هذه العملية.</p>
+          </div>
+        </Modal>
+      )}
 
       {/* Modals */}
       {transitionTarget && (

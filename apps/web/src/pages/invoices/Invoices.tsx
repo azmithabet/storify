@@ -16,9 +16,11 @@ import { getApiErrorMessage } from '@/lib/api-error'
 
 interface InvoiceItem {
   id: string
-  variantId: string
+  variantId?: string       // null for service line items
+  serviceId?: string       // set for service line items
+  lineDescription?: string // snapshot of service name
   productName: string
-  variantSku: string
+  variantSku?: string
   quantity: number
   unitPrice: number
   totalPrice: number
@@ -40,6 +42,7 @@ interface Invoice {
   items?: InvoiceItem[]
 }
 
+// Only product items can be returned (service items have no stock to restock)
 interface ReturnItem { itemId: string; variantId: string; quantity: number; maxQty: number; productName: string; variantSku: string }
 
 const LIMIT = 20
@@ -47,14 +50,17 @@ const LIMIT = 20
 function ReturnModal({ invoice, onClose }: { invoice: Invoice; onClose: () => void }) {
   const qc = useQueryClient()
   const [returnItems, setReturnItems] = useState<ReturnItem[]>(
-    (invoice.items ?? []).map((i) => ({
-      itemId: i.id,
-      variantId: i.variantId,
-      quantity: 0,
-      maxQty: i.quantity,
-      productName: i.productName,
-      variantSku: i.variantSku,
-    }))
+    // Service items (no variantId) cannot be returned — filter them out
+    (invoice.items ?? [])
+      .filter((i): i is InvoiceItem & { variantId: string } => !!i.variantId)
+      .map((i) => ({
+        itemId: i.id,
+        variantId: i.variantId,
+        quantity: 0,
+        maxQty: i.quantity,
+        productName: i.productName,
+        variantSku: i.variantSku ?? i.lineDescription ?? '—',
+      }))
   )
   const [returnType, setReturnType] = useState<'refund' | 'credit'>('refund')
   const [reason, setReason] = useState('')
@@ -341,7 +347,11 @@ export default function Invoices() {
                   <div key={item.id} className="flex justify-between text-sm py-2 border-b border-gray-700 last:border-0">
                     <div>
                       <p className="text-gray-100">{item.productName}</p>
-                      <p className="text-xs"><span className="num-code">{item.variantSku}</span> × <span className="font-numeric num num-muted">{item.quantity}</span></p>
+                      {item.variantSku ? (
+                        <p className="text-xs"><span className="num-code">{item.variantSku}</span> × <span className="font-numeric num num-muted">{item.quantity}</span></p>
+                      ) : (
+                        <p className="text-xs text-cyan-500/70">{item.lineDescription ?? 'خدمة'} × {item.quantity}</p>
+                      )}
                     </div>
                     <Money value={item.totalPrice} />
                   </div>

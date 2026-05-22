@@ -30,7 +30,7 @@ import { etaRoutes } from './modules/eta/eta.routes'
 import { billingRoutes } from './modules/billing/billing.routes'
 import { adminRoutes } from './modules/admin/admin.routes'
 import { seedOwnerFromEnv } from './modules/admin/admin.auth.service'
-import { migrateAllTenants } from '@storify/database'
+import { migrateAllTenants } from '@hesba/database'
 import { authenticate } from './shared/middleware/auth.middleware'
 import { requireUnderLimit } from './shared/middleware/limit.middleware'
 import { startEtaWorker } from './jobs/eta-submission.job'
@@ -111,8 +111,42 @@ app.setErrorHandler((error, request, reply) => {
 })
 
 // ─── Public routes (no tenant required) ──────────────────────────────────────
-app.get('/health', async () => {
-  return { status: 'ok', env: config.NODE_ENV, timestamp: new Date().toISOString() }
+// Migration state is published here for liveness probes / on-call dashboards.
+// `migrateAllTenants` is fire-and-forget at startup (so health checks don't
+// block on slow migrations), but if some tenants fail to migrate we still
+// want that to be visible — not buried in logs.
+interface MigrationState {
+  status: 'pending' | 'ok' | 'partial' | 'failed'
+  ok: number
+  failed: number
+  errors: Array<{ tenantId: string; err: string }>
+  finishedAt: string | null
+}
+const migrationState: MigrationState = {
+  status: 'pending',
+  ok: 0,
+  failed: 0,
+  errors: [],
+  finishedAt: null,
+}
+
+app.get('/health', async (_req, reply) => {
+  // If any tenant migration failed, surface it as a 503 so orchestrators
+  // (Railway / k8s) can see the degraded state. Pending and ok stay 200.
+  const status = migrationState.status === 'failed' ? 503 : 200
+  return reply.status(status).send({
+    status: status === 200 ? 'ok' : 'degraded',
+    env: config.NODE_ENV,
+    timestamp: new Date().toISOString(),
+    migrations: {
+      status: migrationState.status,
+      ok: migrationState.ok,
+      failed: migrationState.failed,
+      // Don't dump full error details to anonymous callers — surfaces tenant
+      // ids and stack info. Just a count.
+      finishedAt: migrationState.finishedAt,
+    },
+  })
 })
 
 // ─── API surface — CORS registered here so static assets bypass it ──────────
@@ -175,7 +209,19 @@ app.register(async function apiContext(api) {
   // ─── Tenant Settings ──────────────────────────────────────────────────────
   sub.get('/api/settings', { preHandler: [authenticate] }, async (request, reply) => {
     const s = await request.tenantDb.tenantSetting.findFirst()
-    return reply.send({ success: true, data: s })
+    if (!s) return reply.send({ success: true, data: s })
+    // Never leak the encrypted ETA secrets to the client. Replace them with
+    // booleans so the UI can show "configured ✓" without exposing values.
+    const { etaClientId, etaClientSecret, etaSigningCert, ...safe } = s
+    return reply.send({
+      success: true,
+      data: {
+        ...safe,
+        etaClientIdSet: !!etaClientId,
+        etaClientSecretSet: !!etaClientSecret,
+        etaSigningCertSet: !!etaSigningCert,
+      },
+    })
   })
 
   sub.patch('/api/settings', { preHandler: [authenticate] }, async (request, reply) => {
@@ -191,18 +237,127 @@ app.register(async function apiContext(api) {
       loyaltyPointValue: z.coerce.number().min(0).optional(),
       printTemplate: z.string().optional(),
       dailySalesTarget: z.coerce.number().min(0).optional(),
-      // ETA toggle — owners can opt out if VAT-exempt. The actual taxpayer
-      // credentials (id, client_id, client_secret, signing cert) are handled
+      // ETA toggle — owners can opt out if VAT-exempt. The encrypted
+      // credentials (client_id, client_secret, signing cert) are handled
       // by the dedicated ETA enrollment flow because they need encryption
       // at rest via APP_ENCRYPTION_KEY.
       etaEnabled: z.boolean().optional(),
+      // ETA issuer registration — public business data, no encryption needed.
+      // Must match what the merchant registered on invoicing.eta.gov.eg;
+      // mismatches cause ETA to reject submissions.
+      // Setting any value to '' clears it (sent as null to the DB).
+      etaTaxpayerId: z.string().trim().max(50).optional(),
+      etaActivityCode: z.string().trim().max(20).optional(),
+      etaBranchCode: z.string().trim().max(20).optional(),
+      etaIssuerName: z.string().trim().max(500).optional(),
+      etaAddressGovernate: z.string().trim().max(50).optional(),
+      etaAddressRegionCity: z.string().trim().max(100).optional(),
+      etaAddressStreet: z.string().trim().max(200).optional(),
+      etaAddressBuilding: z.string().trim().max(50).optional(),
     })
     const parsed = schema.safeParse(request.body)
     if (!parsed.success) return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
     const existing = await request.tenantDb.tenantSetting.findFirst()
     if (!existing) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الإعدادات غير موجودة' } })
-    const updated = await request.tenantDb.tenantSetting.update({ where: { id: existing.id }, data: parsed.data })
-    return reply.send({ success: true, data: updated })
+
+    // Treat empty strings on the ETA text fields as "clear it" so the owner
+    // can roll back a setting from the UI without an extra DELETE endpoint.
+    // The job's missingIssuer guard relies on NULL to mean "not configured",
+    // so '' must be normalized to null here.
+    const ETA_NULLABLE = [
+      'etaTaxpayerId', 'etaActivityCode', 'etaIssuerName',
+      'etaAddressGovernate', 'etaAddressRegionCity',
+      'etaAddressStreet', 'etaAddressBuilding',
+    ] as const
+    const data: Record<string, unknown> = { ...parsed.data }
+    for (const key of ETA_NULLABLE) {
+      if (data[key] === '') data[key] = null
+    }
+
+    const updated = await request.tenantDb.tenantSetting.update({ where: { id: existing.id }, data })
+    // Re-mask before returning (the update result includes the encrypted secrets).
+    const { etaClientId, etaClientSecret, etaSigningCert, ...safe } = updated
+    return reply.send({
+      success: true,
+      data: {
+        ...safe,
+        etaClientIdSet: !!etaClientId,
+        etaClientSecretSet: !!etaClientSecret,
+        etaSigningCertSet: !!etaSigningCert,
+      },
+    })
+  })
+
+  // ─── ETA encrypted credentials ──────────────────────────────────────────────
+  // Separate from PATCH /settings because these are secrets: encrypted at rest
+  // with APP_ENCRYPTION_KEY, write-only (never returned), and each field is
+  // only touched when a non-empty value is supplied (so saving the wizard
+  // without re-typing a secret keeps the existing one).
+  sub.put('/api/settings/eta/credentials', { preHandler: [authenticate] }, async (request, reply) => {
+    const { z } = await import('zod')
+    const { encrypt } = await import('@/shared/utils/encryption')
+    const schema = z.object({
+      etaClientId: z.string().trim().optional(),
+      etaClientSecret: z.string().trim().optional(),
+      etaSigningCert: z.string().trim().optional(),
+    })
+    const parsed = schema.safeParse(request.body)
+    if (!parsed.success) {
+      return reply.status(400).send({ success: false, error: { code: 'validation_error', message: parsed.error.errors[0].message } })
+    }
+    if (!config.APP_ENCRYPTION_KEY) {
+      return reply.status(503).send({ success: false, error: { code: 'encryption_unavailable', message: 'تشفير الخادم غير مهيأ — تواصل مع الدعم' } })
+    }
+
+    const existing = await request.tenantDb.tenantSetting.findFirst()
+    if (!existing) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الإعدادات غير موجودة' } })
+
+    // Encrypt only the fields that arrived with a value. Omitted/empty → untouched.
+    const data: Record<string, string> = {}
+    if (parsed.data.etaClientId) data.etaClientId = encrypt(parsed.data.etaClientId)
+    if (parsed.data.etaClientSecret) data.etaClientSecret = encrypt(parsed.data.etaClientSecret)
+    if (parsed.data.etaSigningCert) data.etaSigningCert = encrypt(parsed.data.etaSigningCert)
+
+    if (Object.keys(data).length === 0) {
+      return reply.status(400).send({ success: false, error: { code: 'no_fields', message: 'لم يتم إرسال أي بيانات للحفظ' } })
+    }
+
+    await request.tenantDb.tenantSetting.update({ where: { id: existing.id }, data })
+    return reply.send({ success: true, data: { saved: Object.keys(data) } })
+  })
+
+  // ─── ETA connection test ──────────────────────────────────────────────────
+  // Decrypts the stored credentials and performs a real OAuth handshake with
+  // ETA's /connect/token. Lets the merchant confirm enrollment before the
+  // first invoice is issued, instead of discovering a bad secret at submit time.
+  sub.post('/api/settings/eta/test', { preHandler: [authenticate] }, async (request, reply) => {
+    const { decrypt } = await import('@/shared/utils/encryption')
+    const { EtaClient } = await import('@/modules/eta/eta.client')
+
+    const s = await request.tenantDb.tenantSetting.findFirst()
+    if (!s) return reply.status(404).send({ success: false, error: { code: 'not_found', message: 'الإعدادات غير موجودة' } })
+    if (!s.etaClientId || !s.etaClientSecret) {
+      return reply.send({ success: false, message: 'بيانات الاعتماد (Client ID و Client Secret) غير مكتملة' })
+    }
+
+    let clientId: string
+    let clientSecret: string
+    try {
+      clientId = decrypt(s.etaClientId)
+      clientSecret = decrypt(s.etaClientSecret)
+    } catch {
+      return reply.send({ success: false, message: 'تعذّر فك تشفير بيانات الاعتماد — أعد إدخالها' })
+    }
+
+    const isProd = s.etaEnvironment === 'production'
+    const client = new EtaClient(clientId, clientSecret, isProd)
+    try {
+      await client.testConnection()
+      return reply.send({ success: true, message: isProd ? 'الاتصال ناجح ✓ (بيئة الإنتاج)' : 'الاتصال ناجح ✓ (بيئة الاختبار preprod)' })
+    } catch (err) {
+      request.log.warn({ err }, 'eta_test_connection_failed')
+      return reply.send({ success: false, message: 'فشل الاتصال بمنظومة ETA — تأكد من Client ID و Client Secret والبيئة' })
+    }
   })
 
   // ─── Currencies ───────────────────────────────────────────────────────────
@@ -274,20 +429,63 @@ const start = async () => {
     // migration doesn't delay startup health checks; per-tenant errors are
     // logged but never thrown. New SQL files in packages/database/migrations/tenant
     // are picked up automatically on the next boot.
+    //
+    // The result is published to `migrationState` so /health can surface a 503
+    // when migrations fail — otherwise a partially-broken deploy would look
+    // healthy and the orchestrator wouldn't roll back.
     migrateAllTenants()
-      .then((r) => app.log.info({ result: r }, 'tenant_migrations_applied'))
-      .catch((err) => app.log.error({ err }, 'tenant_migrations_failed'))
+      .then((r) => {
+        migrationState.ok = r.ok
+        migrationState.failed = r.failed
+        migrationState.errors = r.errors
+        migrationState.finishedAt = new Date().toISOString()
+        migrationState.status = r.failed === 0 ? 'ok' : r.ok === 0 ? 'failed' : 'partial'
+        app.log.info({ result: r }, 'tenant_migrations_applied')
+      })
+      .catch((err) => {
+        migrationState.status = 'failed'
+        migrationState.finishedAt = new Date().toISOString()
+        app.log.error({ err }, 'tenant_migrations_failed')
+      })
 
     // Start background workers
-    startEtaWorker()
-    startDunningWorker()
+    const etaWorker = startEtaWorker()
+    const dunningWorker = startDunningWorker()
     await scheduleDunning()
-    startReminderWorker()
+    const reminderWorker = startReminderWorker()
     await scheduleReminders()
-    startTrialExpiryWorker()
+    const trialWorker = startTrialExpiryWorker()
     await scheduleTrialExpiry()
-    startRenewalWorker()
+    const renewalWorker = startRenewalWorker()
     await scheduleRenewal()
+
+    // ─── Graceful shutdown ───────────────────────────────────────────────────
+    // Rolling deploys (Railway, k8s) send SIGTERM and expect the process to
+    // drain in-flight requests and BullMQ jobs before exiting. Without this
+    // handler the process is killed mid-request and BullMQ workers leave
+    // jobs in `active` state until lock expiry. tini (entrypoint in the
+    // Dockerfile) forwards SIGTERM cleanly to PID 1 = node.
+    const workers = [etaWorker, dunningWorker, reminderWorker, trialWorker, renewalWorker]
+    let shuttingDown = false
+    const shutdown = async (signal: string) => {
+      if (shuttingDown) return
+      shuttingDown = true
+      app.log.info({ signal }, 'shutdown_initiated')
+      // 25s budget; orchestrators typically give 30s before SIGKILL.
+      const timeout = setTimeout(() => {
+        app.log.error('shutdown_timed_out — forcing exit')
+        process.exit(1)
+      }, 25_000).unref()
+      try {
+        await app.close()
+        await Promise.all(workers.map((w) => w.close().catch(() => {})))
+      } finally {
+        clearTimeout(timeout)
+        process.exit(0)
+      }
+    }
+    process.on('SIGTERM', () => void shutdown('SIGTERM'))
+    process.on('SIGINT', () => void shutdown('SIGINT'))
   } catch (err) {
     app.log.error(err)
     process.exit(1)

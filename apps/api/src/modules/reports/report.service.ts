@@ -1,6 +1,6 @@
-import type { TenantPrismaClient } from '@storify/database'
+import type { TenantPrismaClient } from '@hesba/database'
 import { redis } from '../../config/redis'
-import { toDecimal, ZERO } from '../../shared/utils/decimal'
+import { toDecimal } from '../../shared/utils/decimal'
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 

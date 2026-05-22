@@ -232,7 +232,7 @@ export async function customerRoutes(app: FastifyInstance) {
 
       const ExcelJS = await import('exceljs')
       const wb = new ExcelJS.default.Workbook()
-      wb.creator = 'Storify'
+      wb.creator = 'Hesba'
 
       const headerStyle = (row: import('exceljs').Row) => {
         row.eachCell((cell) => {
@@ -333,7 +333,10 @@ export async function customerRoutes(app: FastifyInstance) {
     }
 
     const buf = await file.toBuffer()
-    const text = buf.toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^﻿/, '')
+    // Strip UTF-8 BOM (U+FEFF) that Excel prepends to CSV exports. Using the
+    // Unicode escape form keeps the source file ASCII-clean and avoids
+    // lint's no-irregular-whitespace flag on the literal char.
+    const text = buf.toString('utf-8').replace(/\r\n/g, '\n').replace(/\r/g, '\n').replace(/^\uFEFF/, '')
     const lines = text.split('\n').filter((l) => l.trim())
     if (lines.length < 2) {
       return reply.status(400).send({ success: false, error: { code: 'empty_file', message: 'الملف فارغ أو لا يحتوي على بيانات' } })

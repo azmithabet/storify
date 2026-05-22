@@ -1,4 +1,4 @@
-import type { TenantPrismaClient } from '@storify/database'
+import type { TenantPrismaClient } from '@hesba/database'
 import { Decimal, toDecimal, roundMoney, ZERO } from '../../shared/utils/decimal'
 import { calculateFee } from '../../shared/utils/fee'
 import type { CreateInvoiceInput, ReturnInvoiceInput } from './invoice.schema'
@@ -387,11 +387,18 @@ export async function createInvoice(
       })
     }
 
-    // Generate invoice number: INV-YYYYMMDD-{last6 of UUID}
+    // Generate invoice number from a per-tenant sequence (migration 015).
+    // Format: INV-YYYYMMDD-{6+ digit zero-padded sequence}. The sequence is
+    // monotonic and scoped to the tenant schema, so two concurrent invoices
+    // can never claim the same number — replacing the older UUID-suffix
+    // approach that had a ~1-in-16.7M birthday collision per invoice.
     const now = new Date()
     const datePart = now.toISOString().slice(0, 10).replace(/-/g, '')
-    const suffix = invoice.id.replace(/-/g, '').slice(-6).toUpperCase()
-    const invoiceNumber = `INV-${datePart}-${suffix}`
+    const seqRows = await tx.$queryRawUnsafe<Array<{ nextval: bigint }>>(
+      `SELECT nextval('invoice_number_seq') AS nextval`,
+    )
+    const seq = seqRows[0].nextval.toString().padStart(6, '0')
+    const invoiceNumber = `INV-${datePart}-${seq}`
     await tx.invoice.update({ where: { id: invoice.id }, data: { invoiceNumber } })
 
     // Award loyalty points to customer if enabled

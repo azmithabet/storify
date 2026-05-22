@@ -1,11 +1,11 @@
 import { z } from 'zod'
 import type { FastifyInstance } from 'fastify'
-import { Prisma } from '@storify/database'
+import { Prisma } from '@hesba/database'
 import { config } from '../../config/env'
 import { masterDb, getTenantDb } from '../../config/database'
 import { redis } from '../../config/redis'
 import { hashPassword } from '../../shared/utils/password'
-import { migrateAllTenants } from '@storify/database'
+import { migrateAllTenants } from '@hesba/database'
 import {
   authenticatePlatformAdmin,
   requireOwner,
@@ -26,8 +26,16 @@ function cookieOpts(maxAge: number) {
   return {
     httpOnly: true,
     secure: config.NODE_ENV === 'production',
-    sameSite: 'lax' as const,
-    path: '/',
+    // Strict (not Lax) for the platform-admin cookie: tenant SPAs and admin
+    // SPA share an eTLD+1, so a Lax cookie travels on top-level navigations
+    // initiated from any tenant subdomain. Combined with an XSS on a tenant,
+    // that's privilege escalation. Strict blocks the cookie on cross-site
+    // requests entirely; the admin UI is only entered directly, so usability
+    // doesn't suffer.
+    sameSite: 'strict' as const,
+    // Path-scope so the cookie is only sent to /api/admin/* endpoints; it
+    // shouldn't be attached to tenant API calls either.
+    path: '/api/admin',
     maxAge,
   }
 }
@@ -111,7 +119,7 @@ export async function adminRoutes(app: FastifyInstance) {
     }
     const data = await getPlatformRefreshTokenData(token)
     if (!data) {
-      reply.clearCookie(REFRESH_COOKIE, { path: '/' })
+      reply.clearCookie(REFRESH_COOKIE, { path: '/api/admin' })
       return reply.status(401).send({
         success: false,
         error: { code: 'invalid_refresh_token', message: 'الجلسة منتهية' },
@@ -120,7 +128,7 @@ export async function adminRoutes(app: FastifyInstance) {
     const admin = await masterDb.platformAdmin.findUnique({ where: { id: data.adminId } })
     if (!admin || !admin.isActive) {
       await invalidatePlatformRefreshToken(token)
-      reply.clearCookie(REFRESH_COOKIE, { path: '/' })
+      reply.clearCookie(REFRESH_COOKIE, { path: '/api/admin' })
       return reply.status(401).send({
         success: false,
         error: { code: 'admin_inactive', message: 'الحساب غير مفعّل' },
@@ -143,7 +151,7 @@ export async function adminRoutes(app: FastifyInstance) {
   app.post('/logout', async (request, reply) => {
     const token = request.cookies[REFRESH_COOKIE]
     if (token) await invalidatePlatformRefreshToken(token)
-    reply.clearCookie(REFRESH_COOKIE, { path: '/' })
+    reply.clearCookie(REFRESH_COOKIE, { path: '/api/admin' })
     return reply.send({ success: true })
   })
 

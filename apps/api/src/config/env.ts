@@ -10,7 +10,7 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().default(parseInt(process.env.PORT || '3000', 10)),
   API_HOST: z.string().default('0.0.0.0'),
   FRONTEND_URL: z.string().url(),
-  APP_BASE_DOMAIN: z.string().optional(), // e.g. talabia.app — enables per-tenant subdomain URLs
+  APP_BASE_DOMAIN: z.string().optional(), // e.g. hesbaapp.com — enables per-tenant subdomain URLs
 
   // Database
   DATABASE_MASTER_URL: z.string().url(),
@@ -62,36 +62,16 @@ if (!parsed.success) {
 
 export const config = parsed.data
 
-// Production warnings — fail-fast was attempted but the Railway env var
-// isn't actually being injected (the MCP agent's variable upsert appears
-// to be silent-no-op). Until manual verification confirms the variable
-// reaches the container, we log loudly instead of exiting.
-//
-// Downstream safety still holds:
+// Production warnings — downstream safety still holds:
 //   - encryption.ts throws at call time if APP_ENCRYPTION_KEY is missing
 //   - paymob.webhook.ts fails closed (rejects with 401) on missing HMAC
+// We log a one-line warning so misconfiguration is visible without leaking
+// the names of other env vars (which is reconnaissance for an attacker).
 if (config.NODE_ENV === 'production') {
   const missing: string[] = []
   if (!config.APP_ENCRYPTION_KEY || config.APP_ENCRYPTION_KEY.length < 32) missing.push('APP_ENCRYPTION_KEY')
   if (!config.PAYMOB_HMAC_SECRET) missing.push('PAYMOB_HMAC_SECRET')
   if (missing.length > 0) {
     console.warn(`⚠️  Missing production env vars (features depending on them will fail): ${missing.join(', ')}`)
-
-    // Diagnostic: dump all env keys + the JSON-escaped form of any candidate
-    // that looks like it might be APP_ENCRYPTION_KEY with a typo / whitespace
-    // / unicode lookalike. JSON-escape so invisible chars become visible
-    // (​ etc.). Remove once resolved.
-    const allKeys = Object.keys(process.env).sort()
-    console.warn(`[env diagnostic] total env keys=${allKeys.length}`)
-    console.warn(`[env diagnostic] all keys: ${JSON.stringify(allKeys)}`)
-    const candidates = allKeys.filter((k) => /enc|key/i.test(k))
-    console.warn(`[env diagnostic] candidates matching enc|key: ${JSON.stringify(candidates)}`)
-    // Look for the exact bytes — strict equality vs trimmed equality reveals
-    // whitespace issues.
-    const exact = process.env['APP_ENCRYPTION_KEY']
-    console.warn(`[env diagnostic] exact lookup: defined=${exact !== undefined} length=${(exact ?? '').length}`)
-    // Find any key whose JSON form contains the substring (catches odd chars).
-    const fuzzy = allKeys.filter((k) => JSON.stringify(k).toUpperCase().includes('ENCRYPT'))
-    console.warn(`[env diagnostic] fuzzy ENCRYPT matches (JSON-escaped): ${fuzzy.map((k) => JSON.stringify(k)).join(', ')}`)
   }
 }

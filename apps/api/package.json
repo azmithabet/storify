@@ -1,13 +1,16 @@
 {
-  "name": "@storify/api",
+  "name": "@hesba/api",
   "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc",
+    "build": "tsc && tsc-alias",
     "start": "node dist/index.js",
     "lint": "eslint src --ext .ts",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.525.0",
@@ -20,7 +23,7 @@
     "@fastify/rate-limit": "^9.1.0",
     "@fastify/static": "^7.0.0",
     "@prisma/client": "^5.10.2",
-    "@storify/database": "workspace:*",
+    "@hesba/database": "workspace:*",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.4.2",
     "dayjs": "^1.11.10",
@@ -38,9 +41,15 @@
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20.11.24",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitest/coverage-v8": "^1.6.0",
+    "eslint": "^8.57.0",
     "pino-pretty": "^11.0.0",
     "prisma": "^5.10.2",
+    "tsc-alias": "^1.8.10",
     "tsx": "^4.7.1",
-    "typescript": "^5.4.2"
+    "typescript": "^5.4.2",
+    "vitest": "^1.6.0"
   }
 }

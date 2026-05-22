@@ -19,8 +19,8 @@ export async function tenantMiddleware(
   const baseDomain = config.APP_BASE_DOMAIN
 
   // Resolve subdomain relative to the platform base domain when configured.
-  // Without this, a request to the bare platform host (e.g. "talabia.app") was
-  // treated as if "talabia" were a tenant subdomain — causing 404s on /api/auth/*
+  // Without this, a request to the bare platform host (e.g. "hesbaapp.com") was
+  // treated as if "hesbaapp" were a tenant subdomain — causing 404s on /api/auth/*
   // and every other tenant-scoped route from the marketing/login page.
   let subdomain: string
   if (baseDomain && hostname === baseDomain) {
@@ -42,7 +42,20 @@ export async function tenantMiddleware(
     subdomain = Array.isArray(header) ? header[0] : (header ?? '')
   }
 
-  if (!subdomain || SYSTEM_HOSTS.has(subdomain)) return
+  // Tenant-scoped routes require a tenant context. Falling through silently
+  // would leave `request.tenant` / `request.tenantDb` undefined and the
+  // downstream handler would crash on first access (the global error handler
+  // would then mask it as a generic 500). Return an explicit 400 instead so
+  // callers get a useful error and so this can't be misread as a "feature".
+  if (!subdomain || SYSTEM_HOSTS.has(subdomain)) {
+    return reply.status(400).send({
+      success: false,
+      error: {
+        code: 'tenant_required',
+        message: 'يلزم تحديد المتجر (subdomain) للوصول إلى هذا المسار',
+      },
+    })
+  }
 
   const cacheKey = `tenant:${subdomain}`
 

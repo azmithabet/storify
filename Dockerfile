@@ -20,46 +20,66 @@ COPY packages ./packages
 COPY apps ./apps
 
 # Generate Prisma clients for master + tenant schemas
-RUN pnpm --filter @storify/database db:generate
+RUN pnpm --filter @hesba/database db:generate
 
 # Build the React frontend (output → apps/web/dist)
-RUN pnpm --filter @storify/web build
+RUN pnpm --filter @hesba/web build
+
+# Compile the API to JS (output → apps/api/dist) and rewrite `@/` path aliases
+# to relative paths so plain `node` can resolve them at runtime.
+RUN pnpm --filter @hesba/api build
 
 # ─── Production image ─────────────────────────────────────────────────────────
+# Fresh stage with only production dependencies. tsx, eslint, vitest, and the
+# TypeScript compiler are kept off the runner image because they only exist
+# for build — smaller image, smaller attack surface.
 FROM node:20-alpine AS runner
-RUN apk add --no-cache openssl && corepack enable && corepack prepare pnpm@10 --activate
+RUN apk add --no-cache openssl tini && corepack enable && corepack prepare pnpm@10 --activate
 
 WORKDIR /app
 
-# Copy workspace manifests
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml tsconfig.base.json ./
+# Workspace manifests (needed so pnpm can resolve workspace:* references)
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/database/package.json ./packages/database/
 COPY apps/api/package.json ./apps/api/
-# No apps/web in production — only its built dist is needed
 
-# Install all deps (tsx + prisma CLI are devDeps needed at runtime)
-RUN pnpm install --frozen-lockfile
+# Production-only deps. db:seed and migrate-deploy invoke the prisma CLI, but
+# we'll grab the prisma binary from the builder stage rather than re-installing
+# it as a runtime dep.
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
 
-# Copy Prisma generated clients (gitignored, so must come from builder)
+# Prisma generated clients (gitignored — must come from the builder stage)
 COPY --from=builder /app/packages/database/src ./packages/database/src
 COPY --from=builder /app/packages/database/prisma ./packages/database/prisma
 
-# Copy tenant SQL migrations — runTenantMigrations() reads these at runtime
-# when a new tenant registers (path: __dirname/../migrations/tenant/*.sql)
+# Tenant SQL migrations — runTenantMigrations() reads these at runtime
 COPY --from=builder /app/packages/database/migrations ./packages/database/migrations
 
-# Copy API source (tsx runs it directly — no compile step needed)
-COPY --from=builder /app/apps/api/src ./apps/api/src
-COPY --from=builder /app/apps/api/tsconfig.json ./apps/api/
+# Prisma CLI (a devDep) — copy the binary from the build stage so we can run
+# `prisma migrate deploy` on startup without installing it as a runtime dep.
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
 
-# Copy built frontend
+# Seed script runs via tsx at startup; ship tsx alongside the seed source.
+# Keeps the image small (one dev tool vs all of them).
+COPY --from=builder /app/node_modules/tsx ./node_modules/tsx
+COPY --from=builder /app/node_modules/.bin/tsx ./node_modules/.bin/tsx
+
+# Compiled API code (no source, no tsconfig — plain Node serves dist/index.js)
+COPY --from=builder /app/apps/api/dist ./apps/api/dist
+
+# Built frontend (served statically by the API in production)
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
 ENV NODE_ENV=production
 EXPOSE 3000
 
-# Run migrations + seed plans then start server
-# - prisma runs from packages/database context (exec resolves bin from that package)
-# - db:seed is idempotent (upsert on slug); safe to re-run on every deploy
-# - tsx: use src/index.ts (relative to apps/api), pnpm exec sets cwd to the package
-CMD ["sh", "-c", "pnpm --filter @storify/database exec prisma migrate deploy --schema=prisma/schema.prisma && pnpm --filter @storify/database db:seed && exec env API_PORT=${PORT:-3000} pnpm --filter @storify/api exec tsx src/index.ts"]
+# tini reaps zombies and forwards SIGTERM cleanly to Node so graceful-shutdown
+# handlers fire during rolling deploys.
+ENTRYPOINT ["/sbin/tini", "--"]
+
+# Startup order:
+#   1. prisma migrate deploy — applies any pending master-schema migrations
+#   2. db:seed                — idempotent (upsert on slug)
+#   3. node dist/index.js     — runs compiled JS; no tsx, no on-the-fly transpile
+CMD ["sh", "-c", "pnpm --filter @hesba/database exec prisma migrate deploy --schema=prisma/schema.prisma && pnpm --filter @hesba/database db:seed && exec env API_PORT=${PORT:-3000} node apps/api/dist/index.js"]

@@ -30,13 +30,13 @@ jobs:
       - name: Generate Prisma clients
         run: pnpm db:generate
         env:
-          DATABASE_MASTER_URL: postgresql://postgres:password@localhost:5432/storify_master
+          DATABASE_MASTER_URL: postgresql://postgres:password@localhost:5432/hesba_master
 
       - name: Type-check API
-        run: pnpm --filter @storify/api type-check
+        run: pnpm --filter @hesba/api type-check
 
       - name: Type-check Web
-        run: pnpm --filter @storify/web type-check
+        run: pnpm --filter @hesba/web type-check
 
   lint:
     name: Lint
@@ -51,7 +51,31 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm lint || true   # warn only until lint is fully configured
+      # Lint must pass — `|| true` previously silenced this gate, which meant
+      # nothing automated could catch a regression once tests aren't required.
+      - run: pnpm lint
+
+  test:
+    name: Test (API)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma clients
+        run: pnpm db:generate
+        env:
+          DATABASE_MASTER_URL: postgresql://postgres:password@localhost:5432/hesba_master
+
+      - name: Run API unit tests
+        run: pnpm --filter @hesba/api test
 
   build:
     name: Build
@@ -67,5 +91,14 @@ jobs:
           node-version: 20
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma clients
+        run: pnpm db:generate
+        env:
+          DATABASE_MASTER_URL: postgresql://postgres:password@localhost:5432/hesba_master
+
       - name: Build Web
-        run: pnpm --filter @storify/web build
+        run: pnpm --filter @hesba/web build
+
+      - name: Build API
+        run: pnpm --filter @hesba/api build

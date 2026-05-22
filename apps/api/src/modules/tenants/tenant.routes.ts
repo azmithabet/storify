@@ -1,8 +1,6 @@
 import { FastifyInstance } from 'fastify'
-import { ZodError } from 'zod'
 import { registerTenantSchema } from './tenant.schema'
 import { provisionTenant } from './tenant.service'
-import { config } from '../../config/env'
 
 export async function tenantRoutes(app: FastifyInstance) {
   app.post('/register', async (request, reply) => {

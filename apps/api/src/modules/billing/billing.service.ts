@@ -4,7 +4,7 @@ import { config } from '@/config/env'
 import { PaymobClient, type PaymobBillingData } from './paymob.client'
 import { sendEmail } from '@/shared/utils/email'
 import Decimal from 'decimal.js'
-import { Prisma } from '@storify/database'
+import { Prisma } from '@hesba/database'
 import dayjs from 'dayjs'
 
 /**
@@ -188,7 +188,12 @@ export async function handleWebhookSuccess(params: {
       to: tenant.ownerEmail,
       template: 'payment_succeeded',
       data: { tenantName: tenant.name, amount: `${amountCents / 100} EGP`, period: periodEnd.toLocaleDateString('ar-EG') },
-    }).catch(() => {})
+    }).catch((err) => {
+      // Never throw from a webhook flow over an email failure — payment
+      // state is already persisted. Log so the merchant-success template
+      // doesn't go silent without anyone noticing.
+      console.error('[Billing] email send failed', { template: 'payment_succeeded', tenantId, err: String(err) })
+    })
   }
 }
 
@@ -267,7 +272,12 @@ export async function handleWebhookFailure(params: {
 
   const tenant = await masterDb.tenant.findUnique({ where: { id: tenantId } })
   if (tenant) {
-    await sendEmail({ to: tenant.ownerEmail, template: emailTemplate, data: { tenantName: tenant.name } }).catch(() => {})
+    await sendEmail({ to: tenant.ownerEmail, template: emailTemplate, data: { tenantName: tenant.name } }).catch((err) => {
+      // See note in handleWebhookSuccess — payment state already persisted,
+      // we just need visibility on the failure case (suspension / cancel
+      // notices are time-sensitive for the merchant).
+      console.error('[Billing] email send failed', { template: emailTemplate, tenantId, err: String(err) })
+    })
   }
 }
 

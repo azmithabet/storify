@@ -1,5 +1,5 @@
 import { createHash, randomBytes } from 'crypto'
-import type { TenantPrismaClient } from '@storify/database'
+import type { TenantPrismaClient } from '@hesba/database'
 import { redis } from '../../config/redis'
 import { verifyPassword } from '../../shared/utils/password'
 import { sendPasswordResetEmail } from '../../shared/utils/email'
@@ -185,18 +185,26 @@ export async function resetPassword(
   })
 
   // Best-effort: drop any active sessions for this user so a leaked
-  // refresh token can't outlive the reset.
-  const keys = await redis.keys('refresh:*').catch(() => [] as string[])
-  for (const k of keys) {
-    const raw = await redis.get(k).catch(() => null)
-    if (!raw) continue
-    try {
-      const parsed = JSON.parse(raw) as RefreshTokenData
-      if (parsed.userId === record.userId) await redis.del(k)
-    } catch {
-      // ignore corrupt entries
+  // refresh token can't outlive the reset. Uses SCAN (non-blocking cursor)
+  // instead of KEYS (which blocks Redis O(N) across the whole keyspace —
+  // unsafe in production once the session count grows).
+  let cursor = '0'
+  do {
+    const [next, batch] = await redis
+      .scan(cursor, 'MATCH', 'refresh:*', 'COUNT', 200)
+      .catch(() => ['0', [] as string[]] as const)
+    cursor = next
+    for (const k of batch) {
+      const raw = await redis.get(k).catch(() => null)
+      if (!raw) continue
+      try {
+        const parsed = JSON.parse(raw) as RefreshTokenData
+        if (parsed.userId === record.userId) await redis.del(k)
+      } catch {
+        // ignore corrupt entries
+      }
     }
-  }
+  } while (cursor !== '0')
 }
 
 // ─── Rate limit: forgot-password (5/hour/email, Redis-backed) ────────────────

@@ -1,4 +1,4 @@
-import type { TenantPrismaClient } from '@storify/database'
+import type { TenantPrismaClient } from '@hesba/database'
 import type { AdjustStockInput, CreateTransferInput } from './stock.schema'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -77,20 +77,32 @@ export async function adjustStock(
   input: AdjustStockInput,
   actorId: string,
 ) {
-  const stock = await db.stock.findUnique({
-    where: { uq_stock_variant_branch: { variantId: input.variantId, branchId: input.branchId } },
-  })
-  if (!stock) throw notFound()
+  // Atomic delta with race-safe guard: matches the pattern used by the
+  // invoice/installment paths. Two concurrent +5 adjustments must both stick
+  // (read-then-write would silently overwrite). Negative deltas only succeed
+  // when current quantity ≥ |delta| — matched by the conditional filter.
+  return db.$transaction(async (tx) => {
+    const result = await tx.stock.updateMany({
+      where: {
+        variantId: input.variantId,
+        branchId: input.branchId,
+        // For negative deltas, require enough stock to cover them. Positive
+        // deltas pass the guard trivially (quantity ≥ negative number).
+        ...(input.quantity < 0 ? { quantity: { gte: -input.quantity } } : {}),
+      },
+      data: { quantity: { increment: input.quantity }, updatedAt: new Date() },
+    })
 
-  const newQty = stock.quantity + input.quantity
-  if (newQty < 0) throw badRequest('insufficient_stock')
+    if (result.count === 0) {
+      // Either the stock row doesn't exist or the gate blocked a negative delta.
+      const exists = await tx.stock.findUnique({
+        where: { uq_stock_variant_branch: { variantId: input.variantId, branchId: input.branchId } },
+        select: { variantId: true },
+      })
+      throw exists ? badRequest('insufficient_stock') : notFound()
+    }
 
-  await db.$transaction([
-    db.stock.update({
-      where: { uq_stock_variant_branch: { variantId: input.variantId, branchId: input.branchId } },
-      data: { quantity: newQty, updatedAt: new Date() },
-    }),
-    db.stockMovement.create({
+    await tx.stockMovement.create({
       data: {
         variantId: input.variantId,
         branchId: input.branchId,
@@ -100,11 +112,16 @@ export async function adjustStock(
         note: input.note ?? input.reason,
         reference: null,
       },
-    }),
-  ])
+    })
 
-  const isLow = await checkLowStock(db, input.variantId, input.branchId)
-  return { quantity: newQty, isLowStock: isLow }
+    // Read final quantity inside the transaction so we report exactly what we
+    // just wrote, not a value an unrelated update raced past us.
+    const updated = await tx.stock.findUniqueOrThrow({
+      where: { uq_stock_variant_branch: { variantId: input.variantId, branchId: input.branchId } },
+      select: { quantity: true, minQuantity: true },
+    })
+    return { quantity: updated.quantity, isLowStock: updated.quantity <= updated.minQuantity }
+  })
 }
 
 // ─── Set min quantity ─────────────────────────────────────────────────────────

@@ -1,0 +1,13 @@
+-- Migration 015: Per-tenant sequence for invoice numbers
+--
+-- Previously invoice numbers were generated as
+--   INV-YYYYMMDD-{last 6 hex chars of UUID}
+-- which has a ~1-in-16.7M collision chance per invoice. The existing UNIQUE
+-- constraint catches the collision and aborts the transaction, but the user
+-- sees a generic 500 and has to retry. With enough invoice volume the
+-- collision becomes a recurring papercut.
+--
+-- This migration adds a per-tenant sequence so the suffix is deterministic
+-- and monotonically increasing, eliminating collisions entirely. Existing
+-- invoice_number values are preserved; only new rows use the sequence.
+CREATE SEQUENCE IF NOT EXISTS invoice_number_seq START 1 INCREMENT 1 MINVALUE 1 CACHE 1;

@@ -1,5 +1,5 @@
 import dayjs from 'dayjs'
-import type { TenantPrismaClient } from '@storify/database'
+import type { TenantPrismaClient } from '@hesba/database'
 import { Decimal, toDecimal, roundMoney, ZERO } from '../../shared/utils/decimal'
 import { calculateFee } from '../../shared/utils/fee'
 import type { CreateInstallmentInput, RecordPaymentInput } from './installment.schema'
@@ -200,7 +200,17 @@ export async function createContract(
 
   const interestRate = toDecimal(input.interestRate)
   const monthlyAmount = calcMonthlyAmount(totalAmount, downPayment, input.installmentsCount, interestRate)
-  const contractTotal = roundMoney(downPayment.plus(monthlyAmount.times(input.installmentsCount)))
+
+  // Compute the exact contract total from principal + interest *before*
+  // monthly rounding, so the contract amount the customer signs equals the
+  // sum of payments they actually owe. Without this, `monthly × count` drifts
+  // by ±cents from the real total. The last installment will absorb the
+  // rounding remainder at schedule generation time (see approveContract).
+  const principal = totalAmount.minus(downPayment)
+  const interest = principal
+    .times(interestRate.dividedBy(100))
+    .times(new Decimal(input.installmentsCount).dividedBy(12))
+  const contractTotal = roundMoney(downPayment.plus(principal).plus(interest))
 
   const exchangeRate = toDecimal(currency.rateToBase)
 
@@ -337,14 +347,24 @@ export async function approveContract(
       })
     }
 
-    // Generate payment schedule
+    // Generate payment schedule. The first N-1 installments use the rounded
+    // `monthlyAmount`; the final installment absorbs the rounding remainder
+    // so `sum(schedule) + downPayment == contractTotal` to the cent. Without
+    // this, the customer's signed contract and the schedule sum drift by a
+    // small amount and the contract never closes cleanly.
     const firstDue = dayjs(contract.firstDueDate)
+    const monthly = toDecimal(contract.monthlyAmount)
+    const totalScheduled = toDecimal(contract.totalAmount).minus(toDecimal(contract.downPayment))
+    const lastInstallment = roundMoney(
+      totalScheduled.minus(monthly.times(contract.installmentsCount - 1)),
+    )
     for (let i = 0; i < contract.installmentsCount; i++) {
+      const amount = i === contract.installmentsCount - 1 ? lastInstallment : monthly
       await tx.installmentPayment.create({
         data: {
           contractId,
           installmentNumber: i + 1,
-          amountPaid: contract.monthlyAmount,
+          amountPaid: amount,
           dueDate: firstDue.add(i, 'month').toDate(),
           status: 'pending',
         },

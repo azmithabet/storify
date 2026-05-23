@@ -78,7 +78,7 @@ export default function Login() {
     <div className="min-h-dvh bg-app flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <h1 className="font-display text-4xl font-bold text-brand-400 mb-2">Storify</h1>
+          <h1 className="font-display text-4xl font-bold text-brand-400 mb-2">حِسبة</h1>
           <p className="text-gray-400 text-sm">تسجيل الدخول إلى متجرك</p>
         </div>
 

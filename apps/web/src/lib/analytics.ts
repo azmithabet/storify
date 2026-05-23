@@ -10,7 +10,7 @@
  * Setup:
  *   1. Create a GA4 property in Google Analytics; copy the Measurement ID
  *      (looks like `G-XXXXXXXXXX`)
- *   2. On Railway: storify-app → Variables → add `VITE_GA_MEASUREMENT_ID=G-...`
+ *   2. On Railway: hesba-app → Variables → add `VITE_GA_MEASUREMENT_ID=G-...`
  *   3. Redeploy. Tracking goes live; no code change needed.
  *
  * Verify:

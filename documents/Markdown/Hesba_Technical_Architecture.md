@@ -1,4 +1,4 @@
-# Storify — Technical Architecture Document
+# حِسبة — Technical Architecture Document
 > وثيقة القرارات التقنية والمعمارية
 > **الإصدار:** 1.0.0 | **التاريخ:** أبريل 2026
 
@@ -25,7 +25,7 @@
 ```
 ┌─────────────────────────────────────────────────────┐
 │                  Cloudflare DNS                     │
-│           *.storify.com → Railway API               │
+│           *.hesbaapp.com → Railway API               │
 └──────────────────────┬──────────────────────────────┘
                        │ HTTPS
 ┌──────────────────────▼──────────────────────────────┐
@@ -106,7 +106,7 @@
 ---
 
 ### ADR-004: pnpm Workspaces Monorepo ✅ Accepted
-**القرار:** packages: @storify/api, @storify/web, @storify/database, @storify/shared
+**القرار:** packages: @hesba/api, @hesba/web, @hesba/database, @hesba/shared
 
 **المبرر:**
 - مشاركة TypeScript types بين Frontend وBackend
@@ -501,4 +501,4 @@ redis.setex(`product:${tenantId}:barcode:${barcode}`, 1800, JSON.stringify(produ
 
 ---
 
-*Storify Technical Architecture Document v1.0 — © 2026*
+*حِسبة Technical Architecture Document v1.0 — © 2026*

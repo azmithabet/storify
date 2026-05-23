@@ -43,6 +43,16 @@ export class EtaClient {
     return data.access_token
   }
 
+  /**
+   * Lightweight credential check used by the Settings wizard. Performs the
+   * OAuth client-credentials handshake only — no document is submitted.
+   * Throws if authentication fails (bad client id/secret, wrong environment,
+   * or ETA unreachable).
+   */
+  async testConnection(): Promise<void> {
+    await this.authenticate()
+  }
+
   async submitDocuments(documents: object[]): Promise<EtaSubmitResponse> {
     const token = await this.authenticate()
     const res = await fetch(`${this.baseURL}/api/v1.0/documentsubmissions`, {

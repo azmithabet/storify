@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { Prisma } from '@storify/database'
+import { Prisma } from '@hesba/database'
 import { authenticate, requirePermission } from '../../shared/middleware/auth.middleware'
 import type { JWTPayload } from '../../shared/middleware/auth.middleware'
 import { requireFeature } from '../../shared/middleware/feature.middleware'

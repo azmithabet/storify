@@ -45,7 +45,7 @@ export const useAuthStore = create<AuthState>()(
       },
     }),
     {
-      name: 'storify-auth',
+      name: 'hesba-auth',
       partialize: (state) => ({
         user: state.user,
         accessToken: state.accessToken,

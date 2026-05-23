@@ -1,4 +1,4 @@
-# Storify — Implementation Roadmap v1.2 (for Claude Code)
+# حِسبة — Implementation Roadmap v1.2 (for Claude Code)
 > **The single master execution plan.** Every other doc is a reference; this is the order of operations.
 > **Date:** 2026-05-10 | **Phase 1 target:** ~4 months | **Spec frozen at:** v1.2
 
@@ -26,7 +26,7 @@ Rules:
 ## 1. Session protocol (every session)
 
 At the start of every Claude Code session:
-1. Read this file (`documents/Storify_Implementation_Roadmap.md`)
+1. Read this file (`documents/Hesba_Implementation_Roadmap.md`)
 2. Find the next step where `Done when` is not all green
 3. Read that step's "Read first" docs
 4. Execute the step's Tasks
@@ -43,18 +43,18 @@ At the start of every Claude Code session:
 
 | Doc | When to read |
 |---|---|
-| **`documents/Storify_Implementation_Roadmap.md`** (this file) | Always, at session start |
-| **`documents/Markdown/Storify_Patch_Notes_v1.2.md`** | Always, at session start |
-| `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` | Primary technical reference — schema, middleware, code patterns |
-| `documents/Markdown/Storify_Logic_Flow_Document.md` | Before implementing a business flow (POS, installments, returns) |
-| `documents/Markdown/Storify_Design_System.md` | Before any UI work — tokens, components, RTL rules |
-| `documents/Markdown/Storify_ERD_Document.md` | When designing Prisma models — table-by-table reference |
-| `documents/Markdown/Storify_Payment_Fees_Update.md` | Step 07 only — fee calculation deep dive |
-| `documents/Markdown/Storify_Technical_Architecture.md` | Reference only — architectural decisions explained |
-| `documents/Markdown/Storify_Business_Document.md` | Reference only — pricing, market context |
-| `documents/Claude_Code/STORIFY_MASTER_DOCUMENT.md` | Reference only — older v1.0 doc, superseded by COMPLETE_CONTEXT v1.2 |
+| **`documents/Hesba_Implementation_Roadmap.md`** (this file) | Always, at session start |
+| **`documents/Markdown/Hesba_Patch_Notes_v1.2.md`** | Always, at session start |
+| `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` | Primary technical reference — schema, middleware, code patterns |
+| `documents/Markdown/Hesba_Logic_Flow_Document.md` | Before implementing a business flow (POS, installments, returns) |
+| `documents/Markdown/Hesba_Design_System.md` | Before any UI work — tokens, components, RTL rules |
+| `documents/Markdown/Hesba_ERD_Document.md` | When designing Prisma models — table-by-table reference |
+| `documents/Markdown/Hesba_Payment_Fees_Update.md` | Step 07 only — fee calculation deep dive |
+| `documents/Markdown/Hesba_Technical_Architecture.md` | Reference only — architectural decisions explained |
+| `documents/Markdown/Hesba_Business_Document.md` | Reference only — pricing, market context |
+| `documents/Claude_Code/HESBA_MASTER_DOCUMENT.md` | Reference only — older v1.0 doc, superseded by COMPLETE_CONTEXT v1.2 |
 
-**Conflict resolution:** if two docs disagree, `Storify_Patch_Notes_v1.2.md` wins, then `STORIFY_COMPLETE_CONTEXT.md` v1.2.
+**Conflict resolution:** if two docs disagree, `Hesba_Patch_Notes_v1.2.md` wins, then `HESBA_COMPLETE_CONTEXT.md` v1.2.
 
 ---
 
@@ -80,7 +80,7 @@ At the start of every Claude Code session:
 - [x] v1.2 patches applied to docs
 - [x] D1 ETA full integration confirmed
 - [x] D2 Paymob confirmed
-- [ ] User has read `Storify_Patch_Notes_v1.2.md` end-to-end
+- [ ] User has read `Hesba_Patch_Notes_v1.2.md` end-to-end
 
 ---
 
@@ -100,8 +100,8 @@ Phase 1 has **17 steps** organized in 3 tracks:
 
 **Read first:**
 - `documents/Claude_Code/STEP_01_PROJECT_SETUP.md` (the existing detailed walkthrough)
-- `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` Section 13 (Folder Structure)
-- `documents/Claude_Code/STORIFY_MASTER_DOCUMENT.md` Step 01 (package.json deps — note v1.2 additions: `bcryptjs`, `decimal.js`, `lru-cache`, `@types/bcryptjs`)
+- `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` Section 13 (Folder Structure)
+- `documents/Claude_Code/HESBA_MASTER_DOCUMENT.md` Step 01 (package.json deps — note v1.2 additions: `bcryptjs`, `decimal.js`, `lru-cache`, `@types/bcryptjs`)
 
 **Tasks:**
 1. Create folder structure per Section 13 (`apps/api`, `apps/web`, `packages/database`, `packages/shared`, `infrastructure/docker`)
@@ -144,8 +144,8 @@ pnpm type-check             # zero errors
 **Goal:** Master DB tables (plans, tenants, subscriptions, payment_attempts) created and seeded.
 
 **Read first:**
-- `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` Sections 4 (Master DB schema) + 15 (Plans seed)
-- `documents/Markdown/Storify_Patch_Notes_v1.2.md` (tenants field naming, max_users=3, payment_attempts table)
+- `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` Sections 4 (Master DB schema) + 15 (Plans seed)
+- `documents/Markdown/Hesba_Patch_Notes_v1.2.md` (tenants field naming, max_users=3, payment_attempts table)
 
 **Tasks:**
 1. `cd packages/database && pnpm init`
@@ -160,7 +160,7 @@ pnpm type-check             # zero errors
 6. Run `pnpm db:migrate --name init_master_schema`
 7. Seed file `packages/database/src/seeds/master.seed.ts` with 3 plans (Starter 199 EGP / Pro 499 / Enterprise 999) — **max_users: 3** for Starter
 8. Run `pnpm db:seed`
-9. Wire `apps/api` to `@storify/database` workspace dep
+9. Wire `apps/api` to `@hesba/database` workspace dep
 10. Add `GET /plans` to API returning seeded plans
 
 **Verify:**
@@ -188,8 +188,8 @@ curl http://localhost:3000/plans                # 3 plans returned
 **Goal:** Can create a new tenant via API; tenant middleware resolves subdomain → schema → req.tenantDb.
 
 **Read first:**
-- `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` Section 5 (Multi-tenant — tenant middleware, LRU cache, provisioning, migration runner)
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 1 (tenant registration)
+- `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` Section 5 (Multi-tenant — tenant middleware, LRU cache, provisioning, migration runner)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 1 (tenant registration)
 
 **Tasks:**
 1. `apps/api/src/config/database.ts` — `masterDb` + `getTenantDb()` using **LRU cache (max:50, ttl:30min)** with dispose disconnects pool
@@ -234,8 +234,8 @@ psql $DATABASE_MASTER_URL -c "\dn tenant_test_store"   # schema exists
 **Goal:** JWT auth working end-to-end; password reset functional with email.
 
 **Read first:**
-- `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` Section 6 (full Auth section incl. v1.2 bcrypt + password reset flow)
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 2 (login)
+- `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` Section 6 (full Auth section incl. v1.2 bcrypt + password reset flow)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 2 (login)
 
 **Tasks:**
 1. `apps/api/src/shared/utils/password.ts` — **bcryptjs** (cost 12) — NOT SHA-256
@@ -297,8 +297,8 @@ curl -X POST .../api/auth/forgot-password -d '{"email":"nobody@x.com"}'
 **Goal:** Every tenant gets all 34 tenant tables, including v1.2 additions and ETA fields.
 
 **Read first:**
-- `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` Section 4 (every tenant table)
-- `documents/Markdown/Storify_ERD_Document.md` v1.2 update section (variant FK redirections, ETA fields, audit_logs, password_reset_tokens, eta_submissions)
+- `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` Section 4 (every tenant table)
+- `documents/Markdown/Hesba_ERD_Document.md` v1.2 update section (variant FK redirections, ETA fields, audit_logs, password_reset_tokens, eta_submissions)
 
 **Tasks:**
 1. **Decision:** dual-schema strategy. Master DB = `packages/database/prisma/schema.prisma`. Tenant tables = `packages/database/prisma/schema.tenant.prisma` (separate schema with `multiSchema` preview feature). Generator outputs both clients.
@@ -353,8 +353,8 @@ psql ... -c "SELECT count(*) FROM tenant_test_store.users;"           # 1
 **Goal:** Products with variants, stock per branch, stock movements, low-stock alerts.
 
 **Read first:**
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 6 (stock management)
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 7 (stock transfers)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 6 (stock management)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 7 (stock transfers)
 - COMPLETE_CONTEXT Section 4 (products + variants + stock + stock_movements + stock_transfers)
 
 **Tasks:**
@@ -411,8 +411,8 @@ curl .../api/products/barcode/100001    # returns variant + parent product
 **Goal:** Complete POS sale lifecycle including fee calculation, atomic stock locking, and returns.
 
 **Read first:**
-- `documents/Markdown/Storify_Payment_Fees_Update.md` (full doc)
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 3 (cash/card sale) + Flow 8 (returns) + Flow 13 (fees)
+- `documents/Markdown/Hesba_Payment_Fees_Update.md` (full doc)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 3 (cash/card sale) + Flow 8 (returns) + Flow 13 (fees)
 - COMPLETE_CONTEXT Section 7 (payment fees) + Section 10 (invoice creation v1.2 atomic flow)
 
 **Tasks:**
@@ -470,7 +470,7 @@ curl ... # toggle fee_bearer = customer
 **Goal:** Installment contracts with manager approval gate and external financing.
 
 **Read first:**
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 4 (internal installments) + Flow 5 (external)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 4 (internal installments) + Flow 5 (external)
 - COMPLETE_CONTEXT Section 8 (installment system)
 
 **Tasks:**
@@ -521,7 +521,7 @@ curl ... -H 'Authorization: Bearer {cashier_token}'
 **Goal:** Procurement and expense tracking complete.
 
 **Read first:**
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 9 (suppliers + purchases) + Flow 10 (expenses)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 9 (suppliers + purchases) + Flow 10 (expenses)
 - COMPLETE_CONTEXT Section 4 (suppliers, purchase_orders, purchase_order_items, purchase_receipts, purchase_payments, expenses, expense_categories)
 
 **Tasks:**
@@ -559,13 +559,13 @@ psql ... SELECT * FROM stock_movements WHERE type='in' AND reference=:po_id   # 
 **Goal:** Every invoice automatically submitted to Egyptian Tax Authority. QR code on receipt.
 
 **Prerequisites (must obtain BEFORE starting):**
-- [ ] ETA preprod portal account (Storify owner)
+- [ ] ETA preprod portal account (حِسبة owner)
 - [ ] At least one tenant's: `eta_taxpayer_id` (RIN), `eta_activity_code`, `client_id`, `client_secret`
 - [ ] Digital signing certificate (USB token recommended for first deploy)
 - [ ] Read ETA's official "SDK Developer Manual" — JSON canonical format spec
 
 **Read first:**
-- `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` Step 09a section
+- `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` Step 09a section
 - ETA's official API docs: https://sdk.preprod.invoicing.eta.gov.eg
 - COMPLETE_CONTEXT — `tenant_settings` ETA fields, `invoices` ETA fields, `eta_submissions` table
 
@@ -656,8 +656,8 @@ psql ... SELECT * FROM stock_movements WHERE type='in' AND reference=:po_id   # 
 **Goal:** All Phase 1 reports working with filters and export.
 
 **Read first:**
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 11 (reports)
-- `documents/Markdown/Storify_Business_Document.md` Section 7 (KPIs)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 11 (reports)
+- `documents/Markdown/Hesba_Business_Document.md` Section 7 (KPIs)
 
 **Tasks:**
 1. Dashboard endpoint: `GET /api/reports/dashboard` returns today's sales, pending installments count, low-stock alerts, ETA submission failures, payment fee total
@@ -687,15 +687,15 @@ psql ... SELECT * FROM stock_movements WHERE type='in' AND reference=:po_id   # 
 **Goal:** React + Vite + Tailwind set up with full design system tokens. No business pages yet — just shell + auth.
 
 **Read first (in order):**
-- `documents/Markdown/Storify_Design_System.md` (entire doc — colors, typography, spacing, shadows, motion, RTL)
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 2 (login)
-- `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` Section 12 (design tokens)
+- `documents/Markdown/Hesba_Design_System.md` (entire doc — colors, typography, spacing, shadows, motion, RTL)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 2 (login)
+- `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` Section 12 (design tokens)
 
 **Step 11.0 — Design System Setup (do FIRST, no exceptions)**
 
 1. `pnpm create vite apps/web --template react-ts`
 2. Install deps: `react-router-dom @tanstack/react-query axios zustand react-hook-form zod tailwindcss postcss autoprefixer`
-3. `apps/web/tailwind.config.ts` — port EVERY token from `Storify_Design_System.md`:
+3. `apps/web/tailwind.config.ts` — port EVERY token from `Hesba_Design_System.md`:
    - Colors: brand (50–800), gray scale, semantic (success/warning/danger/info), accents (pink/cyan/violet/teal)
    - Fonts: `body: 'IBM Plex Sans Arabic'`, `display: 'Syne'`, `mono: 'JetBrains Mono'`
    - Spacing: sp-1 through sp-12 (4px base)
@@ -756,9 +756,9 @@ pnpm dev:web
 
 **Read first:**
 - `documents/.trae/documents/phase1-mvp-page-design.md` (POS page design)
-- `documents/Markdown/Storify_Design_System.md` Sections 6 + 11 (buttons + tables)
-- `documents/Markdown/Storify_Payment_Fees_Update.md` (POS fee UI per Section 6)
-- `documents/Markdown/Storify_Logic_Flow_Document.md` Flow 13 (fee selection UI)
+- `documents/Markdown/Hesba_Design_System.md` Sections 6 + 11 (buttons + tables)
+- `documents/Markdown/Hesba_Payment_Fees_Update.md` (POS fee UI per Section 6)
+- `documents/Markdown/Hesba_Logic_Flow_Document.md` Flow 13 (fee selection UI)
 
 **Tasks:**
 1. POS layout: 60% left (search + cart), 40% right (totals + payment)
@@ -829,7 +829,7 @@ pnpm dev:web
 1. CI/CD: GitHub Actions — lint + type-check + test on PR; deploy on main
 2. Railway deployment for API + DB
 3. Vercel deployment for frontend
-4. Cloudflare DNS: `*.storify.com` wildcard
+4. Cloudflare DNS: `*.hesbaapp.com` wildcard
 5. Wildcard SSL on Railway
 6. Sentry integration for error tracking (both apps/api and apps/web)
 7. Backup: PG daily snapshots configured on Railway
@@ -902,5 +902,5 @@ Documented here so they don't get accidentally added:
 
 ---
 
-*Storify Implementation Roadmap v1.2 — © 2026*
+*حِسبة Implementation Roadmap v1.2 — © 2026*
 *Source of truth for execution order and acceptance criteria*

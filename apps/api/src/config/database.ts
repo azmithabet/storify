@@ -1,4 +1,4 @@
-import { PrismaClient, TenantPrismaClient } from '@storify/database'
+import { PrismaClient, TenantPrismaClient } from '@hesba/database'
 import { LRUCache } from 'lru-cache'
 import { config } from './env'
 

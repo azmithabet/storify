@@ -1,4 +1,4 @@
-import type { TenantPrismaClient } from '@storify/database'
+import type { TenantPrismaClient } from '@hesba/database'
 
 interface AuditParams {
   db: TenantPrismaClient

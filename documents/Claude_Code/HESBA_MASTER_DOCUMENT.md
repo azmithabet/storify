@@ -1,9 +1,9 @@
-# STORIFY — Master Technical Document
+# حِسبة — Master Technical Document
 > نظام إدارة مخازن ومحال تجارية — SaaS Multi-tenant
 > **آخر تحديث:** 2026-05-10 (v1.2 patches applied)
-> **الحالة:** Step 1 لم يبدأ — اقرأ `Storify_Patch_Notes_v1.2.md` قبل أي كود
+> **الحالة:** Step 1 لم يبدأ — اقرأ `Hesba_Patch_Notes_v1.2.md` قبل أي كود
 >
-> **⚠️ v1.2 changes:** This file pre-dates v1.2 patches. The canonical reference is `STORIFY_COMPLETE_CONTEXT.md` v1.2 + `Storify_Patch_Notes_v1.2.md`. Critical deltas applied below: bcrypt password hashing, decimal.js dependency, payment_method_id (not payment_type) in invoices.
+> **⚠️ v1.2 changes:** This file pre-dates v1.2 patches. The canonical reference is `HESBA_COMPLETE_CONTEXT.md` v1.2 + `Hesba_Patch_Notes_v1.2.md`. Critical deltas applied below: bcrypt password hashing, decimal.js dependency, payment_method_id (not payment_type) in invoices.
 
 ---
 
@@ -88,12 +88,12 @@
 ```
                     ┌─────────────────────────────────────┐
                     │         Cloudflare DNS               │
-                    │   *.storify.com → Railway API        │
+                    │   *.hesbaapp.com → Railway API        │
                     └──────────────┬──────────────────────┘
                                    │
               ┌────────────────────┼────────────────────┐
               │                    │                    │
-    store1.storify.com   store2.storify.com    admin.storify.com
+    store1.hesbaapp.com   store2.hesbaapp.com    admin.hesbaapp.com
               │                    │                    │
               └────────────────────┼────────────────────┘
                                    │
@@ -123,7 +123,7 @@
 ## Tenant Middleware — إزاي بيشتغل
 
 ```
-Request → store1.storify.com/api/products
+Request → store1.hesbaapp.com/api/products
        ↓
 Tenant Middleware:
   1. بياخد الـ subdomain: "store1"
@@ -171,7 +171,7 @@ created_at    TIMESTAMPTZ DEFAULT NOW()
 ```sql
 id            UUID PRIMARY KEY DEFAULT gen_random_uuid()
 name          VARCHAR(200) NOT NULL
-subdomain     VARCHAR(100) UNIQUE NOT NULL   -- "store1" في store1.storify.com
+subdomain     VARCHAR(100) UNIQUE NOT NULL   -- "store1" في store1.hesbaapp.com
 schema_name   VARCHAR(100) UNIQUE NOT NULL   -- "tenant_abc123"
 plan_id       UUID REFERENCES plans(id)
 is_active     BOOLEAN DEFAULT true
@@ -406,7 +406,7 @@ status             VARCHAR(50) DEFAULT 'completed'    -- completed, refunded, pa
 notes              TEXT
 created_at         TIMESTAMPTZ DEFAULT NOW()
 ```
-> See full payment-method semantics in `Storify_Payment_Fees_Update.md` and `STORIFY_COMPLETE_CONTEXT.md` Section 7.
+> See full payment-method semantics in `Hesba_Payment_Fees_Update.md` and `HESBA_COMPLETE_CONTEXT.md` Section 7.
 
 ### invoice_items
 ```sql
@@ -731,7 +731,7 @@ status = 'pending_approval'  ← البيع مش مكتمل
 ```
 نظام واحد → عملاء لا نهاية
 كل عميل عنده:
-  - subdomain خاص: store1.storify.com
+  - subdomain خاص: store1.hesbaapp.com
   - PostgreSQL schema منفصل: tenant_store1
   - بياناته معزولة 100%
 ```
@@ -839,7 +839,7 @@ async function provisionTenant(data) {
 Railway (~$20/شهر)
   ├── Fastify API Service
   └── PostgreSQL Database
-      ├── storify_master (Master DB)
+      ├── hesba_master (Master DB)
       ├── tenant_abc (Schema)
       ├── tenant_xyz (Schema)
       └── tenant_... (Schema)
@@ -859,7 +859,7 @@ Cloudflare R2 (مجاني لأول 10GB)
   └── إيصالات الأقساط
 
 Cloudflare DNS (مجاني)
-  └── *.storify.com → Railway API
+  └── *.hesbaapp.com → Railway API
 ```
 
 ## ليه مش Shared Hosting؟
@@ -924,7 +924,7 @@ npm install -g pnpm
 
 ### إنشاء الـ Monorepo
 ```bash
-mkdir storify && cd storify
+mkdir hesba && cd hesba
 git init
 pnpm init
 ```
@@ -967,7 +967,7 @@ coverage/
 
 ### .env.example
 ```env
-DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/storify_master"
+DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/hesba_master"
 REDIS_URL="redis://localhost:6379"
 JWT_ACCESS_SECRET="change-this-in-production-min-32-chars"
 JWT_REFRESH_SECRET="change-this-too-in-production-min-32-chars"
@@ -1004,11 +1004,11 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: storify_postgres
+    container_name: hesba_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: storify_master
+      POSTGRES_DB: hesba_master
     ports:
       - '5432:5432'
     volumes:
@@ -1016,7 +1016,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: storify_redis
+    container_name: hesba_redis
     ports:
       - '6379:6379'
     volumes:
@@ -1030,7 +1030,7 @@ volumes:
 ### apps/api/package.json
 ```json
 {
-  "name": "@storify/api",
+  "name": "@hesba/api",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -1154,11 +1154,11 @@ start()
 ### الـ Root package.json
 ```json
 {
-  "name": "storify",
+  "name": "hesba",
   "private": true,
   "scripts": {
-    "dev:api": "pnpm --filter @storify/api dev",
-    "dev:web": "pnpm --filter @storify/web dev",
+    "dev:api": "pnpm --filter @hesba/api dev",
+    "dev:web": "pnpm --filter @hesba/web dev",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   }
@@ -1202,7 +1202,7 @@ pnpm prisma init --datasource-provider postgresql
 ### packages/database/package.json
 ```json
 {
-  "name": "@storify/database",
+  "name": "@hesba/database",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -1640,7 +1640,7 @@ export async function tenantRoutes(app: FastifyInstance) {
     return reply.status(201).send({
       message: 'Tenant created successfully',
       subdomain: tenant.subdomain,
-      loginUrl: `https://${tenant.subdomain}.storify.com`,
+      loginUrl: `https://${tenant.subdomain}.hesbaapp.com`,
     })
   })
 }

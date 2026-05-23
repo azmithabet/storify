@@ -79,7 +79,7 @@ export function AdminShell({ children, title }: AdminShellProps) {
         <div className="px-6 py-5 border-b border-gray-800 flex items-center gap-2">
           <ShieldCheck className="w-5 h-5 text-brand-400" />
           <div>
-            <h1 className="font-display text-lg font-bold text-brand-400 leading-tight">Storify</h1>
+            <h1 className="font-display text-lg font-bold text-brand-400 leading-tight">حِسبة</h1>
             <p className="text-[10px] text-gray-500 uppercase tracking-widest">Admin</p>
           </div>
         </div>

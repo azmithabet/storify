@@ -29,7 +29,7 @@ export async function buildSalesExcel(data: {
   invoices: Array<Record<string, unknown>>
 }): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Storify'
+  wb.creator = 'Hesba'
 
   // Summary sheet
   const summary = wb.addWorksheet('الملخص')
@@ -74,7 +74,7 @@ export async function buildSalesExcel(data: {
 
 export async function buildStockExcel(items: Array<Record<string, unknown>>): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Storify'
+  wb.creator = 'Hesba'
 
   const sheet = wb.addWorksheet('المخزون')
   sheet.addRow(['المنتج', 'SKU', 'الفرع', 'الكمية', 'الحد الأدنى', 'تحذير', 'سعر التكلفة', 'قيمة المخزون'])
@@ -116,7 +116,7 @@ export async function buildStockExcel(items: Array<Record<string, unknown>>): Pr
 
 export async function buildProfitLossExcel(data: Record<string, number | string>): Promise<Buffer> {
   const wb = new ExcelJS.Workbook()
-  wb.creator = 'Storify'
+  wb.creator = 'Hesba'
 
   const sheet = wb.addWorksheet('الأرباح والخسائر')
   sheet.addRow(['البند', 'المبلغ (ج.م)'])

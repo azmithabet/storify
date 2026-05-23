@@ -141,6 +141,16 @@ model TenantSetting {
   etaAutoSubmit   Boolean  @default(true)      @map("eta_auto_submit")
   etaDocType      String   @default("i")       @db.VarChar(20) @map("eta_doc_type")
 
+  // ETA issuer registration — must match the registered taxpayer profile on
+  // https://invoicing.eta.gov.eg. ETA validates `name` and `address.*` against
+  // its own records; mismatches get rejected. Nullable so existing tenants
+  // stay on `pending_setup` until the owner fills them in.
+  etaIssuerName         String? @db.Text          @map("eta_issuer_name")
+  etaAddressGovernate   String? @db.VarChar(50)   @map("eta_address_governate")
+  etaAddressRegionCity  String? @db.VarChar(100)  @map("eta_address_region_city")
+  etaAddressStreet      String? @db.VarChar(200)  @map("eta_address_street")
+  etaAddressBuilding    String? @db.VarChar(50)   @map("eta_address_building")
+
   updatedAt DateTime @default(now()) @map("updated_at")
 
   @@map("tenant_settings")

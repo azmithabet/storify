@@ -109,9 +109,9 @@ function Header({ user }: { user: ReturnType<typeof useAuthStore.getState>['user
       <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-md bg-brand-500 flex items-center justify-center font-display font-bold text-white">
-            S
+            ح
           </div>
-          <span className="font-display text-xl font-bold text-gray-100">Storify</span>
+          <span className="font-display text-xl font-bold text-gray-100">حِسبة</span>
           <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-warning-500/15 text-warning-500 border border-warning-500/30">
             BETA
           </span>
@@ -785,7 +785,7 @@ function formatCompact(n: number): string {
 // ─── vs-Alternatives strip ───────────────────────────────────────────────────
 // Reframes the price by comparing to the real alternatives Egyptian retail
 // uses today: paper/Excel (free but slow + ETA risk) and a manual accountant
-// (1.5-3k EGP/mo). Anchors Storify Starter as the obvious value.
+// (1.5-3k EGP/mo). Anchors Hesba Starter as the obvious value.
 
 function VsAlternativesStrip() {
   const rows = [
@@ -793,29 +793,29 @@ function VsAlternativesStrip() {
       label: 'السرعة',
       paper: 'بطيء',
       accountant: '2-3 أيام',
-      storify: 'لحظي',
-      storifyGood: true,
+      hesba: 'لحظي',
+      hesbaGood: true,
     },
     {
       label: 'ETA معتمد',
       paper: 'لا (غرامة 20,000+ جنيه)',
       accountant: 'جزئي',
-      storify: 'بالكامل',
-      storifyGood: true,
+      hesba: 'بالكامل',
+      hesbaGood: true,
     },
     {
       label: 'أقساط',
       paper: 'يدوي / دفتر',
       accountant: 'لا',
-      storify: 'نظام كامل',
-      storifyGood: true,
+      hesba: 'نظام كامل',
+      hesbaGood: true,
     },
     {
       label: 'التكلفة الشهرية',
       paper: 'وقتك (4-6 ساعات/يوم)',
       accountant: '1,500–3,000 جنيه',
-      storify: 'من 199 جنيه',
-      storifyGood: true,
+      hesba: 'من 199 جنيه',
+      hesbaGood: true,
     },
   ]
   return (
@@ -837,7 +837,7 @@ function VsAlternativesStrip() {
           🧾 محاسب يدوي
         </div>
         <div className="px-3 py-3 bg-brand-900/40 border-b border-brand-500/40 text-center font-semibold text-brand-300">
-          ⚡ Storify
+          ⚡ حِسبة
         </div>
 
         {rows.map((r, i) => (
@@ -865,10 +865,10 @@ function VsAlternativesStrip() {
             </div>
             <div
               className={`px-3 py-3 text-center font-medium ${
-                r.storifyGood ? 'text-success-500' : 'text-gray-300'
+                r.hesbaGood ? 'text-success-500' : 'text-gray-300'
               } ${i < rows.length - 1 ? 'border-b border-brand-500/20 bg-brand-900/20' : 'bg-brand-900/20'}`}
             >
-              {r.storify}
+              {r.hesba}
             </div>
           </Fragment>
         ))}
@@ -1016,9 +1016,9 @@ function Footer() {
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-md bg-brand-500 flex items-center justify-center font-display font-bold text-white">
-              S
+              ح
             </div>
-            <span className="font-display text-lg font-bold text-gray-100">Storify</span>
+            <span className="font-display text-lg font-bold text-gray-100">حِسبة</span>
             <span className="text-xs text-gray-500 mr-2">© {new Date().getFullYear()}</span>
           </div>
 

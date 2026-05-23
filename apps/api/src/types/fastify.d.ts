@@ -1,4 +1,4 @@
-import type { TenantPrismaClient, Tenant, Plan } from '@storify/database'
+import type { TenantPrismaClient, Tenant, Plan } from '@hesba/database'
 import type { JWTPayload } from '../shared/middleware/auth.middleware'
 import type { PlatformJWTPayload } from '../shared/middleware/platform-admin.middleware'
 

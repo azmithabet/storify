@@ -34,7 +34,7 @@ export const useAdminAuthStore = create<AdminAuthState>()(
       isOwner: () => get().admin?.role === 'OWNER',
     }),
     {
-      name: 'storify-admin-auth',
+      name: 'hesba-admin-auth',
       partialize: (state) => ({ admin: state.admin, accessToken: state.accessToken }),
     },
   ),

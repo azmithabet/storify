@@ -34,10 +34,10 @@
   <g transform="translate(960, 80)">
     <rect width="64" height="64" rx="10" fill="#6366F1"/>
     <text x="32" y="48" font-family="Arial, sans-serif" font-size="40" font-weight="700"
-          fill="white" text-anchor="middle">S</text>
+          fill="white" text-anchor="middle">ح</text>
   </g>
   <text x="1040" y="125" font-family="Arial, sans-serif" font-size="32" font-weight="700"
-        fill="#F1F5F9">Storify</text>
+        fill="#F1F5F9">حِسبة</text>
 
   <!-- Main heading -->
   <text x="600" y="290" font-family="Arial, sans-serif" font-size="64" font-weight="800"
@@ -51,7 +51,7 @@
 
   <!-- URL -->
   <text x="600" y="540" font-family="monospace" font-size="22" font-weight="500"
-        fill="#6366F1" text-anchor="middle">talabia.app</text>
+        fill="#6366F1" text-anchor="middle">hesbaapp.com</text>
 
   <!-- Pill -->
   <g transform="translate(530, 565)">

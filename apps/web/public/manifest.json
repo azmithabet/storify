@@ -1,7 +1,7 @@
 {
-  "name": "Storify POS",
-  "short_name": "Storify",
-  "description": "نقطة بيع Storify",
+  "name": "حِسبة POS",
+  "short_name": "حِسبة",
+  "description": "نقطة بيع حِسبة",
   "start_url": "/pos",
   "display": "standalone",
   "background_color": "#111827",
@@ -9,6 +9,6 @@
   "dir": "rtl",
   "lang": "ar",
   "icons": [
-    { "src": "/storify-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/hesba-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ]
 }

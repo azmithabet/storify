@@ -114,7 +114,7 @@ export function Sidebar({ open, onClose }: SidebarProps) {
     >
       {/* Logo */}
       <div className="px-6 py-5 border-b border-gray-800">
-        <h1 className="font-display text-2xl font-bold text-brand-400">Storify</h1>
+        <h1 className="font-display text-2xl font-bold text-brand-400">حِسبة</h1>
       </div>
 
       {/* Nav */}

@@ -1,4 +1,4 @@
-# Storify — Payment Methods & Fees Update v1.1
+# حِسبة — Payment Methods & Fees Update v1.1
 > تحديث شامل لطرق الدفع والرسوم على كل الـ Documents
 > **التاريخ:** أبريل 2026
 
@@ -219,4 +219,4 @@ function calculateFee(totalAmount: Decimal, paymentMethod: PaymentMethod) {
 
 ---
 
-*Storify Payment Methods & Fees Update v1.1 — © 2026*
+*حِسبة Payment Methods & Fees Update v1.1 — © 2026*

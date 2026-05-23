@@ -235,7 +235,7 @@ export async function supplierRoutes(app: FastifyInstance) {
 
       const ExcelJS = await import('exceljs')
       const wb = new ExcelJS.default.Workbook()
-      wb.creator = 'Storify'
+      wb.creator = 'Hesba'
 
       const styleHeader = (row: import('exceljs').Row) => {
         row.eachCell((cell) => {

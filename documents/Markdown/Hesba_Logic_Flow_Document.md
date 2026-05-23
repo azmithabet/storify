@@ -1,4 +1,4 @@
-# Storify — Logic Flow Document
+# حِسبة — Logic Flow Document
 > وثيقة تدفق المنطق الكامل للنظام
 > **الإصدار:** 1.0.0 | **التاريخ:** أبريل 2026
 
@@ -51,7 +51,7 @@
    ↓
 [9] إرسال بريد ترحيبي + رابط الدخول
    ↓
-[END ✅] العميل جاهز — {subdomain}.storify.com
+[END ✅] العميل جاهز — {subdomain}.hesbaapp.com
 ```
 
 ---
@@ -59,7 +59,7 @@
 ## 2. تدفق تسجيل الدخول
 
 ```
-[START] المستخدم يفتح {subdomain}.storify.com
+[START] المستخدم يفتح {subdomain}.hesbaapp.com
    ↓
 [Tenant Middleware] استخراج الـ subdomain من الـ hostname
    ↓
@@ -342,7 +342,7 @@
 
 ---
 
-*Storify Logic Flow Document v1.0 — جميع الحقوق محفوظة © 2026*
+*حِسبة Logic Flow Document v1.0 — جميع الحقوق محفوظة © 2026*
 
 ---
 

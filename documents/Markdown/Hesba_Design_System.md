@@ -1,4 +1,4 @@
-# Storify — Design System v1.0
+# حِسبة — Design System v1.0
 > نظام التصميم الكامل — Colors · Typography · Spacing · Components · Patterns · RTL
 > **الإصدار:** 1.0.0 | **التاريخ:** أبريل 2026
 
@@ -23,7 +23,7 @@
 ```
 
 ### Semantic Colors
-| اللون | Hex | الاستخدام في Storify |
+| اللون | Hex | الاستخدام في حِسبة |
 |---|---|---|
 | Success | #10B981 | فاتورة مكتملة، موافقة، مخزون كافٍ |
 | Warning | #F59E0B | انتظار موافقة، مخزون منخفض، fees |
@@ -296,4 +296,4 @@ Change: text-xs + success/danger color
 
 ---
 
-*Storify Design System v1.0 — © 2026*
+*حِسبة Design System v1.0 — © 2026*

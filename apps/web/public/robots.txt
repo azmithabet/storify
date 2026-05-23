@@ -1,5 +1,5 @@
-# https://talabia.app/robots.txt
-# Storify — multi-tenant retail SaaS for Egypt
+# https://hesbaapp.com/robots.txt
+# Hesba — multi-tenant retail SaaS for Egypt
 
 User-agent: *
 Allow: /
@@ -25,4 +25,4 @@ Disallow: /dev/
 # Crawl-delay is ignored by Google but respected by some others
 Crawl-delay: 1
 
-Sitemap: https://talabia.app/sitemap.xml
+Sitemap: https://hesbaapp.com/sitemap.xml

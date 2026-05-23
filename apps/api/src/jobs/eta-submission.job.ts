@@ -43,6 +43,13 @@ interface InvoiceRow {
   eta_client_secret: string | null
   eta_signing_cert_pem: string | null
   is_production: boolean
+  // Issuer registration — must match the taxpayer profile registered with ETA.
+  // ETA rejects submissions where these don't match its own records.
+  eta_issuer_name: string | null
+  eta_address_governate: string | null
+  eta_address_region_city: string | null
+  eta_address_street: string | null
+  eta_address_building: string | null
 }
 
 interface ItemRow {
@@ -64,7 +71,9 @@ export function startEtaWorker() {
         SELECT i.id, i.invoice_number, i.created_at, i.total_amount,
                ts.eta_enabled, ts.eta_taxpayer_id, ts.eta_activity_code,
                ts.eta_branch_code, ts.eta_client_id, ts.eta_client_secret,
-               ts.eta_signing_cert_pem, COALESCE(ts.eta_is_production, false) AS is_production
+               ts.eta_signing_cert_pem, COALESCE(ts.eta_is_production, false) AS is_production,
+               ts.eta_issuer_name, ts.eta_address_governate, ts.eta_address_region_city,
+               ts.eta_address_street, ts.eta_address_building
         FROM invoices i
         CROSS JOIN tenant_settings ts
         WHERE i.id = $1
@@ -86,7 +95,21 @@ export function startEtaWorker() {
         )
         return
       }
-      if (!inv.eta_taxpayer_id || !inv.eta_client_id || !inv.eta_client_secret) {
+      // Four prerequisites for a valid ETA submission:
+      //   1. Taxpayer credentials  (id / client_id / client_secret) — for auth
+      //   2. Issuer name — the legal business name on the ETA registry
+      //   3. Issuer address — governate / region+city / street / building
+      // Missing any of these means ETA will reject the document, so park the
+      // invoice in 'pending_setup' and let the owner finish enrollment first.
+      const missingCredentials =
+        !inv.eta_taxpayer_id || !inv.eta_client_id || !inv.eta_client_secret
+      const missingIssuer =
+        !inv.eta_issuer_name ||
+        !inv.eta_address_governate ||
+        !inv.eta_address_region_city ||
+        !inv.eta_address_street ||
+        !inv.eta_address_building
+      if (missingCredentials || missingIssuer) {
         await db.$executeRawUnsafe(
           `UPDATE invoices SET eta_status = 'pending_setup' WHERE id = $1`,
           invoiceId,
@@ -104,12 +127,17 @@ export function startEtaWorker() {
         WHERE ii.invoice_id = $1
       `, invoiceId)
 
+      // All fields below are non-null at this point because of the
+      // missingCredentials || missingIssuer guard above. TypeScript can't
+      // narrow through aggregate booleans, so we assert with `!`. If anyone
+      // removes that guard the assertions will start crashing in tests —
+      // which is the desired blast radius.
       const tenantSettings = {
-        eta_taxpayer_id: inv.eta_taxpayer_id,
+        eta_taxpayer_id: inv.eta_taxpayer_id!,
         eta_activity_code: inv.eta_activity_code ?? '',
         eta_branch_code: inv.eta_branch_code ?? '0',
-        eta_client_id: inv.eta_client_id,
-        eta_client_secret: inv.eta_client_secret,
+        eta_client_id: inv.eta_client_id!,
+        eta_client_secret: inv.eta_client_secret!,
         eta_signing_cert_pem: inv.eta_signing_cert_pem ?? undefined,
         eta_enabled: inv.eta_enabled,
         is_production: inv.is_production,
@@ -125,15 +153,15 @@ export function startEtaWorker() {
           vatRate: item.vat_rate,
         })),
         issuer: {
-          name: 'Storify Tenant',
-          taxpayerId: inv.eta_taxpayer_id,
+          name: inv.eta_issuer_name!,
+          taxpayerId: inv.eta_taxpayer_id!,
           activityCode: inv.eta_activity_code ?? '',
           address: {
             country: 'EG',
-            governate: 'Cairo',
-            regionCity: 'Cairo',
-            street: 'Main Street',
-            buildingNumber: '1',
+            governate: inv.eta_address_governate!,
+            regionCity: inv.eta_address_region_city!,
+            street: inv.eta_address_street!,
+            buildingNumber: inv.eta_address_building!,
           },
         },
       }
@@ -149,7 +177,7 @@ export function startEtaWorker() {
       if (result.success && result.etaUuid) {
         const qrData = buildEtaQrData({
           etaLongId: result.etaLongId!,
-          taxpayerId: inv.eta_taxpayer_id,
+          taxpayerId: inv.eta_taxpayer_id!,
           invoiceNumber: inv.invoice_number,
           issuedAt: new Date(inv.created_at),
           totalAmount: Number(inv.total_amount),

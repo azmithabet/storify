@@ -1,4 +1,4 @@
-# Storify — ERD Document
+# حِسبة — ERD Document
 > مخطط قاعدة البيانات الكامل — Entity Relationship Diagram
 > **الإصدار:** 1.0.0 | **التاريخ:** أبريل 2026
 
@@ -331,7 +331,7 @@
 
 ---
 
-*Storify ERD Document v1.0 — جميع الحقوق محفوظة © 2026*
+*حِسبة ERD Document v1.0 — جميع الحقوق محفوظة © 2026*
 
 ---
 
@@ -394,12 +394,12 @@
 ## تحديث v1.2 — Variants, Audit, Password Reset, Tenant Versioning
 
 > **التاريخ:** 2026-05-10
-> **مرجع:** `Storify_Patch_Notes_v1.2.md`
+> **مرجع:** `Hesba_Patch_Notes_v1.2.md`
 
 ### تعديل master.tenants — حقول جديدة وإعادة تسمية
 | الحقل | التغيير | الوصف |
 |---|---|---|
-| `slug` → `subdomain` | إعادة تسمية | يطابق `STORIFY_MASTER_DOCUMENT.md` و `.trae/phase1-mvp.md` |
+| `slug` → `subdomain` | إعادة تسمية | يطابق `HESBA_MASTER_DOCUMENT.md` و `.trae/phase1-mvp.md` |
 | `db_name` → `schema_name` | إعادة تسمية | اسم الـ Postgres schema |
 | `db_url` | محذوف | يُشتق من DATABASE_MASTER_URL + schema_name |
 | `schema_version` | جديد INTEGER DEFAULT 0 | يتتبع آخر migration طُبق على tenant |

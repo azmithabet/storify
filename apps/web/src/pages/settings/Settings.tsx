@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Fragment } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Plus, Edit2, ToggleLeft, ToggleRight, Shield, Tag, RefreshCw, Check, Trash2, Download, Eye, EyeOff, Sparkles, XCircle, Receipt } from 'lucide-react'
@@ -2053,9 +2053,304 @@ const etaStatusMap: Record<string, { label: string; variant: 'warning' | 'danger
 interface TenantSettings {
   id: string
   etaEnabled: boolean
+  etaEnvironment?: string | null
   etaTaxpayerId?: string | null
-  etaClientId?: string | null
-  etaClientSecret?: string | null
+  etaActivityCode?: string | null
+  etaBranchCode?: string | null
+  // Issuer registration — public business data, editable from this screen.
+  // Must match the merchant's profile on invoicing.eta.gov.eg, otherwise ETA
+  // rejects submissions.
+  etaIssuerName?: string | null
+  etaAddressGovernate?: string | null
+  etaAddressRegionCity?: string | null
+  etaAddressStreet?: string | null
+  etaAddressBuilding?: string | null
+  // Encrypted secrets are never sent to the client — the API returns these
+  // booleans instead so the wizard can show a "configured ✓" state.
+  etaClientIdSet?: boolean
+  etaClientSecretSet?: boolean
+  etaSigningCertSet?: boolean
+}
+
+// Egyptian governates — the ETA spec accepts these Arabic strings as-is in
+// the `address.governate` field. Source: ETA codeset table 4.4.
+const EG_GOVERNATES = [
+  'القاهرة', 'الجيزة', 'الإسكندرية', 'الدقهلية', 'البحر الأحمر',
+  'البحيرة', 'الفيوم', 'الغربية', 'الإسماعيلية', 'المنوفية',
+  'المنيا', 'القليوبية', 'الوادي الجديد', 'السويس', 'أسوان',
+  'أسيوط', 'بني سويف', 'بورسعيد', 'دمياط', 'الشرقية',
+  'جنوب سيناء', 'كفر الشيخ', 'مطروح', 'الأقصر', 'قنا',
+  'شمال سيناء', 'سوهاج',
+] as const
+
+// ─── ETA self-service setup wizard ────────────────────────────────────────────
+// Three steps: (1) business/issuer data, (2) ETA credentials, (3) test + finish.
+// Public fields go through PATCH /settings; the encrypted secrets (client id /
+// secret / signing cert) go through PUT /settings/eta/credentials and are
+// write-only — the API only tells us whether each is *set*, never its value.
+function EtaSetupWizard({ settings }: { settings?: TenantSettings }) {
+  const qc = useQueryClient()
+  const [step, setStep] = useState(1)
+  const [testResult, setTestResult] = useState<{ ok: boolean; message: string } | null>(null)
+
+  type BusinessForm = {
+    etaIssuerName: string
+    etaAddressGovernate: string
+    etaAddressRegionCity: string
+    etaAddressStreet: string
+    etaAddressBuilding: string
+  }
+  type CredsForm = {
+    etaTaxpayerId: string
+    etaActivityCode: string
+    etaBranchCode: string
+    etaEnvironment: string
+    etaClientId: string
+    etaClientSecret: string
+    etaSigningCert: string
+  }
+  const [business, setBusiness] = useState<BusinessForm>({
+    etaIssuerName: '', etaAddressGovernate: '', etaAddressRegionCity: '',
+    etaAddressStreet: '', etaAddressBuilding: '',
+  })
+  const [creds, setCreds] = useState<CredsForm>({
+    etaTaxpayerId: '', etaActivityCode: '', etaBranchCode: '0',
+    etaEnvironment: 'preprod', etaClientId: '', etaClientSecret: '', etaSigningCert: '',
+  })
+
+  // Hydrate from server on load. Secrets stay blank (write-only) — their saved
+  // state is shown via the *Set booleans instead.
+  useEffect(() => {
+    if (!settings) return
+    setBusiness({
+      etaIssuerName: settings.etaIssuerName ?? '',
+      etaAddressGovernate: settings.etaAddressGovernate ?? '',
+      etaAddressRegionCity: settings.etaAddressRegionCity ?? '',
+      etaAddressStreet: settings.etaAddressStreet ?? '',
+      etaAddressBuilding: settings.etaAddressBuilding ?? '',
+    })
+    setCreds((c) => ({
+      ...c,
+      etaTaxpayerId: settings.etaTaxpayerId ?? '',
+      etaActivityCode: settings.etaActivityCode ?? '',
+      etaBranchCode: settings.etaBranchCode ?? '0',
+      etaEnvironment: settings.etaEnvironment ?? 'preprod',
+    }))
+  }, [settings])
+
+  const refresh = () => {
+    qc.invalidateQueries({ queryKey: ['tenant-settings-eta'] })
+    qc.invalidateQueries({ queryKey: ['tenant-settings'] })
+  }
+
+  const { mutate: saveBusiness, isPending: savingBusiness } = useMutation({
+    mutationFn: async (data: BusinessForm) => api.patch('/settings', data),
+    onSuccess: () => { toast.success('تم حفظ بيانات المحل'); refresh(); setStep(2) },
+    onError: () => toast.error('تعذّر حفظ البيانات'),
+  })
+
+  const { mutate: saveCreds, isPending: savingCreds } = useMutation({
+    mutationFn: async (data: CredsForm) => {
+      // Public fields first (taxpayer id / activity / branch / environment).
+      await api.patch('/settings', {
+        etaTaxpayerId: data.etaTaxpayerId,
+        etaActivityCode: data.etaActivityCode,
+        etaBranchCode: data.etaBranchCode,
+        etaEnvironment: data.etaEnvironment,
+      })
+      // Encrypted secrets — only send the ones the user actually typed so we
+      // don't overwrite a saved value with a blank.
+      const secretPayload: Record<string, string> = {}
+      if (data.etaClientId.trim()) secretPayload.etaClientId = data.etaClientId.trim()
+      if (data.etaClientSecret.trim()) secretPayload.etaClientSecret = data.etaClientSecret.trim()
+      if (data.etaSigningCert.trim()) secretPayload.etaSigningCert = data.etaSigningCert.trim()
+      if (Object.keys(secretPayload).length > 0) {
+        await api.put('/settings/eta/credentials', secretPayload)
+      }
+    },
+    onSuccess: () => {
+      toast.success('تم حفظ بيانات الربط')
+      // Clear the secret inputs from memory after a successful save.
+      setCreds((c) => ({ ...c, etaClientId: '', etaClientSecret: '', etaSigningCert: '' }))
+      refresh()
+      setStep(3)
+    },
+    onError: () => toast.error('تعذّر حفظ بيانات الربط'),
+  })
+
+  const { mutate: runTest, isPending: testing } = useMutation({
+    mutationFn: async () => (await api.post<{ success: boolean; message: string }>('/settings/eta/test')).data,
+    onSuccess: (res) => {
+      setTestResult({ ok: res.success, message: res.message })
+      if (res.success) toast.success('الاتصال ناجح')
+    },
+    onError: () => setTestResult({ ok: false, message: 'تعذّر إجراء الاختبار — حاول مرة أخرى' }),
+  })
+
+  // Field-level setters keep the JSX terse.
+  const setB = (k: keyof BusinessForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setBusiness((f) => ({ ...f, [k]: e.target.value }))
+  const setC = (k: keyof CredsForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
+    setCreds((f) => ({ ...f, [k]: e.target.value }))
+
+  const STEPS = [
+    { n: 1, label: 'بيانات المحل' },
+    { n: 2, label: 'بيانات الربط' },
+    { n: 3, label: 'الاختبار والتفعيل' },
+  ]
+
+  const credSetHint = (isSet?: boolean) =>
+    isSet ? 'محفوظ مسبقاً — اتركه فارغاً للإبقاء عليه، أو اكتب قيمة جديدة لاستبداله' : undefined
+
+  return (
+    <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 flex flex-col gap-5">
+      <div>
+        <h3 className="text-base font-semibold text-gray-100">إعداد الفاتورة الإلكترونية (ETA)</h3>
+        <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+          اضبط بيانات الربط مع مصلحة الضرائب خطوة بخطوة. كل البيانات لازم تطابق
+          تسجيلك على <span dir="ltr">invoicing.eta.gov.eg</span>.
+        </p>
+      </div>
+
+      {/* Step indicator */}
+      <div className="flex items-center gap-2">
+        {STEPS.map((s, i) => (
+          <Fragment key={s.n}>
+            <button
+              type="button"
+              onClick={() => setStep(s.n)}
+              className="flex items-center gap-2 group"
+            >
+              <span className={cn(
+                'w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors',
+                step === s.n ? 'bg-brand-500 text-white'
+                  : step > s.n ? 'bg-success-500/20 text-success-400 border border-success-500/40'
+                  : 'bg-gray-800 text-gray-500 border border-gray-700',
+              )}>
+                {step > s.n ? <Check className="w-3.5 h-3.5" /> : s.n}
+              </span>
+              <span className={cn('text-xs hidden sm:inline', step === s.n ? 'text-gray-100 font-semibold' : 'text-gray-500')}>
+                {s.label}
+              </span>
+            </button>
+            {i < STEPS.length - 1 && <div className="flex-1 h-px bg-gray-800" />}
+          </Fragment>
+        ))}
+      </div>
+
+      {/* Step 1 — business / issuer data */}
+      {step === 1 && (
+        <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); saveBusiness(business) }}>
+          <Input label="الاسم القانوني للممول" placeholder="مثال: شركة الإسكندرية للتجارة ش.م.م"
+            value={business.etaIssuerName} onChange={setB('etaIssuerName')} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Select label="المحافظة" value={business.etaAddressGovernate} onChange={setB('etaAddressGovernate')}>
+              <option value="">— اختر المحافظة —</option>
+              {EG_GOVERNATES.map((g) => <option key={g} value={g}>{g}</option>)}
+            </Select>
+            <Input label="المدينة / المنطقة" placeholder="مثال: مدينة نصر"
+              value={business.etaAddressRegionCity} onChange={setB('etaAddressRegionCity')} />
+            <Input label="الشارع" placeholder="مثال: شارع التحرير"
+              value={business.etaAddressStreet} onChange={setB('etaAddressStreet')} />
+            <Input label="رقم العقار" placeholder="مثال: 15 أ"
+              value={business.etaAddressBuilding} onChange={setB('etaAddressBuilding')} />
+          </div>
+          <div className="flex justify-end pt-2">
+            <Button type="submit" loading={savingBusiness}>حفظ ومتابعة</Button>
+          </div>
+        </form>
+      )}
+
+      {/* Step 2 — credentials (public + encrypted secrets) */}
+      {step === 2 && (
+        <form className="flex flex-col gap-4" onSubmit={(e) => { e.preventDefault(); saveCreds(creds) }}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Input label="رقم الممول (Taxpayer ID)" placeholder="9 أرقام" dir="ltr"
+              value={creds.etaTaxpayerId} onChange={setC('etaTaxpayerId')} />
+            <Select label="البيئة" value={creds.etaEnvironment} onChange={setC('etaEnvironment')}>
+              <option value="preprod">اختبار (Preprod)</option>
+              <option value="production">إنتاج (Production)</option>
+            </Select>
+            <Input label="كود النشاط (Activity Code)" placeholder="مثال: 4711" dir="ltr"
+              hint="من قائمة أكواد ETA — راجع المحاسب لو مش متأكد"
+              value={creds.etaActivityCode} onChange={setC('etaActivityCode')} />
+            <Input label="كود الفرع (Branch Code)" placeholder="0 للفرع الرئيسي" dir="ltr"
+              value={creds.etaBranchCode} onChange={setC('etaBranchCode')} />
+          </div>
+
+          <div className="border-t border-gray-800 pt-4 flex flex-col gap-4">
+            <div className="flex items-center gap-2">
+              <Shield className="w-4 h-4 text-brand-400" />
+              <h4 className="text-sm font-semibold text-gray-200">بيانات الاعتماد المشفّرة</h4>
+            </div>
+            <p className="text-xs text-gray-500 -mt-2">
+              تُحفظ مشفّرة بالكامل (AES-256) ولا تظهر مرة أخرى بعد الحفظ.
+            </p>
+            <Input label="Client ID" dir="ltr"
+              placeholder={settings?.etaClientIdSet ? '•••••••• (محفوظ)' : 'الصِق Client ID من بوابة ETA'}
+              hint={credSetHint(settings?.etaClientIdSet)}
+              value={creds.etaClientId} onChange={setC('etaClientId')} />
+            <Input label="Client Secret" type="password" dir="ltr"
+              placeholder={settings?.etaClientSecretSet ? '•••••••• (محفوظ)' : 'الصِق Client Secret'}
+              hint={credSetHint(settings?.etaClientSecretSet)}
+              value={creds.etaClientSecret} onChange={setC('etaClientSecret')} />
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm text-gray-300">الشهادة الرقمية (PEM)
+                {settings?.etaSigningCertSet && <span className="text-success-400 text-xs mr-2">✓ محفوظة</span>}
+              </label>
+              <textarea
+                dir="ltr"
+                rows={4}
+                placeholder={settings?.etaSigningCertSet ? '•••••••• (محفوظة — اتركها فارغة للإبقاء)' : '-----BEGIN PRIVATE KEY-----'}
+                value={creds.etaSigningCert}
+                onChange={setC('etaSigningCert')}
+                className="w-full rounded-lg bg-gray-800 border border-gray-700 px-3 py-2 text-sm text-gray-100 font-mono focus:border-brand-500 focus:outline-none"
+              />
+              <p className="text-xs text-gray-500">اختياري — مطلوب فقط للتوقيع المحلي بدون HSM.</p>
+            </div>
+          </div>
+
+          <div className="flex justify-between pt-2">
+            <Button type="button" variant="ghost" onClick={() => setStep(1)}>السابق</Button>
+            <Button type="submit" loading={savingCreds}>حفظ ومتابعة</Button>
+          </div>
+        </form>
+      )}
+
+      {/* Step 3 — test + finish */}
+      {step === 3 && (
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-gray-300 leading-relaxed">
+            اختبر الاتصال بمنظومة ETA للتأكد إن بيانات الربط صحيحة قبل إصدار أول فاتورة.
+          </p>
+
+          {testResult && (
+            <div className={cn(
+              'rounded-md px-4 py-3 text-sm flex items-start gap-2',
+              testResult.ok
+                ? 'bg-success-500/10 border border-success-500/30 text-success-200'
+                : 'bg-danger-500/10 border border-danger-500/30 text-danger-200',
+            )}>
+              {testResult.ok ? <Check className="w-4 h-4 mt-0.5 shrink-0" /> : <XCircle className="w-4 h-4 mt-0.5 shrink-0" />}
+              <span>{testResult.message}</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <Button onClick={() => runTest()} loading={testing}>
+              <Sparkles className="w-4 h-4" />اختبار الاتصال
+            </Button>
+            <Button variant="ghost" onClick={() => setStep(2)}>تعديل البيانات</Button>
+          </div>
+
+          <div className="bg-gray-800/40 border border-gray-700 rounded-md px-4 py-3 text-xs text-gray-400 leading-relaxed">
+            بعد نجاح الاختبار، الفواتير الجديدة هتترسل تلقائياً لمصلحة الضرائب طول ما
+            الإرسال الإلكتروني مفعّل من فوق. مفيش خطوة إضافية مطلوبة.
+          </div>
+        </div>
+      )}
+    </div>
+  )
 }
 
 function EtaSettings() {
@@ -2105,8 +2400,19 @@ function EtaSettings() {
   const meta = data?.meta
 
   // Three states for the banner: opted-out, enabled-but-unconfigured, fully-set-up.
+  // "Fully set up" now requires both credentials AND issuer registration — both
+  // are prerequisites for the job to actually submit anything to ETA (see the
+  // missingCredentials / missingIssuer guards in eta-submission.job.ts).
   const etaEnabled = settings?.etaEnabled ?? true
-  const hasCredentials = !!(settings?.etaTaxpayerId && settings?.etaClientId && settings?.etaClientSecret)
+  const hasCredentials = !!(settings?.etaTaxpayerId && settings?.etaClientIdSet && settings?.etaClientSecretSet)
+  const hasIssuer = !!(
+    settings?.etaIssuerName &&
+    settings?.etaAddressGovernate &&
+    settings?.etaAddressRegionCity &&
+    settings?.etaAddressStreet &&
+    settings?.etaAddressBuilding
+  )
+  const fullySetUp = hasCredentials && hasIssuer
 
   return (
     <div className="flex flex-col gap-6">
@@ -2131,14 +2437,14 @@ function EtaSettings() {
           </label>
         </div>
 
-        {etaEnabled && !hasCredentials && (
+        {etaEnabled && !fullySetUp && (
           <div className="bg-warning-500/10 border border-warning-500/30 rounded-md px-4 py-3 text-sm text-warning-200">
             <p className="font-semibold mb-1">بانتظار إكمال إعداد ETA</p>
             <p className="text-warning-200/80 text-xs leading-relaxed">
-              متجرك مفعّل لإرسال الإيصالات الإلكترونية لكن لم يتم إدخال بيانات الاعتماد بعد
-              (رقم الممول، Client ID، Client Secret، الشهادة الرقمية). الفواتير الجديدة ستبقى
-              في حالة «بانتظار إعداد ETA» حتى تكتمل البيانات. تواصل مع الدعم لإكمال التسجيل بعد
-              التسجيل على بوابة ETA.
+              متجرك مفعّل لإرسال الإيصالات الإلكترونية، لكن الإعداد لسه ناقص.
+              {!hasIssuer && ' املأ بيانات الممول والعنوان في النموذج بالأسفل.'}
+              {!hasCredentials && ' بيانات الاعتماد المشفّرة (Client ID و Client Secret والشهادة الرقمية) لازم يدخلها فريق الدعم بعد تسجيلك على بوابة ETA.'}
+              {' '}الفواتير الجديدة هتفضل في حالة «بانتظار إعداد ETA» لحد ما البيانات تكمل.
             </p>
           </div>
         )}
@@ -2150,12 +2456,15 @@ function EtaSettings() {
           </div>
         )}
 
-        {etaEnabled && hasCredentials && (
+        {etaEnabled && fullySetUp && (
           <div className="bg-success-500/10 border border-success-500/30 rounded-md px-4 py-3 text-xs text-success-200 leading-relaxed">
             تم إعداد ETA — الفواتير تُرسَل تلقائياً إلى مصلحة الضرائب.
           </div>
         )}
       </div>
+
+      {/* Self-service setup wizard — issuer data, encrypted credentials, test. */}
+      {etaEnabled && <EtaSetupWizard settings={settings} />}
 
       <div className="flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-100">حالة إرسال الإيصالات الإلكترونية (ETA)</h3>
@@ -2256,7 +2565,7 @@ function PrintTemplateSettings() {
     const win = window.open('', '_blank', 'width=420,height=640')
     if (!win) return
     const preview = template
-      .replace('{{storeName}}', 'Storify')
+      .replace('{{storeName}}', 'حِسبة')
       .replace('{{invoiceNumber}}', 'INV-20260101-ABCDEF')
       .replace('{{date}}', formatDateTime(new Date()))
       .replace('{{customerName}}', 'عميل تجريبي')

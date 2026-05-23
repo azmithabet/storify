@@ -53,7 +53,7 @@ export default function AdminLogin() {
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-brand-600/20 mb-4">
             <ShieldCheck className="w-7 h-7 text-brand-400" />
           </div>
-          <h1 className="font-display text-3xl font-bold text-brand-400 mb-1">Storify Admin</h1>
+          <h1 className="font-display text-3xl font-bold text-brand-400 mb-1">حِسبة Admin</h1>
           <p className="text-gray-400 text-sm">لوحة إدارة المنصة</p>
         </div>
 
@@ -68,7 +68,7 @@ export default function AdminLogin() {
             <Input
               label="البريد الإلكتروني"
               type="email"
-              placeholder="owner@storify.com"
+              placeholder="owner@hesbaapp.com"
               autoComplete="email"
               error={errors.email?.message}
               {...register('email')}

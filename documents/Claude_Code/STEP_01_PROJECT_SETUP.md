@@ -24,7 +24,7 @@ npm install -g pnpm
 ## 2. إنشاء الـ Monorepo
 
 ```bash
-mkdir storify && cd storify
+mkdir hesba && cd hesba
 git init
 pnpm init
 ```
@@ -63,7 +63,7 @@ touch docker-compose.yml
 ## 4. شرح الـ Structure
 
 ```
-storify/
+hesba/
 │
 ├── apps/
 │   ├── api/                        ← Fastify Backend
@@ -157,7 +157,7 @@ coverage/
 # ================================================
 # DATABASE — Master DB (للـ tenants والـ plans)
 # ================================================
-DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/storify_master"
+DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/hesba_master"
 
 # ================================================
 # REDIS
@@ -211,7 +211,7 @@ pnpm init
 
 ```json
 {
-  "name": "@storify/api",
+  "name": "@hesba/api",
   "version": "1.0.0",
   "private": true,
   "scripts": {
@@ -390,11 +390,11 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: storify_postgres
+    container_name: hesba_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: storify_master
+      POSTGRES_DB: hesba_master
     ports:
       - '5432:5432'
     volumes:
@@ -407,7 +407,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: storify_redis
+    container_name: hesba_redis
     ports:
       - '6379:6379'
     volumes:
@@ -441,13 +441,13 @@ docker-compose ps
 
 ```json
 {
-  "name": "storify",
+  "name": "hesba",
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev:api": "pnpm --filter @storify/api dev",
-    "dev:web": "pnpm --filter @storify/web dev",
-    "build": "pnpm --filter @storify/api build && pnpm --filter @storify/web build",
+    "dev:api": "pnpm --filter @hesba/api dev",
+    "dev:web": "pnpm --filter @hesba/web dev",
+    "build": "pnpm --filter @hesba/api build && pnpm --filter @hesba/web build",
     "lint": "pnpm -r lint",
     "type-check": "pnpm -r type-check",
     "docker:up": "docker-compose up -d",

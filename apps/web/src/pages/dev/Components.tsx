@@ -20,7 +20,7 @@ const sampleData = [
 export default function ComponentsShowcase() {
   return (
     <div className="min-h-dvh bg-app p-8 flex flex-col gap-12 max-w-5xl mx-auto">
-      <h1 className="font-display text-4xl font-bold text-brand-400">مكتبة المكونات — Storify</h1>
+      <h1 className="font-display text-4xl font-bold text-brand-400">مكتبة المكونات — حِسبة</h1>
 
       {/* Buttons */}
       <section className="flex flex-col gap-4">
@@ -64,7 +64,7 @@ export default function ComponentsShowcase() {
         <div className="grid grid-cols-2 gap-4">
           <Input label="الاسم" placeholder="أدخل الاسم" />
           <Input label="مع خطأ" placeholder="أدخل القيمة" error="هذا الحقل مطلوب" />
-          <Input label="مع تلميح" placeholder="اسم المتجر" hint="my-store.storify.com" />
+          <Input label="مع تلميح" placeholder="اسم المتجر" hint="my-store.hesbaapp.com" />
           <Input label="معطّل" placeholder="لا يمكن التعديل" disabled />
         </div>
       </section>

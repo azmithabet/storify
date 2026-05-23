@@ -102,7 +102,7 @@ export default function DayClose() {
         @media print{body{padding:16px}}
       </style></head><body>
       <h1>تقرير إغلاق اليوم</h1>
-      <p style="color:#6b7280;font-size:12px">تاريخ: ${formatDate(date)} — Storify POS</p>
+      <p style="color:#6b7280;font-size:12px">تاريخ: ${formatDate(date)} — حِسبة POS</p>
       <h2>نقطة البيع (${data?.pos.count ?? 0} معاملة)</h2>
       <table><thead><tr><th>طريقة الدفع</th><th style="text-align:center">عدد</th><th style="text-align:left">الإجمالي</th></tr></thead>
       <tbody>${posRows}</tbody>

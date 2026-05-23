@@ -1,9 +1,9 @@
-# STORIFY — Complete Project Context for Claude Code
+# حِسبة — Complete Project Context for Claude Code
 > **هذا الملف يحتوي على كل شيء — لا تحتاج أي مصدر آخر**
 > اقرأ هذا الملف كاملاً قبل كتابة أي سطر كود
 > الإصدار: 1.2 | مايو 2026
 >
-> **⚠️ Read `Storify_Patch_Notes_v1.2.md` first** — it documents what changed since v1.1 and why. Do not implement v1.1 code that conflicts with v1.2 patches.
+> **⚠️ Read `Hesba_Patch_Notes_v1.2.md` first** — it documents what changed since v1.1 and why. Do not implement v1.1 code that conflicts with v1.2 patches.
 
 ---
 
@@ -37,35 +37,35 @@
 ## 📂 Claude_Code/ — ملفات التنفيذ
 | الملف | المحتوى | متى تستخدمه؟ |
 |---|---|---|
-| `STORIFY_COMPLETE_CONTEXT.md` | **هذا الملف** — كل التفاصيل التقنية | دائماً — المرجع الرئيسي |
+| `HESBA_COMPLETE_CONTEXT.md` | **هذا الملف** — كل التفاصيل التقنية | دائماً — المرجع الرئيسي |
 | `STEP_01_PROJECT_SETUP.md` | تفاصيل Step 01 (مكتمل) | مراجعة ما تم إنجازه |
 | `CLAUDE_CODE_STARTER_PROMPT.md` | Prompts جاهزة للـ Steps | نسخ prompt كل step |
-| `STORIFY_MASTER_DOCUMENT.md` | الـ Master document الكامل | مرجع شامل إضافي |
+| `HESBA_MASTER_DOCUMENT.md` | الـ Master document الكامل | مرجع شامل إضافي |
 
 ## 📂 Markdown/ — Documentation للقراءة والـ Context
 | الملف | المحتوى | متى تستخدمه؟ |
 |---|---|---|
-| `Storify_Business_Document.md` | وثيقة الأعمال — السوق، الباقات، الـ KPIs | فهم السياق التجاري |
-| `Storify_Logic_Flow_Document.md` | 13 flow كامل لكل العمليات | قبل تطوير أي module |
-| `Storify_ERD_Document.md` | ERD كامل بكل الجداول والعلاقات | مرجع DB إضافي |
-| `Storify_Technical_Architecture.md` | ADRs + Architecture decisions | فهم سبب كل قرار تقني |
-| `Storify_Design_System.md` | Design tokens + Components + RTL rules | تطوير الـ Frontend |
-| `Storify_Payment_Fees_Update.md` | تحديث نظام الـ Fees | تفاصيل إضافية عن الـ fees |
+| `Hesba_Business_Document.md` | وثيقة الأعمال — السوق، الباقات، الـ KPIs | فهم السياق التجاري |
+| `Hesba_Logic_Flow_Document.md` | 13 flow كامل لكل العمليات | قبل تطوير أي module |
+| `Hesba_ERD_Document.md` | ERD كامل بكل الجداول والعلاقات | مرجع DB إضافي |
+| `Hesba_Technical_Architecture.md` | ADRs + Architecture decisions | فهم سبب كل قرار تقني |
+| `Hesba_Design_System.md` | Design tokens + Components + RTL rules | تطوير الـ Frontend |
+| `Hesba_Payment_Fees_Update.md` | تحديث نظام الـ Fees | تفاصيل إضافية عن الـ fees |
 
 ## 📂 Interactive/ — للمراجعة البشرية
 | الملف | المحتوى |
 |---|---|
-| `Storify_Wireframes.html` | **افتح في المتصفح** — 17 شاشة تفاعلية كاملة |
-| `Storify_Design_System.html` | **افتح في المتصفح** — Design System تفاعلي |
+| `Hesba_Wireframes.html` | **افتح في المتصفح** — 17 شاشة تفاعلية كاملة |
+| `Hesba_Design_System.html` | **افتح في المتصفح** — Design System تفاعلي |
 
 ## 📂 PDFs/ — للطباعة والمشاركة
 ```
-Storify_Business_Document.pdf
-Storify_Logic_Flow_Document.pdf
-Storify_ERD_Document.pdf
-Storify_Technical_Architecture.pdf
-Storify_Design_System.pdf
-Storify_Payment_Fees_Update.pdf
+Hesba_Business_Document.pdf
+Hesba_Logic_Flow_Document.pdf
+Hesba_ERD_Document.pdf
+Hesba_Technical_Architecture.pdf
+Hesba_Design_System.pdf
+Hesba_Payment_Fees_Update.pdf
 ```
 
 ---
@@ -74,10 +74,10 @@ Storify_Payment_Fees_Update.pdf
 
 ### عند تطوير أي Module — اتبع هذا الترتيب:
 1. **Section 4** في هذا الملف → Database schema للـ module
-2. `Storify_Logic_Flow_Document.md` → الـ business flow الخاص بالـ module
+2. `Hesba_Logic_Flow_Document.md` → الـ business flow الخاص بالـ module
 3. **Section 10** في هذا الملف → Business logic rules
 4. **Section 11** في هذا الملف → API design standards
-5. `Storify_Design_System.md` → عند تطوير الـ Frontend
+5. `Hesba_Design_System.md` → عند تطوير الـ Frontend
 
 ### عند البدء في كل Step:
 ```
@@ -85,12 +85,12 @@ Step 02: هذا الملف Section 4 (Master DB) + Section 15 (Seed)
 Step 03: هذا الملف Section 5 (Multi-tenant)
 Step 04: هذا الملف Section 6 (Auth)
 Step 05: هذا الملف Section 4 (Tenant Schema — كل الجداول)
-Step 06: هذا الملف Section 4 + Storify_Logic_Flow_Document.md (Flow 6)
-Step 07: هذا الملف Section 7 (Fees) + Storify_Logic_Flow_Document.md (Flow 3,4,5)
-Step 08: هذا الملف Section 8 (Installments) + Storify_Logic_Flow_Document.md (Flow 4)
-Step 09: Storify_Logic_Flow_Document.md (Flows 9,10)
-Step 10: Storify_Logic_Flow_Document.md (Flow 11)
-Step 11+: Storify_Design_System.md + Interactive/Storify_Wireframes.html
+Step 06: هذا الملف Section 4 + Hesba_Logic_Flow_Document.md (Flow 6)
+Step 07: هذا الملف Section 7 (Fees) + Hesba_Logic_Flow_Document.md (Flow 3,4,5)
+Step 08: هذا الملف Section 8 (Installments) + Hesba_Logic_Flow_Document.md (Flow 4)
+Step 09: Hesba_Logic_Flow_Document.md (Flows 9,10)
+Step 10: Hesba_Logic_Flow_Document.md (Flow 11)
+Step 11+: Hesba_Design_System.md + Interactive/Hesba_Wireframes.html
 ```
 
 ---
@@ -99,8 +99,8 @@ Step 11+: Storify_Design_System.md + Interactive/Storify_Wireframes.html
 
 # 1. Project Overview
 
-## What is Storify?
-Storify is a **B2B SaaS platform** for retail store and inventory management, built for the **Arabic market (Egypt)**. It is a multi-tenant system where each customer (store owner) gets a completely isolated environment.
+## What is حِسبة?
+حِسبة is a **B2B SaaS platform** for retail store and inventory management, built for the **Arabic market (Egypt)**. It is a multi-tenant system where each customer (store owner) gets a completely isolated environment.
 
 ## Target Users
 - Retail stores (clothing, electronics, shoes, etc.)
@@ -258,7 +258,7 @@ if (contract.status === 'pending_approval') {
 
 # 4. Complete Database Schema
 
-## Master DB: `storify_master`
+## Master DB: `hesba_master`
 
 ### plans
 ```sql
@@ -938,7 +938,7 @@ INDEX idx_eta_status (status, submitted_at)
 
 ## How It Works
 ```
-Request: GET https://ahmed-store.storify.com/api/products
+Request: GET https://ahmed-store.hesbaapp.com/api/products
          ↓
 Tenant Middleware:
   1. Extract subdomain: "ahmed-store"
@@ -1285,7 +1285,7 @@ export async function resetPassword(
 }
 ```
 > **Rate limit:** 5 forgot-password requests per email per hour (Redis-backed).
-> **Email content:** raw token in URL — `https://{subdomain}.storify.com/reset?token={rawToken}`. Token TTL 1 hour, single-use.
+> **Email content:** raw token in URL — `https://{subdomain}.hesbaapp.com/reset?token={rawToken}`. Token TTL 1 hour, single-use.
 
 ## Auth Middleware
 ```typescript
@@ -1879,7 +1879,7 @@ interface PaginationMeta {
 
 ## Complete Structure
 ```
-storify/
+hesba/
 ├── .env                          ← Root env file
 ├── .env.example
 ├── .gitignore
@@ -1889,7 +1889,7 @@ storify/
 │
 ├── apps/
 │   ├── api/
-│   │   ├── package.json          ← @storify/api
+│   │   ├── package.json          ← @hesba/api
 │   │   ├── tsconfig.json
 │   │   └── src/
 │   │       ├── index.ts          ← App entry point
@@ -1939,7 +1939,7 @@ storify/
 │   │           └── fastify.d.ts  ← augment Request with tenant, tenantDb
 │   │
 │   └── web/
-│       ├── package.json          ← @storify/web
+│       ├── package.json          ← @hesba/web
 │       ├── vite.config.ts
 │       ├── tailwind.config.ts
 │       └── src/
@@ -1979,7 +1979,7 @@ storify/
 │
 ├── packages/
 │   ├── database/
-│   │   ├── package.json          ← @storify/database
+│   │   ├── package.json          ← @hesba/database
 │   │   ├── prisma/
 │   │   │   ├── schema.prisma     ← Master DB schema
 │   │   │   └── migrations/
@@ -1991,7 +1991,7 @@ storify/
 │   │           └── tenant.seed.ts ← tenant defaults seed
 │   │
 │   └── shared/
-│       ├── package.json          ← @storify/shared
+│       ├── package.json          ← @hesba/shared
 │       └── src/
 │           ├── types/            ← shared DTOs and response types
 │           ├── constants/        ← roles, status values, etc.
@@ -2005,16 +2005,16 @@ storify/
 ```json
 {
   "scripts": {
-    "dev:api": "pnpm --filter @storify/api dev",
-    "dev:web": "pnpm --filter @storify/web dev",
+    "dev:api": "pnpm --filter @hesba/api dev",
+    "dev:web": "pnpm --filter @hesba/web dev",
     "build": "pnpm -r build",
     "type-check": "pnpm -r type-check",
     "lint": "pnpm -r lint",
-    "db:generate": "pnpm --filter @storify/database db:generate",
-    "db:migrate": "pnpm --filter @storify/database db:migrate",
-    "db:seed": "pnpm --filter @storify/database db:seed",
-    "db:studio": "pnpm --filter @storify/database db:studio",
-    "db:reset": "pnpm --filter @storify/database db:reset",
+    "db:generate": "pnpm --filter @hesba/database db:generate",
+    "db:migrate": "pnpm --filter @hesba/database db:migrate",
+    "db:seed": "pnpm --filter @hesba/database db:seed",
+    "db:studio": "pnpm --filter @hesba/database db:studio",
+    "db:reset": "pnpm --filter @hesba/database db:reset",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down"
   }
@@ -2028,14 +2028,14 @@ storify/
 ## Environment Variables (.env)
 ```env
 # Database
-DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/storify_master"
+DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/hesba_master"
 
 # Redis
 REDIS_URL="redis://localhost:6379"
 
 # JWT (minimum 32 chars each)
-JWT_ACCESS_SECRET="storify-access-secret-change-this-in-prod-32+"
-JWT_REFRESH_SECRET="storify-refresh-secret-change-this-in-prod-32+"
+JWT_ACCESS_SECRET="hesba-access-secret-change-this-in-prod-32+"
+JWT_REFRESH_SECRET="hesba-refresh-secret-change-this-in-prod-32+"
 JWT_ACCESS_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="7d"
 
@@ -2049,7 +2049,7 @@ FRONTEND_URL="http://localhost:5173"
 R2_ACCOUNT_ID=""
 R2_ACCESS_KEY_ID=""
 R2_SECRET_ACCESS_KEY=""
-R2_BUCKET_NAME="storify-uploads"
+R2_BUCKET_NAME="hesba-uploads"
 R2_PUBLIC_URL=""
 
 # Paymob (SaaS billing) — v1.2
@@ -2061,7 +2061,7 @@ PAYMOB_IFRAME_ID=""                  # checkout iframe
 PAYMOB_BASE_URL="https://accept.paymob.com/api"
 
 # ETA (Egyptian Tax Authority) — v1.2
-# These are Storify platform-level credentials; tenant-specific creds live in tenant_settings
+# These are حِسبة platform-level credentials; tenant-specific creds live in tenant_settings
 ETA_PREPROD_BASE_URL="https://api.preprod.invoicing.eta.gov.eg"
 ETA_PROD_BASE_URL="https://api.invoicing.eta.gov.eg"
 ETA_ENCRYPTION_KEY=""                # AES-256 key to encrypt tenant_settings.eta_client_secret at rest
@@ -2076,11 +2076,11 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: storify_postgres
+    container_name: hesba_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: storify_master
+      POSTGRES_DB: hesba_master
     ports:
       - '5432:5432'
     volumes:
@@ -2093,7 +2093,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: storify_redis
+    container_name: hesba_redis
     ports:
       - '6379:6379'
     volumes:
@@ -2221,7 +2221,7 @@ Project setup, monorepo, Docker, TypeScript, folder structure.
 2. Write `schema.prisma` for: plans, tenants, subscriptions
 3. Run migration: `init_master_schema`
 4. Seed 3 default plans
-5. Connect `@storify/api` to `@storify/database`
+5. Connect `@hesba/api` to `@hesba/database`
 6. Verify: `GET /health` and `GET /plans`
 
 ## Step 03 — Tenant Provisioning
@@ -2317,7 +2317,7 @@ Project setup, monorepo, Docker, TypeScript, folder structure.
 - Switch to production only after preprod passes 100 sample invoices
 
 ## Step 09b — Paymob SaaS Billing  ← NEW v1.2 (~1 week)
-**Task:** Tenants pay for their Storify subscription via Paymob.
+**Task:** Tenants pay for their حِسبة subscription via Paymob.
 
 ### Prerequisites
 - Paymob merchant account (production)
@@ -2405,7 +2405,7 @@ Step 11+ ⏳ NOT STARTED — Frontend
 9. Create `src/index.ts` to export types
 10. Create `src/seeds/master.seed.ts` with 3 plans (exact data in Section 15)
 11. Run `pnpm db:seed` and verify 3 plans in DB
-12. Add `@storify/database: workspace:*` to `apps/api/package.json`
+12. Add `@hesba/database: workspace:*` to `apps/api/package.json`
 13. Run `pnpm install` from root
 14. Update `apps/api/src/index.ts` to add:
     - `GET /health` → `{ status: 'ok', timestamp }`
@@ -2424,5 +2424,5 @@ Then immediately start Step 03 without waiting.
 
 ---
 
-*STORIFY COMPLETE CONTEXT v1.1 — أبريل 2026*
+*حِسبة COMPLETE CONTEXT v1.1 — أبريل 2026*
 *This file contains EVERYTHING — no other source needed*

@@ -17,13 +17,13 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
       <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">عزيزنا ${name},</p>
       ${body}
       <hr style="border:none;border-top:1px solid #e5e7eb;margin:28px 0"/>
-      <p style="font-size:11px;color:#9ca3af;margin:0;text-align:center">Storify — منصة إدارة المبيعات</p>
+      <p style="font-size:11px;color:#9ca3af;margin:0;text-align:center">حِسبة — منصة إدارة المبيعات</p>
     </div>`
 
   switch (template) {
     case 'payment_succeeded':
       return {
-        subject: 'تم الدفع بنجاح — Storify',
+        subject: 'تم الدفع بنجاح — حِسبة',
         html: wrap('تم تجديد اشتراكك بنجاح ✓', `
           <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px;margin:20px 0">
             <div style="display:flex;justify-content:space-between;margin-bottom:8px">
@@ -35,12 +35,12 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
               <strong style="font-family:monospace;color:#111">${data.period ?? ''}</strong>
             </div>
           </div>
-          <p style="font-size:14px;color:#374151;margin:0">شكراً لثقتكم بـ Storify.</p>`),
+          <p style="font-size:14px;color:#374151;margin:0">شكراً لثقتكم بـ حِسبة.</p>`),
       }
 
     case 'payment_failed':
       return {
-        subject: 'فشل الدفع — Storify',
+        subject: 'فشل الدفع — حِسبة',
         html: wrap('فشلت عملية الدفع', `
           <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:16px;margin:20px 0">
             <p style="margin:0;color:#dc2626;font-size:14px;font-weight:600">تعذّر تجديد اشتراككم تلقائياً.</p>
@@ -52,7 +52,7 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
 
     case 'subscription_suspended':
       return {
-        subject: 'تم تعليق اشتراكك — Storify',
+        subject: 'تم تعليق اشتراكك — حِسبة',
         html: wrap('تم تعليق حسابك مؤقتاً', `
           <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:20px 0">
             <p style="margin:0;color:#c2410c;font-size:14px;font-weight:600">تعذّرت محاولات الدفع المتعددة.</p>
@@ -64,10 +64,10 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
 
     case 'subscription_cancelled':
       return {
-        subject: 'تم إلغاء اشتراكك — Storify',
+        subject: 'تم إلغاء اشتراكك — حِسبة',
         html: wrap('تم إلغاء اشتراكك', `
           <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
-            نأسف لإبلاغكم بأن اشتراككم في Storify قد تم إلغاؤه بسبب تكرار فشل الدفع.
+            نأسف لإبلاغكم بأن اشتراككم في حِسبة قد تم إلغاؤه بسبب تكرار فشل الدفع.
           </p>
           <p style="font-size:14px;line-height:1.7;color:#374151;margin:0">
             لإعادة تفعيل الخدمة يرجى التواصل مع فريق الدعم.
@@ -76,10 +76,10 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
 
     case 'trial_expired':
       return {
-        subject: 'انتهت فترة تجربتك — Storify',
+        subject: 'انتهت فترة تجربتك — حِسبة',
         html: wrap('انتهت فترة التجربة المجانية', `
           <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
-            نشكركم على تجربة Storify. لقد انتهت فترة التجربة المجانية البالغة 14 يومًا.
+            نشكركم على تجربة حِسبة. لقد انتهت فترة التجربة المجانية البالغة 14 يومًا.
           </p>
           <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
             لمتابعة الاستخدام يرجى اختيار خطة اشتراك وإتمام الدفع.
@@ -92,7 +92,7 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
 
     case 'trial_ending_soon':
       return {
-        subject: `تنتهي فترة تجربتك خلال ${data.daysRemaining ?? ''} ${data.daysRemaining === '1' ? 'يوم' : 'أيام'} — Storify`,
+        subject: `تنتهي فترة تجربتك خلال ${data.daysRemaining ?? ''} ${data.daysRemaining === '1' ? 'يوم' : 'أيام'} — حِسبة`,
         html: wrap('فترة تجربتك تقترب من الانتهاء', `
           <div style="background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:16px;margin:20px 0">
             <p style="margin:0;color:#c2410c;font-size:14px;font-weight:600">
@@ -110,11 +110,11 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
 
     case 'subscription_cancellation_scheduled':
       return {
-        subject: 'تم جدولة إلغاء اشتراكك — Storify',
+        subject: 'تم جدولة إلغاء اشتراكك — حِسبة',
         html: wrap('تم استلام طلب الإلغاء', `
           <p style="font-size:14px;line-height:1.7;color:#374151;margin:0 0 16px">
             سيتم إلغاء اشتراككم في نهاية الفترة الحالية بتاريخ <strong>${data.periodEnd ?? ''}</strong>.
-            ستستمرون في استخدام Storify بشكل طبيعي حتى ذلك التاريخ.
+            ستستمرون في استخدام حِسبة بشكل طبيعي حتى ذلك التاريخ.
           </p>
           <p style="font-size:14px;line-height:1.7;color:#374151;margin:0">
             إذا غيّرتم رأيكم، يمكنكم إيقاف الإلغاء من إعدادات الاشتراك في أي وقت قبل تاريخ الانتهاء.
@@ -123,7 +123,7 @@ function billingEmailHtml(template: string, data: Record<string, string>): { sub
 
     default:
       return {
-        subject: `Storify — ${template}`,
+        subject: `حِسبة — ${template}`,
         html: `<pre dir="ltr" style="font-size:12px;font-family:monospace">${JSON.stringify(data, null, 2)}</pre>`,
       }
   }
@@ -140,7 +140,7 @@ export async function sendEmail({ to, template, data }: {
   const { Resend } = await import('resend')
   const resend = new Resend(config.RESEND_API_KEY)
   await resend.emails.send({
-    from: config.EMAIL_FROM ?? 'noreply@storify.app',
+    from: config.EMAIL_FROM ?? 'noreply@hesbaapp.com',
     to,
     subject,
     html,
@@ -186,7 +186,7 @@ function buildReceiptHtml(invoice: InvoiceReceiptData): string {
       <div style="display:flex;justify-content:space-between;align-items:flex-start">
         <div>
           <h1 style="font-size:22px;font-weight:700;margin:0 0 4px">فاتورة ضريبية</h1>
-          <p style="color:#6b7280;font-size:12px;margin:0">Storify POS</p>
+          <p style="color:#6b7280;font-size:12px;margin:0">حِسبة POS</p>
         </div>
         <div style="text-align:left">
           <p style="font-size:18px;font-weight:700;font-family:monospace;margin:0">${invoice.invoiceNumber}</p>
@@ -215,7 +215,7 @@ function buildReceiptHtml(invoice: InvoiceReceiptData): string {
         ${fee > 0 ? `<div style="display:flex;justify-content:space-between;width:280px;font-size:13px"><span>رسوم الدفع</span><span>${fmtMoney(fee)}</span></div>` : ''}
         <div style="display:flex;justify-content:space-between;width:280px;font-size:16px;font-weight:700;border-top:2px solid #111;padding-top:8px;margin-top:4px"><span>الإجمالي</span><span>${fmtMoney(invoice.totalAmount)} ج</span></div>
       </div>
-      <p style="margin-top:32px;text-align:center;font-size:11px;color:#9ca3af">شكراً لتعاملكم معنا — Storify</p>
+      <p style="margin-top:32px;text-align:center;font-size:11px;color:#9ca3af">شكراً لتعاملكم معنا — حِسبة</p>
     </div>
   `
 }
@@ -226,7 +226,7 @@ function buildReceiptHtml(invoice: InvoiceReceiptData): string {
  * safe in CI and local dev.
  */
 export async function sendInvoiceReceiptEmail({ to, invoice }: { to: string; invoice: InvoiceReceiptData }) {
-  const subject = `فاتورة ${invoice.invoiceNumber} — Storify`
+  const subject = `فاتورة ${invoice.invoiceNumber} — حِسبة`
 
   if (!config.RESEND_API_KEY) {
     console.log(`[DEV] Invoice receipt for ${invoice.invoiceNumber} → ${to}`)
@@ -236,7 +236,7 @@ export async function sendInvoiceReceiptEmail({ to, invoice }: { to: string; inv
   const { Resend } = await import('resend')
   const resend = new Resend(config.RESEND_API_KEY)
   await resend.emails.send({
-    from: config.EMAIL_FROM ?? 'noreply@storify.app',
+    from: config.EMAIL_FROM ?? 'noreply@hesbaapp.com',
     to,
     subject,
     html: buildReceiptHtml(invoice),
@@ -260,8 +260,8 @@ interface InstallmentReminderData {
  */
 export async function sendInstallmentReminderEmail(data: InstallmentReminderData) {
   const subject = data.isOverdue
-    ? `قسط متأخر — Storify`
-    : `تذكير بقسط مستحق — Storify`
+    ? `قسط متأخر — حِسبة`
+    : `تذكير بقسط مستحق — حِسبة`
 
   if (!config.RESEND_API_KEY) {
     console.log(`[DEV] Installment reminder #${data.installmentNumber} → ${data.to}`, data)
@@ -295,14 +295,14 @@ export async function sendInstallmentReminderEmail(data: InstallmentReminderData
           <strong style="color:${tone.accent};font-size:13px">${tone.label}</strong>
         </div>
       </div>
-      <p style="margin:16px 0 0;font-size:12px;color:#9ca3af">شكراً لتعاملكم معنا — ${data.storeName ?? 'Storify'}</p>
+      <p style="margin:16px 0 0;font-size:12px;color:#9ca3af">شكراً لتعاملكم معنا — ${data.storeName ?? 'حِسبة'}</p>
     </div>
   `
 
   const { Resend } = await import('resend')
   const resend = new Resend(config.RESEND_API_KEY)
   await resend.emails.send({
-    from: config.EMAIL_FROM ?? 'noreply@storify.app',
+    from: config.EMAIL_FROM ?? 'noreply@hesbaapp.com',
     to: data.to,
     subject,
     html,
@@ -325,9 +325,9 @@ export async function sendPasswordResetEmail({ to, rawToken, subdomain }: SendPa
   const resend = new Resend(config.RESEND_API_KEY)
 
   await resend.emails.send({
-    from: config.EMAIL_FROM ?? 'noreply@storify.app',
+    from: config.EMAIL_FROM ?? 'noreply@hesbaapp.com',
     to,
-    subject: 'إعادة تعيين كلمة المرور — Storify',
+    subject: 'إعادة تعيين كلمة المرور — حِسبة',
     html: `
       <div dir="rtl" style="font-family:sans-serif;max-width:480px;margin:auto">
         <h2>إعادة تعيين كلمة المرور</h2>

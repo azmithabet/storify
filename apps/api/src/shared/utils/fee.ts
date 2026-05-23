@@ -1,4 +1,4 @@
-import type { PaymentMethod } from '@storify/database'
+import type { PaymentMethod } from '@hesba/database'
 import { Decimal, toDecimal, roundMoney, ZERO } from './decimal'
 
 export interface FeeResult {

@@ -53,7 +53,7 @@ export function printReceipt(inv: ReceiptInvoice): void {
     .total td{font-weight:bold;font-size:14px;border-top:1px dashed #000;padding-top:6px}
     @media print{@page{margin:4mm;size:80mm auto}}
   </style></head><body>
-    <div class="center"><h2>Storify</h2><p style="font-size:11px">نقطة البيع</p></div>
+    <div class="center"><h2>حِسبة</h2><p style="font-size:11px">نقطة البيع</p></div>
     <div class="dashed"></div>
     <p>رقم الفاتورة: <b>${inv.invoiceNumber}</b></p>
     <p>التاريخ: ${formatDateTime(inv.createdAt)}</p>
@@ -122,7 +122,7 @@ export function printInvoice(inv: InvoiceForPrint): void {
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
       <div>
         <h1>فاتورة ضريبية</h1>
-        <p style="color:#6b7280;font-size:12px">Storify POS</p>
+        <p style="color:#6b7280;font-size:12px">حِسبة POS</p>
       </div>
       <div style="text-align:left">
         <p style="font-size:18px;font-weight:700;font-family:'IBM Plex Mono',monospace">${inv.invoiceNumber}</p>
@@ -148,7 +148,7 @@ export function printInvoice(inv: InvoiceForPrint): void {
       ${Number(inv.feeAmount) > 0 ? `<div class="totals-row"><span>رسوم الدفع</span><span>${fmt2(Number(inv.feeAmount))}</span></div>` : ''}
       <div class="totals-row total"><span>الإجمالي</span><span>${fmt2(Number(inv.totalAmount))} ج</span></div>
     </div>
-    <div class="footer"><p>شكراً لتعاملكم معنا — تم الإنشاء بواسطة Storify</p></div>
+    <div class="footer"><p>شكراً لتعاملكم معنا — تم الإنشاء بواسطة حِسبة</p></div>
   </body></html>`
 
   openPrintWindow(html, 800, 1000, 300)
@@ -226,7 +226,7 @@ export function printPurchaseOrder(po: PurchaseOrderForPrint, statusLabel: strin
     .footer{margin-top:40px;display:flex;justify-content:space-between}
     @media print{@page{margin:15mm;size:A4}}
   </style></head><body>
-    <h1>Storify — أمر شراء</h1>
+    <h1>حِسبة — أمر شراء</h1>
     <h2>رقم الأمر: <strong>${poRef}</strong> | الحالة: ${statusLabel}</h2>
     <div class="grid">
       <div><span>المورد</span>${po.supplier?.name ?? '—'}</div>
@@ -300,7 +300,7 @@ export function printWorkOrderReceipt(wo: WorkOrderReceiptData): void {
     <div class="header">
       <h1>إيصال خدمة — ${wo.ticketNumber}</h1>
       ${wo.invoiceNumber ? `<p style="font-size:12px;color:#6b7280">فاتورة رقم: ${wo.invoiceNumber}</p>` : ''}
-      <p style="font-size:12px;color:#6b7280">التاريخ: ${formatDate(wo.createdAt)} — Storify Services</p>
+      <p style="font-size:12px;color:#6b7280">التاريخ: ${formatDate(wo.createdAt)} — حِسبة Services</p>
     </div>
 
     <div class="meta">

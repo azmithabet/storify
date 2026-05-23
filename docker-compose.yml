@@ -3,11 +3,11 @@ version: '3.9'
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: storify_postgres
+    container_name: hesba_postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
-      POSTGRES_DB: storify_master
+      POSTGRES_DB: hesba_master
     ports:
       - '5432:5432'
     volumes:
@@ -20,7 +20,7 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: storify_redis
+    container_name: hesba_redis
     ports:
       - '6379:6379'
     volumes:

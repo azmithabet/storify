@@ -1,4 +1,4 @@
-# Storify — Claude Code Starter Prompt
+# حِسبة — Claude Code Starter Prompt
 
 > انسخ الـ prompt ده وابعته لـ Claude Code في أول session
 
@@ -7,11 +7,11 @@
 ## الـ Prompt الكامل
 
 ```
-You are a senior full-stack engineer working on "Storify" — a multi-tenant SaaS 
+You are a senior full-stack engineer working on "حِسبة" — a multi-tenant SaaS 
 system for retail store and inventory management, built for the Arabic market.
 
 ## Project Overview
-Storify is a B2B SaaS platform where each customer (tenant) gets their own isolated 
+حِسبة is a B2B SaaS platform where each customer (tenant) gets their own isolated 
 PostgreSQL schema. The system manages: POS sales, inventory, installment contracts, 
 suppliers, expenses, and reports.
 
@@ -47,7 +47,7 @@ suppliers, expenses, and reports.
 7. **RTL/Arabic:** UI is Arabic RTL. dir="rtl" on html. Numbers are LTR inline.
 
 ## Database Architecture
-### Master DB (storify_master)
+### Master DB (hesba_master)
 Tables: plans, tenants, subscriptions
 
 ### Tenant Schema (tenant_{slug})  
@@ -123,7 +123,7 @@ Complete Step 02:
 2. Create prisma/schema.prisma for Master DB (plans, tenants, subscriptions)
 3. Run first migration: init_master_schema
 4. Create seed file with 3 default plans (Starter 199/mo, Professional 499/mo, Enterprise 999/mo)
-5. Connect @storify/api to @storify/database package
+5. Connect @hesba/api to @hesba/database package
 6. Add GET /plans and GET /health endpoints to verify everything works
 
 Follow the exact schema defined above. Use cuid() for IDs in Master DB.
@@ -197,7 +197,7 @@ Test all auth flows including token expiry and refresh.
 ### 1. لو Claude Code طلب توضيح
 قوله:
 ```
-Follow the Storify architecture exactly as specified in the prompt. 
+Follow the حِسبة architecture exactly as specified in the prompt. 
 Use the exact table names, field names, and patterns defined above.
 Do not deviate from the specified tech stack.
 ```
@@ -205,7 +205,7 @@ Do not deviate from the specified tech stack.
 ### 2. لو في error في الـ Migration
 قوله:
 ```
-Check the PostgreSQL connection and ensure storify_master database exists.
+Check the PostgreSQL connection and ensure hesba_master database exists.
 Run: docker-compose up -d
 Then retry the migration.
 ```
@@ -250,10 +250,10 @@ Give me a full status report:
 ## ملف .env المطلوب قبل البداية
 
 ```env
-DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/storify_master"
+DATABASE_MASTER_URL="postgresql://postgres:password@localhost:5432/hesba_master"
 REDIS_URL="redis://localhost:6379"
-JWT_ACCESS_SECRET="storify-access-secret-min-32-chars-here"
-JWT_REFRESH_SECRET="storify-refresh-secret-min-32-chars-here"
+JWT_ACCESS_SECRET="hesba-access-secret-min-32-chars-here"
+JWT_REFRESH_SECRET="hesba-refresh-secret-min-32-chars-here"
 JWT_ACCESS_EXPIRES_IN="15m"
 JWT_REFRESH_EXPIRES_IN="7d"
 NODE_ENV="development"
@@ -278,4 +278,4 @@ docker-compose ps
 
 ---
 
-*Storify — Claude Code Starter Guide v1.0 — أبريل 2026*
+*حِسبة — Claude Code Starter Guide v1.0 — أبريل 2026*

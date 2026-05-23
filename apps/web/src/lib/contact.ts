@@ -22,6 +22,6 @@ export function whatsappLink(message?: string): string {
 export const SALES_MESSAGES = {
   enterprise:
     'مرحبًا، أنا مهتم بباقة Enterprise لمتجر/سلسلة متاجر. ممكن نتكلم عن التفاصيل والأسعار؟',
-  general: 'مرحبًا، عندي سؤال عن Storify.',
-  demo: 'مرحبًا، حابب أشوف عرض تجريبي لـ Storify.',
+  general: 'مرحبًا، عندي سؤال عن حِسبة.',
+  demo: 'مرحبًا، حابب أشوف عرض تجريبي لحِسبة.',
 } as const

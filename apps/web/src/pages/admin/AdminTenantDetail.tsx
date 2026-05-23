@@ -183,7 +183,7 @@ export default function AdminTenantDetail() {
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <Badge variant={statusVariant[data.status]} dot>{statusLabel[data.status]}</Badge>
             <Badge variant="brand">{data.plan.name}</Badge>
-            <span className="text-xs text-gray-500" dir="ltr">{data.subdomain}.storify</span>
+            <span className="text-xs text-gray-500" dir="ltr">{data.subdomain}.hesbaapp.com</span>
           </div>
         </div>
         <div className="flex gap-2">

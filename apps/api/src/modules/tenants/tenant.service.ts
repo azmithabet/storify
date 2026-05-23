@@ -1,6 +1,6 @@
 import { masterDb } from '../../config/database'
 import { getTenantDb } from '../../config/database'
-import { runTenantMigrations } from '@storify/database'
+import { runTenantMigrations } from '@hesba/database'
 import { hashPassword } from '../../shared/utils/password'
 import { startTrial } from '../billing/billing.service'
 import type { RegisterTenantInput } from './tenant.schema'

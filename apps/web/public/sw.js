@@ -1,6 +1,7 @@
 // Bump CACHE on every shell change. The activate handler nukes any cache
-// whose name doesn't match — so v3 wipes the older entries.
-const CACHE = 'storify-shell-v3'
+// whose name doesn't match — so v4 wipes the older entries (including the
+// pre-rebrand storify-shell-v3 cache).
+const CACHE = 'hesba-shell-v4'
 const SHELL_URL = '/'
 
 self.addEventListener('install', (e) => {

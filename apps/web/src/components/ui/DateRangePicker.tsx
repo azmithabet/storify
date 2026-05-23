@@ -166,7 +166,7 @@ export function DateRangePicker({
             dir="rtl"
             numberOfMonths={1}
             weekStartsOn={6}
-            className="rdp-storify"
+            className="rdp-hesba"
           />
         </div>
       )}

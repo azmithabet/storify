@@ -1,4 +1,4 @@
-# Storify — Documentation Patch Notes v1.2
+# حِسبة — Documentation Patch Notes v1.2
 > Pre-implementation patches applied to the spec before any code is written
 > **Date:** 2026-05-10
 > **Reason:** Resolve cross-document inconsistencies + close critical gaps surfaced during deep review
@@ -16,29 +16,29 @@ Every change below has been applied in-place to the affected docs. This file is 
 ## A. Inconsistencies Resolved
 
 ### A1. Tenant identifier field naming
-**Decision:** `subdomain` + `schema_name` (matches `STORIFY_MASTER_DOCUMENT.md` and `.trae/phase1-mvp.md`).
+**Decision:** `subdomain` + `schema_name` (matches `HESBA_MASTER_DOCUMENT.md` and `.trae/phase1-mvp.md`).
 
-| Old (in `STORIFY_COMPLETE_CONTEXT.md`) | New (canonical) |
+| Old (in `HESBA_COMPLETE_CONTEXT.md`) | New (canonical) |
 |---|---|
 | `tenants.slug` | `tenants.subdomain` |
 | `tenants.db_name` | `tenants.schema_name` |
 | `tenants.db_url` | (removed — connection string is derived) |
 
-**Files updated:** `STORIFY_COMPLETE_CONTEXT.md` (Sections 4, 5).
+**Files updated:** `HESBA_COMPLETE_CONTEXT.md` (Sections 4, 5).
 
 ### A2. `invoices.payment_type` deprecated
 **Decision:** Use `invoices.payment_method_id UUID FK→payment_methods` (v1.1 model).
 
 The string field `payment_type VARCHAR(50)` in the v1.0 master doc has been replaced. There is no migration path because no code exists yet.
 
-**Files updated:** `STORIFY_MASTER_DOCUMENT.md` (Section 4 invoices table).
+**Files updated:** `HESBA_MASTER_DOCUMENT.md` (Section 4 invoices table).
 
 ### A3. Starter plan `max_users`
-**Decision:** `3` (matches business doc, master doc, and the `Storify_Business_Document.md` plans table).
+**Decision:** `3` (matches business doc, master doc, and the `Hesba_Business_Document.md` plans table).
 
-The `2` in `STORIFY_COMPLETE_CONTEXT.md` Section 15 was a typo.
+The `2` in `HESBA_COMPLETE_CONTEXT.md` Section 15 was a typo.
 
-**Files updated:** `STORIFY_COMPLETE_CONTEXT.md` (Section 15 seed data).
+**Files updated:** `HESBA_COMPLETE_CONTEXT.md` (Section 15 seed data).
 
 ---
 
@@ -67,14 +67,14 @@ export async function verifyPassword(password: string, stored: string): Promise<
 
 `users.password_hash` field stays `TEXT` (bcrypt hashes are 60 chars).
 
-**Files updated:** `STORIFY_COMPLETE_CONTEXT.md` (Section 6), `STORIFY_MASTER_DOCUMENT.md` (Step 03 password.ts + Step 01 package.json deps).
+**Files updated:** `HESBA_COMPLETE_CONTEXT.md` (Section 6), `HESBA_MASTER_DOCUMENT.md` (Step 03 password.ts + Step 01 package.json deps).
 
 ### B2. `decimal.js` dependency added
 **Reason:** All financial calculation snippets reference `decimal.js` but it was missing from `apps/api/package.json`.
 
 **Dependency added:** `decimal.js ^10.4.3`.
 
-**Files updated:** `STORIFY_MASTER_DOCUMENT.md` (Step 01 package.json).
+**Files updated:** `HESBA_MASTER_DOCUMENT.md` (Step 01 package.json).
 
 ### B3. Stock check moved inside transaction
 **Reason:** The original invoice flow validated stock BEFORE the transaction. Two cashiers selling the last unit simultaneously both pass validation, both transactions succeed, stock goes negative.
@@ -100,7 +100,7 @@ for (const item of data.items) {
 }
 ```
 
-**Files updated:** `STORIFY_COMPLETE_CONTEXT.md` (Section 10).
+**Files updated:** `HESBA_COMPLETE_CONTEXT.md` (Section 10).
 
 ### B4. Connection pool eviction for tenant clients
 **Reason:** `getTenantDb()` cached PrismaClients in a `Map` forever. With 100 tenants × 10 connections each = 1000 connections; PostgreSQL default `max_connections = 100`.
@@ -118,7 +118,7 @@ const tenantClients = new LRUCache<string, PrismaClient>({
 
 **Dependency added:** `lru-cache ^10.2.0`.
 
-**Files updated:** `STORIFY_COMPLETE_CONTEXT.md` (Section 5), `STORIFY_MASTER_DOCUMENT.md` (Step 03 + package.json).
+**Files updated:** `HESBA_COMPLETE_CONTEXT.md` (Section 5), `HESBA_MASTER_DOCUMENT.md` (Step 03 + package.json).
 
 ### B5. Tenant schema versioning + migration runner
 **Reason:** When you add a column to the tenant schema in month 6, you have N tenants whose schemas are stale. The original docs said "run migrations" without specifying how.
@@ -129,7 +129,7 @@ const tenantClients = new LRUCache<string, PrismaClient>({
 
 Migration files live in `packages/database/migrations/tenant/` numbered `001_init.sql`, `002_add_variants.sql`, etc. Each is a plain SQL file run via `client.$executeRawUnsafe()` against the tenant schema.
 
-**Files updated:** `STORIFY_COMPLETE_CONTEXT.md` (Section 5).
+**Files updated:** `HESBA_COMPLETE_CONTEXT.md` (Section 5).
 
 ---
 
@@ -223,7 +223,7 @@ These were identified during gap analysis but explicitly deferred. They appear h
 
 ### D1. Egyptian e-invoicing (ETA) — ✅ NOW IN PHASE 1 SCOPE (Option C)
 **Status:** Confirmed for Phase 1 — full integration.
-**Schema additions:** see `tenant_settings` (ETA config block), `invoices` (ETA tracking fields), and new `eta_submissions` table — documented in `STORIFY_COMPLETE_CONTEXT.md` Section 4.
+**Schema additions:** see `tenant_settings` (ETA config block), `invoices` (ETA tracking fields), and new `eta_submissions` table — documented in `HESBA_COMPLETE_CONTEXT.md` Section 4.
 **Implementation step:** new Step 09a — ETA Integration (~3 weeks).
 **Timeline impact:** Phase 1 extends from 3 months to ~4 months.
 **Required externally before coding starts:**
@@ -247,7 +247,7 @@ Phase 1 invoices will not be linked to a shift. Adding `invoices.shift_id` later
 
 ### D4. SaaS billing — ✅ NOW IN PHASE 1 SCOPE (Paymob)
 **Status:** Confirmed — Paymob integration in Phase 1.
-**Master DB additions:** `subscriptions.provider/provider_subscription_id/provider_customer_id/last_payment_at/next_billing_at/failed_attempts`, new `payment_attempts` table — documented in `STORIFY_COMPLETE_CONTEXT.md` Section 4.
+**Master DB additions:** `subscriptions.provider/provider_subscription_id/provider_customer_id/last_payment_at/next_billing_at/failed_attempts`, new `payment_attempts` table — documented in `HESBA_COMPLETE_CONTEXT.md` Section 4.
 **Implementation step:** new Step 09b — Paymob Integration (~1 week).
 **Dunning flow:** day 0 fail → 1 attempt; day 3 retry; day 7 retry → PAST_DUE; day 14 retry → SUSPENDED; day 44 → CANCELLED + 30d data retention.
 **Required externally before coding starts:**
@@ -269,12 +269,12 @@ Phase 1 invoices will not be linked to a shift. Adding `invoices.shift_id` later
 
 | File | Type of changes |
 |---|---|
-| `documents/Claude_Code/STORIFY_COMPLETE_CONTEXT.md` | Field renames, schema additions, code corrections |
-| `documents/Claude_Code/STORIFY_MASTER_DOCUMENT.md` | package.json deps, password.ts, invoices schema |
-| `documents/Markdown/Storify_ERD_Document.md` | New v1.2 section with new tables |
-| `documents/Markdown/Storify_Patch_Notes_v1.2.md` | This file (new) |
+| `documents/Claude_Code/HESBA_COMPLETE_CONTEXT.md` | Field renames, schema additions, code corrections |
+| `documents/Claude_Code/HESBA_MASTER_DOCUMENT.md` | package.json deps, password.ts, invoices schema |
+| `documents/Markdown/Hesba_ERD_Document.md` | New v1.2 section with new tables |
+| `documents/Markdown/Hesba_Patch_Notes_v1.2.md` | This file (new) |
 
-`Storify_Logic_Flow_Document.md`, `Storify_Technical_Architecture.md`, `Storify_Business_Document.md`, `Storify_Design_System.md`, `Storify_Payment_Fees_Update.md` — left untouched. They reference business outcomes, not specific field names, so the patches above don't invalidate them.
+`Hesba_Logic_Flow_Document.md`, `Hesba_Technical_Architecture.md`, `Hesba_Business_Document.md`, `Hesba_Design_System.md`, `Hesba_Payment_Fees_Update.md` — left untouched. They reference business outcomes, not specific field names, so the patches above don't invalidate them.
 
 ---
 

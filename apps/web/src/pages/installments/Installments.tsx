@@ -540,7 +540,7 @@ function printContract(c: InstallmentContract) {
       @media print{body{padding:16px}}
     </style></head><body>
     <div style="display:flex;justify-content:space-between;align-items:flex-start">
-      <div><h1>عقد بيع بالتقسيط</h1><p style="color:#6b7280;font-size:12px">Storify POS</p></div>
+      <div><h1>عقد بيع بالتقسيط</h1><p style="color:#6b7280;font-size:12px">حِسبة POS</p></div>
       <div style="text-align:left">
         <p style="font-size:16px;font-weight:700;font-family:'IBM Plex Mono',monospace">${c.contractNumber}</p>
         <p style="font-size:12px;color:#6b7280">${formatDate(new Date())}</p>
@@ -565,7 +565,7 @@ function printContract(c: InstallmentContract) {
       <div class="sig-box">توقيع العميل: ${c.customer?.fullName ?? ''}</div>
       <div class="sig-box">توقيع البائع</div>
     </div>
-    <div class="footer"><p>تم الإنشاء بواسطة Storify — هذا العقد ملزم قانونياً</p></div>
+    <div class="footer"><p>تم الإنشاء بواسطة حِسبة — هذا العقد ملزم قانونياً</p></div>
   </body></html>`
 
   const win = window.open('', '_blank', 'width=800,height=1100')

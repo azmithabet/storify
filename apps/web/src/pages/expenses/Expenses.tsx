@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input, Select, Pagination, BulkActionBar } from '@/components/ui'
+import { Table, Money, Badge, SkeletonTable, Button, Drawer, Modal, Input, Select, Pagination, BulkActionBar, ConfirmDialog } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import { useAuthStore } from '@/stores/auth.store'
@@ -166,6 +166,7 @@ function BudgetPanel({ categories }: { categories: Category[] }) {
   const qc = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Budget | null>(null)
+  const [deletingBudget, setDeletingBudget] = useState<Budget | null>(null)
 
   const { data: budgets = [], isLoading } = useQuery<Budget[]>({
     queryKey: ['expense-budgets'],
@@ -221,7 +222,7 @@ function BudgetPanel({ categories }: { categories: Category[] }) {
                         <Edit2 className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={() => { if (confirm(`حذف ميزانية ${b.category.name}؟`)) deleteBudget(b.id) }}
+                        onClick={() => setDeletingBudget(b)}
                         className="text-gray-500 hover:text-danger-400 transition-colors p-1"
                         aria-label="حذف"
                       >
@@ -252,6 +253,14 @@ function BudgetPanel({ categories }: { categories: Category[] }) {
         )}
       </div>
       <BudgetUpsertModal open={modalOpen} onClose={() => setModalOpen(false)} categories={categories} existing={editing} />
+      <ConfirmDialog
+        open={!!deletingBudget}
+        title="حذف الميزانية"
+        message={`حذف ميزانية ${deletingBudget?.category.name ?? ''}؟`}
+        confirmLabel="حذف"
+        onConfirm={() => { if (deletingBudget) deleteBudget(deletingBudget.id); setDeletingBudget(null) }}
+        onCancel={() => setDeletingBudget(null)}
+      />
     </div>
   )
 }
@@ -352,6 +361,7 @@ function TemplatesPanel({ categories }: { categories: Category[] }) {
   const qc = useQueryClient()
   const [drawerOpen, setDrawerOpen] = useState(false)
   const [editing, setEditing] = useState<ExpenseTemplate | null>(null)
+  const [deletingTemplate, setDeletingTemplate] = useState<ExpenseTemplate | null>(null)
 
   const { data: templates = [], isLoading } = useQuery<ExpenseTemplate[]>({
     queryKey: ['expense-templates'],
@@ -410,7 +420,7 @@ function TemplatesPanel({ categories }: { categories: Category[] }) {
                         <Edit2 className="w-3 h-3" />
                       </button>
                       <button
-                        onClick={() => { if (confirm(`حذف القالب "${t.name}"؟`)) deleteTemplate(t.id) }}
+                        onClick={() => setDeletingTemplate(t)}
                         className="text-gray-500 hover:text-danger-400 transition-colors p-1"
                         aria-label="حذف"
                         title="حذف"
@@ -438,6 +448,14 @@ function TemplatesPanel({ categories }: { categories: Category[] }) {
         )}
       </div>
       <TemplateUpsertDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} categories={categories} existing={editing} />
+      <ConfirmDialog
+        open={!!deletingTemplate}
+        title="حذف القالب"
+        message={`حذف القالب "${deletingTemplate?.name ?? ''}"؟`}
+        confirmLabel="حذف"
+        onConfirm={() => { if (deletingTemplate) deleteTemplate(deletingTemplate.id); setDeletingTemplate(null) }}
+        onCancel={() => setDeletingTemplate(null)}
+      />
     </div>
   )
 }
@@ -459,9 +477,9 @@ export default function Expenses() {
 
   const selection = useSelection(data.map((e) => e.id))
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = data.filter((e) => selection.isSelected(e.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'الوصف', accessor: 'description', width: 32 },

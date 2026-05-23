@@ -622,9 +622,9 @@ export default function Installments() {
 
   const selection = useSelection(data.map((c) => c.id))
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = data.filter((c) => selection.isSelected(c.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'رقم العقد', accessor: 'contractNumber', width: 20 },

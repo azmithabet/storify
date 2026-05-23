@@ -295,9 +295,9 @@ export default function PurchaseOrders() {
 
   const selection = useSelection(data.map((p) => p.id))
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = data.filter((p) => selection.isSelected(p.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'رقم الأمر', accessor: (p) => p.id.slice(0, 8).toUpperCase(), width: 18 },

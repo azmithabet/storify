@@ -429,9 +429,9 @@ function MovementsTab() {
 
   const selection = useSelection(items.map((m) => m.id))
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = items.filter((m) => selection.isSelected(m.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'المنتج', accessor: (m) => m.variant.product.name, width: 28 },

@@ -14,7 +14,7 @@ import { track } from '@/lib/analytics'
 
 const schema = z.object({
   email: z.string().email('بريد إلكتروني غير صالح'),
-  password: z.string().min(6, 'كلمة المرور يجب أن تكون 6 أحرف على الأقل'),
+  password: z.string().min(8, 'كلمة المرور يجب أن تكون 8 أحرف على الأقل'),
   subdomain: z.string().min(1, 'مطلوب'),
 })
 
@@ -24,7 +24,7 @@ export default function Login() {
   const [showPwd, setShowPwd] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
-  const { setAuth } = useAuthStore()
+  const { setAuth, tenantSubdomain } = useAuthStore()
   const requestedFrom = (location.state as { from?: { pathname: string } })?.from?.pathname
 
   /**
@@ -47,7 +47,10 @@ export default function Login() {
     register,
     handleSubmit,
     formState: { errors },
-  } = useForm<FormData>({ resolver: zodResolver(schema) })
+  } = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { subdomain: tenantSubdomain ?? '' },
+  })
 
   const { mutate, isPending, error } = useMutation({
     mutationFn: async (data: FormData) => {
@@ -90,6 +93,7 @@ export default function Login() {
           )}
 
           <form onSubmit={handleSubmit((d) => mutate(d))} className="flex flex-col gap-5">
+            <fieldset disabled={isPending} className="contents">
             <Input
               label="اسم المتجر (Subdomain)"
               placeholder="my-store"
@@ -136,6 +140,7 @@ export default function Login() {
             <Button type="submit" loading={isPending} size="lg" className="w-full">
               تسجيل الدخول
             </Button>
+            </fieldset>
           </form>
 
           <p className="text-center text-sm text-gray-500 mt-6">

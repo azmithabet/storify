@@ -13,7 +13,9 @@ const ForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'))
 const ResetPassword = lazy(() => import('@/pages/auth/ResetPassword'))
 const Register = lazy(() => import('@/pages/auth/Register'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
-const ComponentsShowcase = lazy(() => import('@/pages/dev/Components'))
+const ComponentsShowcase = import.meta.env.DEV
+  ? lazy(() => import('@/pages/dev/Components'))
+  : lazy(() => Promise.resolve({ default: () => null }))
 
 // Lazy-load all protected pages (stubs for now)
 const POS = lazy(() => import('@/pages/pos/POS'))
@@ -71,8 +73,10 @@ export default function App() {
           <Route path="/reset-password" element={<GuestGuard><ResetPassword /></GuestGuard>} />
           <Route path="/register" element={<GuestGuard><Register /></GuestGuard>} />
 
-          {/* Dev route (no auth required in dev) */}
-          <Route path="/dev/components" element={<ComponentsShowcase />} />
+          {/* Dev route — only registered in dev builds, never shipped to prod */}
+          {import.meta.env.DEV && (
+            <Route path="/dev/components" element={<ComponentsShowcase />} />
+          )}
 
           {/* Public marketing landing — visible to everyone */}
           <Route path="/" element={<Landing />} />

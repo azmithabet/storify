@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useMemo } from 'react'
+import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { DayPicker, type DateRange } from 'react-day-picker'
 import {
   format, parseISO, isValid,
@@ -112,7 +112,7 @@ export function DateRangePicker({
   const activePresets = customPresets ?? defaultPresets
 
   return (
-    <div className={cn('relative inline-block', className)}>
+    <div className={cn('relative inline-flex items-center', className)}>
       <button
         ref={triggerRef}
         type="button"
@@ -120,23 +120,25 @@ export function DateRangePicker({
         className={cn(
           'flex items-center gap-2 bg-gray-700 border border-gray-600 rounded text-gray-100 focus:outline-none focus:border-brand-500 transition-colors',
           compact ? 'px-2 py-1 text-xs' : 'px-3 py-2.5 text-sm min-h-[44px]',
+          (value.from || value.to) ? (compact ? 'rounded-e-none' : 'rounded-e-none') : '',
         )}
       >
         <CalendarIcon className={compact ? 'w-3 h-3' : 'w-4 h-4'} />
         <span className="font-mono whitespace-nowrap">{display}</span>
-        {(value.from || value.to) && (
-          <span
-            role="button"
-            tabIndex={0}
-            aria-label="مسح الفترة"
-            onClick={clear}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') clear(e as unknown as React.MouseEvent) }}
-            className="text-gray-500 hover:text-gray-300 cursor-pointer"
-          >
-            <X className={compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
-          </span>
-        )}
       </button>
+      {(value.from || value.to) && (
+        <button
+          type="button"
+          aria-label="مسح الفترة"
+          onClick={clear}
+          className={cn(
+            'flex items-center justify-center bg-gray-700 border border-s-0 border-gray-600 rounded-e text-gray-500 hover:text-gray-300 hover:bg-gray-600 transition-colors focus:outline-none focus:border-brand-500',
+            compact ? 'px-1.5 py-1 h-full' : 'px-2 min-h-[44px]',
+          )}
+        >
+          <X className={compact ? 'w-3 h-3' : 'w-3.5 h-3.5'} />
+        </button>
+      )}
 
       {open && (
         <div

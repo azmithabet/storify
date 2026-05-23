@@ -6,7 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import App from './App'
 import './styles/globals.css'
 
-if ('serviceWorker' in navigator) {
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch(() => {})
   })
@@ -34,7 +34,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
       >
         <App />
         <Toaster
-          position="bottom-left"
+          position="bottom-right"
           toastOptions={{
             style: {
               background: '#1E293B',

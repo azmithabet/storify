@@ -322,10 +322,14 @@ export default function POS() {
         items: cart.map((i) => ({ variantId: i.variantId, quantity: i.quantity, unitPrice: i.unitPrice })),
       }
       if (!navigator.onLine) {
-        const queue = JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]')
-        queue.push(payload)
-        localStorage.setItem('pos_offline_queue', JSON.stringify(queue))
-        setOfflineQueue(queue)
+        try {
+          const queue = JSON.parse(localStorage.getItem('pos_offline_queue') ?? '[]')
+          queue.push(payload)
+          localStorage.setItem('pos_offline_queue', JSON.stringify(queue))
+          setOfflineQueue(queue)
+        } catch {
+          // localStorage unavailable (private browsing quota exceeded) — queue lost but sale proceeds
+        }
         return { id: 'offline', invoiceNumber: `OFFLINE-${Date.now()}`, totalAmount: 0, feeAmount: 0 }
       }
       const res = await api.post<{ data: { id: string; invoiceNumber: string; totalAmount: number; feeAmount: number } }>('/invoices', payload)

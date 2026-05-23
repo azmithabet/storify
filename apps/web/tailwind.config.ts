@@ -107,6 +107,7 @@ const config: Config = {
       },
       animation: {
         'fade-in': 'fadeIn 300ms ease both',
+        'fade-in-up': 'fadeInUp 250ms ease both',
         shimmer: 'shimmer 1500ms infinite',
         'spin-slow': 'spin 1000ms linear infinite',
       },
@@ -114,6 +115,10 @@ const config: Config = {
         fadeIn: {
           '0%': { opacity: '0' },
           '100%': { opacity: '1' },
+        },
+        fadeInUp: {
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
         },
         shimmer: {
           '0%': { backgroundPosition: '-200% 0' },

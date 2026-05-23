@@ -57,9 +57,19 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma clients
+        run: pnpm db:generate
+        env:
+          DATABASE_MASTER_URL: postgresql://postgres:password@localhost:5432/hesba_master
+
       # Lint must pass — `|| true` previously silenced this gate, which meant
       # nothing automated could catch a regression once tests aren't required.
-      - run: pnpm lint
+      - name: Lint API
+        run: pnpm --filter @hesba/api lint
+
+      - name: Lint Web
+        run: pnpm --filter @hesba/web lint
 
   test:
     name: Test (API)

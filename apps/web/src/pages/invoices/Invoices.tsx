@@ -190,9 +190,9 @@ export default function Invoices() {
 
   const selection = useSelection(invoices.map((i) => i.id))
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = invoices.filter((i) => selection.isSelected(i.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'رقم الفاتورة', accessor: 'invoiceNumber', width: 18 },

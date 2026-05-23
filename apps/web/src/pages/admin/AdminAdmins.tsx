@@ -36,14 +36,15 @@ export default function AdminAdmins() {
   const { admin: currentAdmin, isOwner } = useAdminAuthStore()
   const [creating, setCreating] = useState(false)
 
-  if (!isOwner()) return <Navigate to="/admin" replace />
-
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'admins'],
     queryFn: async () => {
       const res = await adminApi.get<{ success: true; data: AdminRow[] }>('/admins')
       return res.data.data
     },
+    // Query disabled for non-owners — the early return below ensures we never
+    // actually render the data, but we must call the hook unconditionally.
+    enabled: isOwner(),
   })
 
   const toggleMutation = useMutation({
@@ -56,6 +57,8 @@ export default function AdminAdmins() {
     },
     onError: (err) => toast.error(getApiErrorMessage(err)),
   })
+
+  if (!isOwner()) return <Navigate to="/admin" replace />
 
   return (
     <AdminShell title="المسؤولون">

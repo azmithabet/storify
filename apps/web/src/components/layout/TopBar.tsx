@@ -47,6 +47,9 @@ function NotificationPanel({ onClose }: { onClose: () => void }) {
   return (
     <div
       ref={ref}
+      id="notification-panel"
+      role="dialog"
+      aria-label="الإشعارات"
       className="absolute left-0 top-full mt-2 w-80 bg-gray-800 border border-gray-700 rounded-r-xl shadow-2xl z-50 overflow-hidden"
     >
       <div className="px-4 py-3 border-b border-gray-700">
@@ -119,7 +122,8 @@ export function TopBar({ title, onMenuClick }: { title?: string; onMenuClick?: (
           )}
           aria-label="الإشعارات"
           aria-expanded={open}
-          aria-haspopup="true"
+          aria-haspopup="dialog"
+          aria-controls={open ? 'notification-panel' : undefined}
         >
           <Bell className="w-4 h-4" />
           {totalAlerts > 0 && (

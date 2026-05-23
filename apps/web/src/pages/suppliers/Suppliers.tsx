@@ -323,9 +323,9 @@ export default function Suppliers() {
 
   const selection = useSelection(suppliers.map((s) => s.id))
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = suppliers.filter((s) => selection.isSelected(s.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'الاسم', accessor: 'name', width: 28 },

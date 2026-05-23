@@ -63,7 +63,7 @@ export function Table<T>({
               <th
                 key={col.key}
                 className={cn(
-                  'text-right px-4 py-3 text-xs uppercase tracking-wider text-gray-500 font-medium',
+                  'text-end px-4 py-3 text-xs uppercase tracking-wider text-gray-500 font-medium',
                   col.headerClassName,
                 )}
               >
@@ -86,10 +86,13 @@ export function Table<T>({
                 <tr
                   key={keyExtractor(row)}
                   onClick={() => onRowClick?.(row)}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  role={onRowClick ? 'button' : undefined}
+                  onKeyDown={onRowClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onRowClick(row) } } : undefined}
                   className={cn(
                     'border-b border-gray-700/50 transition-colors duration-fast',
                     isSelected ? 'bg-brand-500/10' : 'bg-gray-800 hover:bg-gray-700/50',
-                    onRowClick && 'cursor-pointer',
+                    onRowClick && 'cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-500',
                   )}
                 >
                   {selection && (

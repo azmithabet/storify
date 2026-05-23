@@ -387,7 +387,7 @@ export default function Reports() {
               <Button
                 variant="ghost" size="sm"
                 disabled={!installSummary}
-                onClick={() => installSummary && exportRowsToExcel(
+                onClick={() => void (installSummary && exportRowsToExcel(
                   [
                     { label: 'عقود نشطة', value: installSummary.active },
                     { label: 'متأخرة', value: installSummary.overdue },
@@ -401,7 +401,7 @@ export default function Reports() {
                   ],
                   'installments-summary.xlsx',
                   'الأقساط',
-                )}
+                ))}
               >
                 <Download className="w-3 h-3" />تصدير Excel
               </Button>
@@ -520,7 +520,7 @@ export default function Reports() {
               <Button
                 variant="ghost" size="sm"
                 disabled={!feesData || feesData.byPaymentMethod.length === 0}
-                onClick={() => feesData && exportRowsToExcel(
+                onClick={() => void (feesData && exportRowsToExcel(
                   feesData.byPaymentMethod,
                   [
                     { header: 'طريقة الدفع', accessor: (r) => r.paymentMethod.name ?? '—', width: 24 },
@@ -530,7 +530,7 @@ export default function Reports() {
                   ],
                   'fees-report.xlsx',
                   'رسوم الدفع',
-                )}
+                ))}
               >
                 <Download className="w-3 h-3" />تصدير Excel
               </Button>
@@ -600,7 +600,7 @@ export default function Reports() {
               <Button
                 variant="ghost" size="sm"
                 disabled={!topData || topData.length === 0}
-                onClick={() => topData && exportRowsToExcel(
+                onClick={() => void (topData && exportRowsToExcel(
                   topData,
                   [
                     { header: 'المنتج', accessor: 'productName', width: 32 },
@@ -610,7 +610,7 @@ export default function Reports() {
                   ],
                   'top-products.xlsx',
                   'أكثر المنتجات مبيعاً',
-                )}
+                ))}
               >
                 <Download className="w-3 h-3" />تصدير Excel
               </Button>
@@ -652,7 +652,7 @@ export default function Reports() {
               <Button
                 variant="ghost" size="sm"
                 disabled={!returnsData || returnsData.topReasons.length === 0}
-                onClick={() => returnsData && exportRowsToExcel(
+                onClick={() => void (returnsData && exportRowsToExcel(
                   returnsData.topReasons,
                   [
                     { header: 'السبب', accessor: 'reason', width: 40 },
@@ -661,7 +661,7 @@ export default function Reports() {
                   ],
                   'return-reasons.xlsx',
                   'أسباب الإرجاع',
-                )}
+                ))}
               >
                 <Download className="w-3 h-3" />تصدير الأسباب
               </Button>

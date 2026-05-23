@@ -2,7 +2,7 @@
   "name": "حِسبة POS",
   "short_name": "حِسبة",
   "description": "نقطة بيع حِسبة",
-  "start_url": "/pos",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#111827",
   "theme_color": "#6366f1",

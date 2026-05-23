@@ -101,7 +101,8 @@ export default function Register() {
           )}
 
           <form onSubmit={handleSubmit((d) => mutate(d))} className="flex flex-col gap-5">
-            <div className="grid grid-cols-2 gap-4">
+            <fieldset disabled={isPending} className="contents">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="اسم المتجر"
                 placeholder="متجري الإلكتروني"
@@ -132,7 +133,7 @@ export default function Register() {
               ))}
             </Select>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label="اسمك"
                 placeholder="محمد أحمد"
@@ -172,6 +173,7 @@ export default function Register() {
             <Button type="submit" loading={isPending} size="lg" className="w-full">
               إنشاء المتجر
             </Button>
+            </fieldset>
           </form>
 
           <p className="text-center text-sm text-gray-500 mt-6">

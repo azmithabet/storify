@@ -43,7 +43,7 @@ const tooltipLabelStyle = { color: chartTheme.axisText, marginBottom: 4 }
 const tooltipItemStyle = { color: chartTheme.tooltipText }
 const axisProps = {
   stroke: chartTheme.axisLine,
-  tick: { fill: chartTheme.axisText, fontSize: 11, fontFamily: 'JetBrains Mono' },
+  tick: { fill: chartTheme.axisText, fontSize: 11, fontFamily: 'IBM Plex Mono' },
   tickLine: false,
 }
 
@@ -67,7 +67,7 @@ export function ChartCard({ title, subtitle, height = 280, children, actions }: 
           {actions}
         </div>
       )}
-      <div style={{ width: '100%', height }}>{children}</div>
+      <div role="img" aria-label={title ?? 'رسم بياني'} style={{ width: '100%', height }}>{children}</div>
     </div>
   )
 }
@@ -298,7 +298,7 @@ export function DonutChartView({
             <text
               x="50%" y="50%" textAnchor="middle" dominantBaseline="middle"
               fill={chartTheme.tooltipText}
-              style={{ fontSize: 18, fontWeight: 700, fontFamily: 'JetBrains Mono' }}
+              style={{ fontSize: 18, fontWeight: 700, fontFamily: 'IBM Plex Mono' }}
             >{centerValue}</text>
           </>
         )}

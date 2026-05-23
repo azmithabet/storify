@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx'
 import { downloadBlob } from './download'
 
 export interface ExportColumn<T> {
@@ -16,19 +15,14 @@ function getValue<T>(row: T, accessor: ExportColumn<T>['accessor']) {
   return v as string | number | boolean | null | undefined
 }
 
-/**
- * Export tabular data to an .xlsx file purely client-side.
- *
- * Use this when there's no backend export endpoint for the table being viewed,
- * or as a fallback if the backend export fails. For large datasets (>10k rows),
- * prefer a server-side endpoint to keep memory usage in check.
- */
-export function exportRowsToExcel<T>(
+export async function exportRowsToExcel<T>(
   rows: T[],
   columns: ExportColumn<T>[],
   filename: string,
   sheetName = 'Sheet1',
 ) {
+  const XLSX = await import('xlsx')
+
   const aoa: (string | number | boolean | null)[][] = [
     columns.map((c) => c.header),
     ...rows.map((row) => columns.map((c) => {

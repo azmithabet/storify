@@ -7,7 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer, Pagination, Modal, Alert, DateRangePicker, Select } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Pagination, Modal, Alert, DateRangePicker, Select, ConfirmDialog } from '@/components/ui'
 import { api } from '@/api/client'
 import { cn } from '@/lib/cn'
 import type { PaginationMeta } from '@/types/api'
@@ -353,6 +353,7 @@ function BillingSettings() {
     enabled: !!status,
   })
   const [upgradeOpen, setUpgradeOpen] = useState(false)
+  const [cancelConfirm, setCancelConfirm] = useState(false)
 
   const { mutate: cancelSub, isPending: cancelling } = useMutation({
     mutationFn: () => api.post('/billing/cancel'),
@@ -455,16 +456,20 @@ function BillingSettings() {
           <Button
             variant="secondary"
             loading={cancelling}
-            onClick={() => {
-              if (window.confirm('سيستمر الاشتراك حتى نهاية الفترة الحالية ثم يُلغى. هل تريد المتابعة؟')) {
-                cancelSub()
-              }
-            }}
+            onClick={() => setCancelConfirm(true)}
           >
             <XCircle className="w-4 h-4" />
             إلغاء الاشتراك
           </Button>
         )}
+        <ConfirmDialog
+          open={cancelConfirm}
+          title="إلغاء الاشتراك"
+          message="سيستمر الاشتراك حتى نهاية الفترة الحالية ثم يُلغى. هل تريد المتابعة؟"
+          confirmLabel="تأكيد الإلغاء"
+          onConfirm={() => { setCancelConfirm(false); cancelSub() }}
+          onCancel={() => setCancelConfirm(false)}
+        />
       </div>
 
       <div>
@@ -1541,7 +1546,7 @@ function AuditLogSettings() {
       }
       const truncated = collected.length >= EXPORT_CAP && totalPages > p - 1
 
-      exportRowsToExcel(
+      await exportRowsToExcel(
         collected,
         [
           { header: 'التاريخ', accessor: (l) => formatDateTime(l.createdAt), width: 22 },

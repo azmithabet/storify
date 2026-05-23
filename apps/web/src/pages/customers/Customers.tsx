@@ -364,9 +364,9 @@ export default function Customers() {
 
   const selection = useSelection(customers.map((c) => c.id))
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = customers.filter((c) => selection.isSelected(c.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'الاسم', accessor: 'fullName', width: 28 },

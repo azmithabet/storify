@@ -6,7 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
 import { AppShell } from '@/components/layout/AppShell'
-import { Button, Input, Badge, Table, Drawer, Modal, Money, SkeletonTable, Pagination, BulkActionBar, Select } from '@/components/ui'
+import { Button, Input, Badge, Table, Drawer, Modal, Money, SkeletonTable, Pagination, BulkActionBar, Select, ConfirmDialog } from '@/components/ui'
 import { api } from '@/api/client'
 import { getApiErrorMessage } from '@/lib/api-error'
 import type { PaginationMeta } from '@/types/api'
@@ -104,6 +104,7 @@ export default function Products() {
   const [detailProduct, setDetailProduct] = useState<Product | null>(null)
   const [importResult, setImportResult] = useState<{ created: number; skipped: number; errors: { row: number; reason: string }[] } | null>(null)
   const [labelCopies, setLabelCopies] = useState(1)
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const importMutation = useMutation({
@@ -154,9 +155,9 @@ export default function Products() {
     onError: (e) => toast.error(getApiErrorMessage(e, 'فشل الحذف الجماعي')),
   })
 
-  const bulkExport = () => {
+  const bulkExport = async () => {
     const selected = products.filter((p) => selection.isSelected(p.id))
-    exportRowsToExcel(
+    await exportRowsToExcel(
       selected,
       [
         { header: 'الاسم', accessor: 'name', width: 28 },
@@ -349,15 +350,19 @@ export default function Products() {
         <Button
           variant="danger" size="sm"
           loading={bulkDelete.isPending}
-          onClick={() => {
-            if (confirm(`هل تريد حذف ${selection.count} منتج؟ لا يمكن التراجع.`)) {
-              bulkDelete.mutate(selection.ids)
-            }
-          }}
+          onClick={() => setBulkDeleteConfirm(true)}
         >
           <Trash2 className="w-4 h-4" />حذف
         </Button>
       </BulkActionBar>
+      <ConfirmDialog
+        open={bulkDeleteConfirm}
+        title="تأكيد الحذف"
+        message={`هل تريد حذف ${selection.count} منتج؟ لا يمكن التراجع.`}
+        confirmLabel="حذف"
+        onConfirm={() => { setBulkDeleteConfirm(false); bulkDelete.mutate(selection.ids) }}
+        onCancel={() => setBulkDeleteConfirm(false)}
+      />
     </AppShell>
   )
 }

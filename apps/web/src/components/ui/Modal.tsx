@@ -27,14 +27,19 @@ export function Modal({ open, onClose, title, children, footer, size = 'md', cla
   const panelRef = useRef<HTMLDivElement>(null)
   const prevFocusRef = useRef<HTMLElement | null>(null)
 
-  // Save caller focus → move into modal → restore on close
+  // Save caller focus → move into modal → restore on close; lock body scroll while open
   useEffect(() => {
     if (!open) return
     prevFocusRef.current = document.activeElement as HTMLElement
     const panel = panelRef.current
     const first = panel?.querySelector<HTMLElement>(FOCUSABLE)
     ;(first ?? panel)?.focus()
-    return () => { prevFocusRef.current?.focus() }
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      prevFocusRef.current?.focus()
+      document.body.style.overflow = original
+    }
   }, [open])
 
   // Escape + Tab trap (combined so a single removeEventListener cleans both)

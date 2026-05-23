@@ -19,14 +19,32 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
   const panelRef = useRef<HTMLDivElement>(null)
   const prevFocusRef = useRef<HTMLElement | null>(null)
 
-  // Save caller focus → move into drawer → restore on close
+  // Manage inert imperatively — React 18 doesn't support the `inert` prop.
+  // This keeps closed drawers out of the tab order and hidden from AT without
+  // putting aria-hidden on a role="dialog" element (which conflicts with aria-modal).
+  useEffect(() => {
+    const panel = panelRef.current
+    if (!panel) return
+    if (open) {
+      panel.removeAttribute('inert')
+    } else {
+      panel.setAttribute('inert', '')
+    }
+  }, [open])
+
+  // Save caller focus → move into drawer → restore on close; lock body scroll while open
   useEffect(() => {
     if (!open) return
     prevFocusRef.current = document.activeElement as HTMLElement
     const panel = panelRef.current
     const first = panel?.querySelector<HTMLElement>(FOCUSABLE)
     ;(first ?? panel)?.focus()
-    return () => { prevFocusRef.current?.focus() }
+    const original = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+    return () => {
+      prevFocusRef.current?.focus()
+      document.body.style.overflow = original
+    }
   }, [open])
 
   // Escape + Tab trap
@@ -81,7 +99,6 @@ export function Drawer({ open, onClose, title, children, width = 'w-96', footer 
         role="dialog"
         aria-modal="true"
         aria-labelledby={title ? titleId : undefined}
-        aria-hidden={!open}
       >
         {title && (
           // shrink-0 so the header is pinned even when content overflows.

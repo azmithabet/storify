@@ -71,6 +71,17 @@ COPY --from=builder /app/apps/api/dist ./apps/api/dist
 # Built frontend (served statically by the API in production)
 COPY --from=builder /app/apps/web/dist ./apps/web/dist
 
+# Run as an unprivileged user (least privilege — shrinks RCE blast radius).
+# node_modules stays root-owned and world-readable; the runtime server writes
+# nothing locally, and startup tooling (pnpm/prisma/tsx) only needs a writable
+# HOME plus a scratch cache dir.
+RUN addgroup -g 1001 -S nodejs \
+ && adduser -S nodejs -u 1001 -G nodejs -h /home/nodejs \
+ && mkdir -p /home/nodejs /app/node_modules/.cache \
+ && chown -R nodejs:nodejs /home/nodejs /app/node_modules/.cache
+USER nodejs
+ENV HOME=/home/nodejs
+
 ENV NODE_ENV=production
 EXPOSE 3000
 

@@ -172,6 +172,23 @@ export async function createInvoice(
   const today = new Date()
   today.setHours(0, 0, 0, 0)
 
+  // Batch-load active product discounts for every product in the cart in ONE
+  // query (previously a findFirst ran per line item — an N+1 on the POS hot
+  // path). Keep the first active discount per product to mirror findFirst.
+  const productIds = [...new Set(variants.map((v) => v.productId))]
+  const activeDiscounts = await db.productDiscount.findMany({
+    where: {
+      productId: { in: productIds },
+      isActive: true,
+      startDate: { lte: today },
+      endDate: { gte: today },
+    },
+  })
+  const discountByProduct = new Map<string, (typeof activeDiscounts)[number]>()
+  for (const d of activeDiscounts) {
+    if (!discountByProduct.has(d.productId)) discountByProduct.set(d.productId, d)
+  }
+
   let subtotal = ZERO
   let taxTotal = ZERO
 
@@ -189,15 +206,8 @@ export async function createInvoice(
     const variant = variantMap.get(item.variantId)!
     const unitPrice = toDecimal(item.unitPrice)
 
-    // Check for active product discount
-    const productDiscount = await db.productDiscount.findFirst({
-      where: {
-        productId: variant.productId,
-        isActive: true,
-        startDate: { lte: today },
-        endDate: { gte: today },
-      },
-    })
+    // Active product discount (pre-loaded above — no per-item query).
+    const productDiscount = discountByProduct.get(variant.productId) ?? null
 
     let itemDiscount = ZERO
     if (productDiscount) {

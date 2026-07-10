@@ -35,6 +35,8 @@ export default function Login() {
    */
   function landingFor(user: AuthUser): string {
     const can = (r: string, a: string) => user.permissions?.[r]?.includes(a) ?? false
+    const onboardingKey = `hesba_onboarded_${user.id}`
+    if (!localStorage.getItem(onboardingKey)) return '/onboarding'
     if (can('invoices', 'create')) return '/pos'
     if (can('invoices', 'read')) return '/invoices'
     if (can('products', 'read')) return '/products'

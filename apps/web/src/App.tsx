@@ -13,7 +13,6 @@ const ForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'))
 const ResetPassword = lazy(() => import('@/pages/auth/ResetPassword'))
 const Register = lazy(() => import('@/pages/auth/Register'))
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
-const Onboarding = lazy(() => import('@/pages/Onboarding'))
 const ComponentsShowcase = import.meta.env.DEV
   ? lazy(() => import('@/pages/dev/Components'))
   : lazy(() => Promise.resolve({ default: () => null }))
@@ -85,7 +84,6 @@ export default function App() {
           {/* Protected routes — each wrapped in RoleGuard so unauthorized users
               see a friendly "forbidden" view rather than a half-loaded page
               with all empty data and 403s in the console. Super-admin bypasses. */}
-          <Route path="/onboarding" element={<AuthGuard><Onboarding /></AuthGuard>} />
           <Route path="/dashboard" element={<AuthGuard><Dashboard /></AuthGuard>} />
           <Route path="/pos" element={<AuthGuard><RoleGuard resource="invoices" action="create"><POS /></RoleGuard></AuthGuard>} />
           <Route path="/day-close" element={<AuthGuard><RoleGuard resource="reports" action="read"><DayClose /></RoleGuard></AuthGuard>} />

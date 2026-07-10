@@ -37,6 +37,8 @@ function cookieOpts(maxAge: number) {
     sameSite: 'lax' as const,
     path: '/',
     maxAge,
+    // Share the refresh cookie across all subdomains (*.hesbaapp.com)
+    ...(config.APP_BASE_DOMAIN ? { domain: `.${config.APP_BASE_DOMAIN}` } : {}),
   }
 }
 

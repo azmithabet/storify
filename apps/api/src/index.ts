@@ -159,6 +159,14 @@ app.get('/health', async (_req, reply) => {
   })
 })
 
+// Caddy on-demand TLS ask endpoint — returns 200 only for *.APP_BASE_DOMAIN
+app.get('/internal/check-tenant', async (req, reply) => {
+  const domain = (req.query as Record<string, string>).domain ?? ''
+  const base = config.APP_BASE_DOMAIN
+  if (base && domain.endsWith(`.${base}`)) return reply.status(200).send()
+  return reply.status(400).send()
+})
+
 // ─── API surface — CORS registered here so static assets bypass it ──────────
 app.register(async function apiContext(api) {
   await api.register(cors, {

@@ -1,8 +1,6 @@
 {
 	on_demand_tls {
 		ask http://app:3000/internal/check-tenant
-		interval 2m
-		burst 5
 	}
 }
 
